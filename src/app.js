@@ -4,38 +4,74 @@ const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
 require('dotenv').config();
 
-const healthRoutes = require('./routes/health');
+// ── Rutas ─────────────────────────────────────────────────────────────────────
+const healthRoutes      = require('./routes/health');
+const perfilRoutes      = require('./routes/perfil');
+const usuarioRoutes     = require('./routes/usuario');
+const clienteRoutes     = require('./routes/cliente');
+const fabricanteRoutes  = require('./routes/fabricante');
+const inventarioRoutes  = require('./routes/inventario');
+const camionRoutes      = require('./routes/camion');
+const servicioRoutes    = require('./routes/servicio');
+const solicitudRoutes   = require('./routes/solicitud');
+const cotizacionRoutes  = require('./routes/cotizacion');
+const presupuestoRoutes = require('./routes/presupuesto');
+const proyectoRoutes    = require('./routes/proyecto');
+const trabajoRoutes     = require('./routes/trabajo');
 
 const app = express();
 
-// Middleware
+// ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 
-// Swagger Spec Options
+// ── Swagger ───────────────────────────────────────────────────────────────────
 const swaggerOptions = {
     definition: {
         openapi: '3.0.0',
         info: {
             title: 'SWEFIRE API',
             version: '1.0.0',
-            description: 'API for the SWEFIRE project using Node.js and MariaDB',
+            description:
+                'API REST completa para el proyecto SWEFIRE. ' +
+                'Permite gestionar (CRUD) todas las tablas de la base de datos MariaDB: ' +
+                'Perfiles, Usuarios, Clientes, Fabricantes, Inventario, Camiones, ' +
+                'Servicios, Solicitudes, Cotizaciones, Presupuestos, Proyectos y Trabajos.',
         },
         servers: [
-            {
-                url: `http://localhost:${process.env.PORT || 3000}`,
-            },
+            { url: `http://localhost:${process.env.PORT || 3000}` },
         ],
     },
-    apis: ['./src/routes/*.js'], // Path to the API docs
+    apis: ['./src/routes/*.js'],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-
-// Swagger UI Route
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-// Routes
-app.use('/api/health', healthRoutes);
+// ── API Routes ────────────────────────────────────────────────────────────────
+app.use('/api/health',       healthRoutes);
+app.use('/api/perfiles',     perfilRoutes);
+app.use('/api/usuarios',     usuarioRoutes);
+app.use('/api/clientes',     clienteRoutes);
+app.use('/api/fabricantes',  fabricanteRoutes);
+app.use('/api/inventario',   inventarioRoutes);
+app.use('/api/camiones',     camionRoutes);
+app.use('/api/servicios',    servicioRoutes);
+app.use('/api/solicitudes',  solicitudRoutes);
+app.use('/api/cotizaciones', cotizacionRoutes);
+app.use('/api/presupuestos', presupuestoRoutes);
+app.use('/api/proyectos',    proyectoRoutes);
+app.use('/api/trabajos',     trabajoRoutes);
+
+// ── DB health check inline ────────────────────────────────────────────────────
+const pool = require('./config/db');
+app.get('/api/db-health', async (req, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.json({ status: 'DB conectada correctamente ✅' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 module.exports = app;

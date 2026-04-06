@@ -11,6 +11,8 @@ const db = require('../config/db');
  *       200:
  *         description: Successfully returns health check
  */
+
+//ayuda a ver si la bd esta conectada
 router.get('/', async (req, res) => {
     let dbStatus = 'Disconnected';
     let conn;
