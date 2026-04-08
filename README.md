@@ -235,7 +235,8 @@ Para conectar este backend a cualquier frontend (React, Vue, Angular, React Nati
 El backend corre por defecto en `http://localhost:3000`. Asegúrate de que el backend esté encendido (`npm run dev`) antes de probar desde el frontend.
 
 ### 2. Cómo llamar a la API (Ejemplo con Fetch)
-No necesitas configurar nada especial en el frontend más que apuntar a la URL correcta. El backend ya tiene **CORS habilitado** para permitir peticiones desde otros dominios.
+No necesitas configurar nada especial en el frontend más que apuntar a la URL correcta. 
+El backend ya tiene **CORS habilitado** para permitir peticiones desde otros dominios.
 
 ### 3. Ejemplo: Llamar a un atributo desde un "Screen"
 Si quieres mostrar, por ejemplo, el **nombre de un cliente** en una pantalla de tu frontend:
@@ -296,8 +297,44 @@ export default ClienteScreen;
 
 ---
 
-### Errores comunes
+## DESPLIEGUE EN RENDER.COM
 
-- **404 Not Found**: El registro con ese ID no existe en la base de datos
-- **500 Internal Server Error**: Revisar que la base de datos esté corriendo y las credenciales en `.env` sean correctas
-- **Error de llave foránea**: Si intentas crear un registro que referencia a otro que no existe (ej: crear un usuario con un `dni_perfil` que no está en PERFIL), la base de datos lo rechazará
+Para subir este proyecto a Render y que funcione con la URL `https://swefire.onrender.com`, sigue estos pasos:
+
+### 1. Preparar la Base de Datos
+Render no ofrece MariaDB de forma nativa como servicio gestionado. Tienes dos opciones:
+- **Opción A (Recomendada)**: Usa un proveedor externo gratuito como **Aiven.io** o **DigitalOcean** para crear una base de datos MariaDB.
+- **Opción B**: Usa el archivo `render.yaml` incluido para desplegar todo, pero asegúrate de configurar las variables de entorno de la base de datos externa.
+
+### 2. Configuración en Render
+1. Inicia sesión en [Render.com](https://render.com).
+2. Haz clic en **"New +"** y elige **"Web Service"**.
+3. Conecta tu repositorio de GitHub (`backend-SWEFIRE`).
+4. **Configuraciones principales**:
+   - **Runtime**: `Node`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+5. Haz clic en **"Advanced"** -> **"Add Environment Variable"** y agrega las siguientes:
+
+| Variable | Valor Sugerido | Notas |
+|----------|----------------|-------|
+| `PORT` | `10000` | Render asigna esto automáticamente si no lo pones. |
+| `DB_HOST` | *(Tu host de MariaDB)* | Ej: `mysql-swefire.aivencloud.com` |
+| `DB_USER` | `root` o el asignado | Usuario de tu DB en la nube. |
+| `DB_PASSWORD` | *(Tu contraseña)* | Contraseña de tu DB en la nube. |
+| `DB_NAME` | `swefire_db` | Nombre de la base de datos. |
+| `DB_PORT` | `3306` | Puerto de conexión (3306 es el estándar). |
+| `DB_SSL` | `true` | **Importante**: La mayoría de nubes requieren SSL. |
+
+### 3. Subir los datos (.sql)
+Una vez tengas tu base de datos en la nube (ej. en Aiven), debes ejecutar el archivo `datos_prueba.sql` o `schema.sql` contra esa nueva base de datos usando un cliente como **DBeaver**, **HeidiSQL** o por terminal apuntando al host remoto:
+```bash
+mysql -u [usuario] -p -h [host_remoto] [nombre_db] < datos_prueba.sql
+```
+
+### 4. Verificar Despliegue
+Una vez desplegado, podrás acceder a:
+- Web Service: `https://swefire.onrender.com/api/health`
+- Documentación: `https://swefire.onrender.com/api-docs`
+
+---

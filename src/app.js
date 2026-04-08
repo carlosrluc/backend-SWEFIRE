@@ -39,7 +39,10 @@ const swaggerOptions = {
                 'Servicios, Solicitudes, Cotizaciones, Presupuestos, Proyectos y Trabajos.',
         },
         servers: [
-            { url: `http://localhost:${process.env.PORT || 3000}` },
+            { 
+                url: process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 3000}`,
+                description: process.env.RENDER_EXTERNAL_URL ? 'Servidor de Producción' : 'Servidor Local'
+            },
         ],
     },
     apis: ['./src/routes/*.js'],
