@@ -205,28 +205,75 @@ Ejemplo: **Eliminar un cliente**
 
 ---
 
-### Tablas disponibles y sus rutas base
+### Listado completo de Rutas y Sub-rutas (API)
 
-| Recurso | Ruta base |
-|---------|-----------|
-| Perfiles | `/api/perfiles` |
-| Usuarios | `/api/usuarios` |
-| Clientes | `/api/clientes` |
-| Fabricantes | `/api/fabricantes` |
-| Inventario | `/api/inventario` |
-| Camiones | `/api/camiones` |
-| Servicios | `/api/servicios` |
-| Solicitudes | `/api/solicitudes` |
-| Cotizaciones | `/api/cotizaciones` |
-| Presupuestos | `/api/presupuestos` |
-| Proyectos | `/api/proyectos` |
-| Trabajos | `/api/trabajos` |
+A continuación se detallan todas las rutas disponibles para interactuar con la base de datos:
 
-Cada ruta base también tiene sub-rutas para sus tablas relacionadas. Por ejemplo:
-- `/api/perfiles/{dni}/educacion` — educaciones del perfil
-- `/api/perfiles/{dni}/brevetes` — brevetes del perfil
-- `/api/camiones/{placa}/mantenimientos` — mantenimientos del camión
-- `/api/trabajos/{id}/rrhh/{rid}/pdfs` — PDFs de un registro RRHH
+| Recurso | Ruta Principal | Sub-rutas Disponibles |
+|---------|---------------|-----------------------|
+| **Perfiles** | `/api/perfiles` | `/{dni}`, `/{dni}/educacion`, `/{dni}/brevetes`, `/{dni}/certificaciones` |
+| **Usuarios** | `/api/usuarios` | `/{id}` |
+| **Clientes** | `/api/clientes` | `/{id}`, `/{id}/contactos`, `/{id}/telefonos-movil`, `/{id}/correos`, `/{id}/telefonos-fijo` |
+| **Fabricantes** | `/api/fabricantes` | `/{id}` |
+| **Inventario** | `/api/inventario` | `/{id}` |
+| **Camiones** | `/api/camiones` | `/{placa}`, `/{placa}/mantenimientos`, `/{placa}/inventario` |
+| **Servicios** | `/api/servicios` | `/{id}` |
+| **Solicitudes** | `/api/solicitudes` | `/{id}` |
+| **Cotizaciones** | `/api/cotizaciones` | `/{id}` |
+| **Presupuestos** | `/api/presupuestos` | `/{id}` |
+| **Proyectos** | `/api/proyectos` | `/{id}` |
+| **Trabajos** | `/api/trabajos` | `/{id}` |
+| **Sistema** | `/api/health` | `/api/db-health`, `/api-docs` (Swagger) |
+
+---
+
+## GUÍA RÁPIDA: CONECTAR EL BACKEND AL FRONTEND
+
+Para conectar este backend a cualquier frontend (React, Vue, Angular, React Native, etc.), sigue estos pasos directos:
+
+### 1. Configuración Base
+El backend corre por defecto en `http://localhost:3000`. Asegúrate de que el backend esté encendido (`npm run dev`) antes de probar desde el frontend.
+
+### 2. Cómo llamar a la API (Ejemplo con Fetch)
+No necesitas configurar nada especial en el frontend más que apuntar a la URL correcta. El backend ya tiene **CORS habilitado** para permitir peticiones desde otros dominios.
+
+### 3. Ejemplo: Llamar a un atributo desde un "Screen"
+Si quieres mostrar, por ejemplo, el **nombre de un cliente** en una pantalla de tu frontend:
+
+```javascript
+// Ejemplo en un componente de React / React Native
+import React, { useEffect, useState } from 'react';
+
+const ClienteScreen = ({ clienteId }) => {
+  const [cliente, setCliente] = useState(null);
+
+  useEffect(() => {
+    // 1. Llamamos a la sub-ruta del cliente específico
+    fetch(`http://localhost:3000/api/clientes/${clienteId}`)
+      .then(response => response.json())
+      .then(data => {
+        // 2. Guardamos la respuesta (que es un objeto JSON)
+        setCliente(data); 
+      })
+      .catch(error => console.error("Error conectando al backend:", error));
+  }, [clienteId]);
+
+  if (!cliente) return <p>Cargando...</p>;
+
+  return (
+    <div>
+      <h1>Detalle del Cliente</h1>
+      {/* 3. Llamamos a un ATRIBUTO específico del backend (ej: nombre_comercial) */}
+      <p>Nombre: {cliente.nombre_comercial}</p>
+      <p>Rubro: {cliente.rubro}</p>
+    </div>
+  );
+};
+
+export default ClienteScreen;
+```
+
+---
 
 ---
 
