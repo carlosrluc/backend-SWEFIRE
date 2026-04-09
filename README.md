@@ -1,6 +1,9 @@
 # backend-SWEFIRE
 Backend con MariaDB para el proyecto SWEFIRE.
 
+# Ojito
+instalar en la pc Node.js y Mysql
+
 ## instalado por terminal
 que se ha instalado?
 express: framework para crear el servidor y manejar rutas/API
