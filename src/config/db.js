@@ -7,10 +7,7 @@ const pool = mysql.createPool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    ssl: {
-        rejectUnauthorized: false
-        //ca: fs.readFileSync('./certs/ca.pem')
-    },
+    ssl: process.env.DB_SSL,
     waitForConnections: true,
     connectionLimit: 10000,
 });
