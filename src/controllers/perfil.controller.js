@@ -208,3 +208,33 @@ exports.deleteCertificacion = async (req, res) => {
         res.json({ message: 'Certificación eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+exports.getConductoresDisponibles = async (req, res) => {
+    const { fecha } = req.query;
+    try {
+        if (!fecha) {
+            return res.status(400).json({ error: 'Se requiere el parámetro fecha (YYYY-MM-DD)' });
+        }
+
+        // Buscamos perfiles que:
+        // 1. Tengan al menos un registro en PERFIL_BREVETE (tienen licencia)
+        // 2. No tengan una jornada asignada en la fecha indicada en TRABAJO_JORNADA
+        // 3. Tengan uno de los roles solicitados
+        const sql = `
+            SELECT DISTINCT p.DNI, p.Nombre, p.Apellido, u.rol, p.estado
+            FROM PERFIL p
+            JOIN PERFIL_BREVETE b ON p.DNI = b.DNI_perfil
+            LEFT JOIN USUARIO u ON p.DNI = u.dni_perfil
+            WHERE (LOWER(u.rol) IN ('supervisorcampo', 'trabajtaller', 'trabajcampo'))
+            AND p.DNI NOT IN (
+                SELECT DNI_Trabajador 
+                FROM TRABAJO_JORNADA 
+                WHERE dia = ?
+            )
+        `;
+        const rows = await db.query(sql, [fecha]);
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};

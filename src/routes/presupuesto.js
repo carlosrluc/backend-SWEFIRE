@@ -24,9 +24,18 @@ const c = require('../controllers/presupuesto.controller');
  *   get:
  *     tags: [Presupuesto]
  *     summary: Listar todos los presupuestos internos
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de presupuestos
+ *         description: Lista de presupuestos con metadatos de paginación
  *   post:
  *     tags: [Presupuesto]
  *     summary: Crear un presupuesto interno

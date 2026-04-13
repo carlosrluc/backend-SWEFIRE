@@ -16,13 +16,44 @@ const c = require('../controllers/perfil.controller');
 
 /**
  * @openapi
+ * /api/perfiles/conductores/disponibles:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener conductores con brevete disponibles en una fecha
+ *     parameters:
+ *       - in: query
+ *         name: fecha
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Fecha a consultar disponiblidad (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Lista de conductores disponibles
+ *       400:
+ *         description: Fecha faltante
+ */
+router.get('/conductores/disponibles', c.getConductoresDisponibles);
+
+/**
+ * @openapi
  * /api/perfiles:
  *   get:
  *     tags: [Perfil]
  *     summary: Listar todos los perfiles
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de perfiles
+ *         description: Lista de perfiles con metadatos de paginación
  *   post:
  *     tags: [Perfil]
  *     summary: Crear un perfil

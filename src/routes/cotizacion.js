@@ -23,10 +23,19 @@ const { permit } = require('../middlewares/role.middleware');
  * /api/cotizaciones:
  *   get:
  *     tags: [Cotización]
- *     summary: Listar todas las cotizaciones
+ *     summary: Listar todas las cotizaciones comerciales
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de cotizaciones
+ *         description: Lista de cotizaciones con metadatos de paginación
  *   post:
  *     tags: [Cotización]
  *     summary: Crear una cotización
