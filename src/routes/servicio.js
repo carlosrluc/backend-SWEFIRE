@@ -1,6 +1,16 @@
 const router = require('express').Router();
 const c = require('../controllers/servicio.controller');
 
+const auth = require('../middlewares/auth.middleware');
+const { requireRoles } = require('../middlewares/role.middleware');
+
+const canGet = requireRoles(['trabajtaller', 'supervisorcampo', 'trabajcampo', 'abogado']);
+const canPost = requireRoles(['trabajtaller']);
+const canPut = requireRoles(['trabajtaller']);
+const canDelete = requireRoles([]);
+
+router.use(auth);
+
 /**
  * @openapi
  * tags:
@@ -47,8 +57,8 @@ const c = require('../controllers/servicio.controller');
  *       201:
  *         description: Servicio creado
  */
-router.get('/', c.getAll);
-router.post('/', c.create);
+router.get('/', canGet, c.getAll);
+router.post('/', canPost, c.create);
 
 /**
  * @openapi
@@ -101,9 +111,9 @@ router.post('/', c.create);
  *       200:
  *         description: Eliminado
  */
-router.get('/:id', c.getById);
-router.put('/:id', c.update);
-router.delete('/:id', c.remove);
+router.get('/:id', canGet, c.getById);
+router.put('/:id', canPut, c.update);
+router.delete('/:id', canDelete, c.remove);
 
 /**
  * @openapi
@@ -142,8 +152,8 @@ router.delete('/:id', c.remove);
  *       201:
  *         description: Personal creado
  */
-router.get('/:id/personal', c.getPersonal);
-router.post('/:id/personal', c.createPersonal);
+router.get('/:id/personal', canGet, c.getPersonal);
+router.post('/:id/personal', canPost, c.createPersonal);
 
 /**
  * @openapi
@@ -164,6 +174,6 @@ router.post('/:id/personal', c.createPersonal);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/personal/:pid', c.deletePersonal);
+router.delete('/:id/personal/:pid', canDelete, c.deletePersonal);
 
 module.exports = router;
