@@ -15,19 +15,10 @@ const c = require('../controllers/inventario.controller');
  * /api/inventario:
  *   get:
  *     tags: [Inventario]
- *     summary: Listar todos los ítems de inventario
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *         description: Número de página
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
- *         description: Cantidad de resultados por página
+ *     summary: Listar todos los objetos del inventario
  *     responses:
  *       200:
- *         description: Lista de inventario con metadatos de paginación
+ *         description: Lista de objetos
  *   post:
  *     tags: [Inventario]
  *     summary: Crear un objeto en el inventario

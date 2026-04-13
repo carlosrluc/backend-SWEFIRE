@@ -18,21 +18,13 @@ const c = require('../controllers/cliente.controller');
 
 /**
  * @openapi
+ * /api/clientes:
  *   get:
  *     tags: [Cliente]
  *     summary: Listar todos los clientes
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *         description: Número de página
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
- *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de clientes con metadatos de paginación
+ *         description: Lista de clientes
  *   post:
  *     tags: [Cliente]
  *     summary: Crear un cliente

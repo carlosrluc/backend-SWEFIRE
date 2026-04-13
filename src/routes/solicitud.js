@@ -20,18 +20,9 @@ const c = require('../controllers/solicitud.controller');
  *   get:
  *     tags: [Solicitud]
  *     summary: Listar todas las solicitudes
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *         description: Número de página
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
- *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de solicitudes con metadatos de paginación
+ *         description: Lista de solicitudes
  *   post:
  *     tags: [Solicitud]
  *     summary: Crear una solicitud

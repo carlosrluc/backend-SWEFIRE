@@ -16,21 +16,13 @@ const c = require('../controllers/perfil.controller');
 
 /**
  * @openapi
+ * /api/perfiles:
  *   get:
  *     tags: [Perfil]
  *     summary: Listar todos los perfiles
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *         description: Número de página
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
- *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de perfiles con metadatos de paginación
+ *         description: Lista de perfiles
  *   post:
  *     tags: [Perfil]
  *     summary: Crear un perfil

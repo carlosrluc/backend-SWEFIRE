@@ -12,21 +12,13 @@ const c = require('../controllers/fabricante.controller');
 
 /**
  * @openapi
+ * /api/fabricantes:
  *   get:
  *     tags: [Fabricante]
  *     summary: Listar todos los fabricantes
- *     parameters:
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *         description: Número de página
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
- *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de fabricantes con metadatos de paginación
+ *         description: Lista de fabricantes
  *   post:
  *     tags: [Fabricante]
  *     summary: Crear un fabricante

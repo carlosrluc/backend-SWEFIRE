@@ -2,29 +2,8 @@ const db = require('../config/db');
 
 // ── COTIZACION_COMERCIAL ──────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
-    try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const offset = (page - 1) * limit;
-
-        const rows = await db.query(
-            'SELECT * FROM COTIZACION_COMERCIAL LIMIT ? OFFSET ?',
-            [limit, offset]
-        );
-
-        const countResult = await db.query('SELECT COUNT(*) as total FROM COTIZACION_COMERCIAL');
-        const total = countResult[0].total;
-
-        res.json({
-            data: rows,
-            pagination: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit)
-            }
-        });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    try { res.json(await db.query('SELECT * FROM COTIZACION_COMERCIAL')); }
+    catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getById = async (req, res) => {
