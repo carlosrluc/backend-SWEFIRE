@@ -1,16 +1,6 @@
 const router = require('express').Router();
 const c = require('../controllers/presupuesto.controller');
 
-const auth = require('../middlewares/auth.middleware');
-const { requireRoles } = require('../middlewares/role.middleware');
-
-const canGet = requireRoles(['trabajtaller', 'supervisorcampo', 'trabajcampo', 'abogado', 'cliente']);
-const canPost = requireRoles(['trabajtaller', 'abogado']);
-const canPut = requireRoles(['trabajtaller', 'abogado']);
-const canDelete = requireRoles([]);
-
-router.use(auth);
-
 /**
  * @openapi
  * tags:
@@ -64,8 +54,8 @@ router.use(auth);
  *       201:
  *         description: Presupuesto creado
  */
-router.get('/', canGet, c.getAll);
-router.post('/', canPost, c.create);
+router.get('/', c.getAll);
+router.post('/', c.create);
 
 /**
  * @openapi
@@ -116,9 +106,9 @@ router.post('/', canPost, c.create);
  *       200:
  *         description: Eliminado
  */
-router.get('/:id', canGet, c.getById);
-router.put('/:id', canPut, c.update);
-router.delete('/:id', canDelete, c.remove);
+router.get('/:id', c.getById);
+router.put('/:id', c.update);
+router.delete('/:id', c.remove);
 
 /**
  * @openapi
@@ -155,8 +145,8 @@ router.delete('/:id', canDelete, c.remove);
  *       201:
  *         description: Material creado
  */
-router.get('/:id/material-directo', canGet, c.getMaterialDirecto);
-router.post('/:id/material-directo', canPost, c.createMaterialDirecto);
+router.get('/:id/material-directo', c.getMaterialDirecto);
+router.post('/:id/material-directo', c.createMaterialDirecto);
 
 /**
  * @openapi
@@ -177,7 +167,7 @@ router.post('/:id/material-directo', canPost, c.createMaterialDirecto);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/material-directo/:sid', canDelete, c.deleteMaterialDirecto);
+router.delete('/:id/material-directo/:sid', c.deleteMaterialDirecto);
 
 /**
  * @openapi
@@ -215,8 +205,8 @@ router.delete('/:id/material-directo/:sid', canDelete, c.deleteMaterialDirecto);
  *       201:
  *         description: Creado
  */
-router.get('/:id/mano-obra', canGet, c.getManoObra);
-router.post('/:id/mano-obra', canPost, c.createManoObra);
+router.get('/:id/mano-obra', c.getManoObra);
+router.post('/:id/mano-obra', c.createManoObra);
 
 /**
  * @openapi
@@ -237,7 +227,7 @@ router.post('/:id/mano-obra', canPost, c.createManoObra);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/mano-obra/:sid', canDelete, c.deleteManoObra);
+router.delete('/:id/mano-obra/:sid', c.deleteManoObra);
 
 /**
  * @openapi
@@ -274,8 +264,8 @@ router.delete('/:id/mano-obra/:sid', canDelete, c.deleteManoObra);
  *       201:
  *         description: Creado
  */
-router.get('/:id/servicios', canGet, c.getServicio);
-router.post('/:id/servicios', canPost, c.createServicio);
+router.get('/:id/servicios', c.getServicio);
+router.post('/:id/servicios', c.createServicio);
 
 /**
  * @openapi
@@ -296,7 +286,7 @@ router.post('/:id/servicios', canPost, c.createServicio);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/servicios/:sid', canDelete, c.deleteServicio);
+router.delete('/:id/servicios/:sid', c.deleteServicio);
 
 /**
  * @openapi
@@ -333,8 +323,8 @@ router.delete('/:id/servicios/:sid', canDelete, c.deleteServicio);
  *       201:
  *         description: Creado
  */
-router.get('/:id/costos-indirectos', canGet, c.getCostoIndirecto);
-router.post('/:id/costos-indirectos', canPost, c.createCostoIndirecto);
+router.get('/:id/costos-indirectos', c.getCostoIndirecto);
+router.post('/:id/costos-indirectos', c.createCostoIndirecto);
 
 /**
  * @openapi
@@ -355,7 +345,7 @@ router.post('/:id/costos-indirectos', canPost, c.createCostoIndirecto);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/costos-indirectos/:sid', canDelete, c.deleteCostoIndirecto);
+router.delete('/:id/costos-indirectos/:sid', c.deleteCostoIndirecto);
 
 /**
  * @openapi
@@ -392,8 +382,8 @@ router.delete('/:id/costos-indirectos/:sid', canDelete, c.deleteCostoIndirecto);
  *       201:
  *         description: Creado
  */
-router.get('/:id/gastos-admin', canGet, c.getGastoAdmin);
-router.post('/:id/gastos-admin', canPost, c.createGastoAdmin);
+router.get('/:id/gastos-admin', c.getGastoAdmin);
+router.post('/:id/gastos-admin', c.createGastoAdmin);
 
 /**
  * @openapi
@@ -414,6 +404,6 @@ router.post('/:id/gastos-admin', canPost, c.createGastoAdmin);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/gastos-admin/:sid', canDelete, c.deleteGastoAdmin);
+router.delete('/:id/gastos-admin/:sid', c.deleteGastoAdmin);
 
 module.exports = router;

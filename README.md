@@ -238,14 +238,12 @@ Para conectar este backend a cualquier frontend (React, Vue, Angular, React Nati
 ### 1. Configuración Base
 El backend corre por defecto en `http://localhost:3000`. Asegúrate de que el backend esté encendido (`npm run dev`) antes de probar desde el frontend.
 
-### 2. Autenticación JWT y Roles (SISTEMA DE SEGURIDAD)
-El sistema ahora está protegido por **JWT** y **Roles de Usuario**.  
-Para que tu frontend tenga autorización para interactuar con la API:
-1. **Conseguir el Token**: Implementa una pantalla de Login conectada a `POST /api/usuarios/login` enviando `usuario` y `contrasena` (Nota: el DNI se encriptará correctamente en backend). La API responderá con un campo `"token": "ey..."`.
-2. **Guardar el Token**: En el frontend, almacena este string (recomendado usar `localStorage` o `AsyncStorage`).
-3. **Enviar el Token**: En **todas las llamadas posteriores**, es necesario suministrar este token en el Header `Authorization` usando el esquema Bearer. De lo contrario recibirás el error `401 Sin Autorización`. Ciertas acciones también te darán un error `403` si el rol de este usuario no está permitido.
+### 2. Cómo llamar a la API (Ejemplo con Fetch)
+No necesitas configurar nada especial en el frontend más que apuntar a la URL correcta. 
+El backend ya tiene **CORS habilitado** para permitir peticiones desde otros dominios.
 
-### 3. Ejemplo: Llamar a la API enviando el Token (Fetch)
+### 3. Ejemplo: Llamar a un atributo desde un "Screen"
+Si quieres mostrar, por ejemplo, el **nombre de un cliente** en una pantalla de tu frontend:
 
 ```javascript
 // Ejemplo en un componente de React / React Native
@@ -255,18 +253,13 @@ const ClienteScreen = ({ clienteId }) => {
   const [cliente, setCliente] = useState(null);
 
   useEffect(() => {
-    // 1. Obtener el token guardado tras el inicio de sesión
-    const token = localStorage.getItem('token'); // <- AJUSTAR SEGÚN FRAMEWORK
-
-    // 2. Llamamos a la sub-ruta enviando el Header Authorization
-    fetch(`http://localhost:3000/api/clientes/${clienteId}`, {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}` // <--- ¡AQUÍ INYECTAMOS EL TOKEN DE SEGURIDAD!
-      }
-    })
+    // 1. Llamamos a la sub-ruta del cliente específico
+    fetch(`http://localhost:3000/api/clientes/${clienteId}`)
       .then(response => response.json())
-      .then(data => setCliente(data))
+      .then(data => {
+        // 2. Guardamos la respuesta (que es un objeto JSON)
+        setCliente(data); 
+      })
       .catch(error => console.error("Error conectando al backend:", error));
   }, [clienteId]);
 
