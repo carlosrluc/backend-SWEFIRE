@@ -2,8 +2,29 @@ const db = require('../config/db');
 
 // ── TRABAJO ───────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM TRABAJO')); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+
+        const rows = await db.query(
+            'SELECT * FROM TRABAJO LIMIT ? OFFSET ?',
+            [limit, offset]
+        );
+
+        const countResult = await db.query('SELECT COUNT(*) as total FROM TRABAJO');
+        const total = countResult[0].total;
+
+        res.json({
+            data: rows,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getById = async (req, res) => {

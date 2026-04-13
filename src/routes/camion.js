@@ -18,9 +18,18 @@ const c = require('../controllers/camion.controller');
  *   get:
  *     tags: [Camión]
  *     summary: Listar todos los camiones
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de camiones
+ *         description: Lista de camiones con metadatos de paginación
  *   post:
  *     tags: [Camión]
  *     summary: Registrar un camión

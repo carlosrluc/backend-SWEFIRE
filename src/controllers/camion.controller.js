@@ -2,8 +2,29 @@ const db = require('../config/db');
 
 // ── CAMION ────────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM CAMION')); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+
+        const rows = await db.query(
+            'SELECT * FROM CAMION LIMIT ? OFFSET ?',
+            [limit, offset]
+        );
+
+        const countResult = await db.query('SELECT COUNT(*) as total FROM CAMION');
+        const total = countResult[0].total;
+
+        res.json({
+            data: rows,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getByPlaca = async (req, res) => {

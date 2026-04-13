@@ -12,13 +12,21 @@ const c = require('../controllers/servicio.controller');
 
 /**
  * @openapi
- * /api/servicios:
  *   get:
  *     tags: [Servicio]
  *     summary: Listar todos los servicios
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de servicios
+ *         description: Lista de servicios con metadatos de paginación
  *   post:
  *     tags: [Servicio]
  *     summary: Crear un servicio

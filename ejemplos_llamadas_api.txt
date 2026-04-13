@@ -1,0 +1,189 @@
+# Ejemplos de integración Backend (SWEFIRE) - Frontend
+
+Este archivo contiene ejemplos de cómo llamar a las rutas del backend desde el frontend, considerando que el backend está desplegado en Render.
+
+## 1. Configuración de Base URL
+La URL base para las peticiones al backend en producción es:
+https://swefire.onrender.com
+
+Documentación Swagger: https://swefire.onrender.com/api-docs
+
+---
+
+## 2. Ejemplos usando Fetch (Vanilla JS)
+
+### Listar Proyectos (GET)
+```javascript
+const getProyectos = async () => {
+    try {
+        const response = await fetch('https://swefire.onrender.com/api/proyectos');
+        const data = await response.json();
+        console.log(data);
+        return data;
+    } catch (error) {
+        console.error('Error al obtener proyectos:', error);
+    }
+};
+```
+### Listar solicitudes (GET) 
+```javascript
+const getSolicitud = async () => {
+    try {
+        const response = await fetch('https://swefire.onrender.com/api/solicitudes');
+        const data = await response.json();
+        console.log(data);
+        return data;
+    } catch (error) {
+        console.error('Error al obtener proyectos:', error);
+    }
+};
+
+
+### Crear un Usuario (POST)
+```javascript
+const createUsuario = async (userData) => {
+    try {
+        const response = await fetch('https://swefire.onrender.com/api/usuarios', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(userData)
+        });
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error('Error al crear usuario:', error);
+    }
+};
+
+// Ejemplo de uso:
+// createUsuario({
+//     dni_perfil: "12345678",
+//     rol: "admin",
+//     contrasena: "secreto123",
+//     correo: "ejemplo@correo.com"
+// });
+```
+
+---
+
+## 3. Ejemplos usando Axios (Recomendado)
+
+### Buscar Proyecto por ID (GET)
+```javascript
+import axios from 'axios';
+
+const API_BASE_URL = 'https://swefire.onrender.com/api';
+
+const getProyectoById = async (id) => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/proyectos/${id}`);
+        return response.data;
+    } catch (error) {
+        console.error('Error:', error.response ? error.response.data : error.message);
+    }
+};
+```
+
+### Actualizar Proyecto (PUT)
+```javascript
+const updateProyecto = async (id, updateData) => {
+    try {
+        const response = await axios.put(`${API_BASE_URL}/proyectos/${id}`, updateData);
+        return response.data;
+    } catch (error) {
+        console.error('Error actualizando:', error);
+    }
+};
+
+// Ejemplo: updateProyecto(5, { estado: "En Ejecución", observaciones: "Iniciado hoy" });
+```
+
+---
+
+## 4. Caso de Uso: Flujo de Cotizaciones (CUS)
+
+Este flujo es común cuando se requiere crear una cotización completa con sus detalles.
+
+### Paso 1: Crear la cabecera de la Cotización
+```javascript
+const createCotizacion = async (datos) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/cotizaciones`, {
+            version: 1,
+            nombre: "Cotización Mantenimiento Preventivo",
+            id_solicitud: 12,      // ID de la solicitud vinculada
+            DNI_O_RUC: "20601234567",
+            precio_total: 1500.50,
+            estado: "aprobado"      // o 'rechazado por cliente', 'descartada'
+        });
+        return response.data; // Retorna la cotización creada con su nuevo ID
+    } catch (error) {
+        console.error('Error al crear cabecera:', error.response.data);
+    }
+};
+```
+
+### Paso 2: Agregar un Servicio a la Cotización
+Una vez que tienes el `id_cotizacion`, puedes añadirle servicios:
+```javascript
+const addServicioACotizacion = async (idCotizacion, idServicio) => {
+    try {
+        await axios.post(`${API_BASE_URL}/cotizaciones/${idCotizacion}/servicios`, {
+            ID_Servicio: idServicio,
+            fecha_inicio: "2024-05-01",
+            fecha_finalizacion: "2024-05-05",
+            jornada: "Completa",
+            precio_comercial: 500.00
+        });
+        console.log("Servicio agregado con éxito");
+    } catch (error) {
+        console.error('Error al agregar servicio:', error.response.data);
+    }
+};
+```
+
+### Paso 3: Agregar Inventario (Equipos/Herramientas)
+```javascript
+const addInventarioACotizacion = async (idCotizacion, idEquipo) => {
+    try {
+        await axios.post(`${API_BASE_URL}/cotizaciones/${idCotizacion}/inventario`, {
+            ID_Inventario: idEquipo,
+            cantidad: 2,
+            intencion: "alquilar", // 'comprar' o 'alquilar'
+            dias_alquilados: 5,
+            precio_comercial: 50.00
+        });
+        console.log("Equipo agregado con éxito");
+    } catch (error) {
+        console.error('Error al agregar inventario:', error.response.data);
+    }
+};
+```
+
+---
+
+## 5. Estructura de Rutas Disponibles
+Todas las rutas comienzan con https://swefire.onrender.com/api/
+
+- /proyectos
+- /usuarios
+- /clientes
+- /solicitudes
+- /cotizaciones
+- /inventario
+- /camiones
+- /presupuestos
+... (ver Swagger para lista completa)
+
+---
+
+## 6. Tips para el Frontend
+1. **CORS**: El backend ya tiene habilitado CORS, por lo que no deberías tener problemas de dominios cruzados.
+2. **Estados HTTP**: 
+   - 200/201: Éxito.
+   - 400: Error en datos enviados.
+   - 404: No encontrado.
+   - 500: Error en el servidor backend.
+3. **Manejo de Carga**: Render puede poner a "dormir" la instancia si no recibe tráfico. La primera petición después de un tiempo puede tardar hasta 30 segundos en responder mientras el servidor arranca.

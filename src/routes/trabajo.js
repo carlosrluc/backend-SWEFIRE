@@ -19,10 +19,19 @@ const c = require('../controllers/trabajo.controller');
  * /api/trabajos:
  *   get:
  *     tags: [Trabajo]
- *     summary: Listar todos los trabajos
+ *     summary: Listar todos los trabajos realizados
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de trabajos
+ *         description: Lista de trabajos con metadatos de paginación
  *   post:
  *     tags: [Trabajo]
  *     summary: Crear un trabajo

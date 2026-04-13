@@ -10,13 +10,21 @@ const c = require('../controllers/usuario.controller');
 
 /**
  * @openapi
- * /api/usuarios:
  *   get:
  *     tags: [Usuario]
  *     summary: Listar todos los usuarios
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de usuarios (sin contraseña)
+ *         description: Lista de usuarios con metadatos de paginación
  *   post:
  *     tags: [Usuario]
  *     summary: Crear un usuario
@@ -32,12 +40,38 @@ const c = require('../controllers/usuario.controller');
  *               rol: { type: string, example: "admin" }
  *               contrasena: { type: string, example: "secret123" }
  *               correo: { type: string, example: "usuario@email.com" }
+ *               nombre: { type: string, example: "Juan" }
+ *               apellido: { type: string, example: "Pérez" }
  *     responses:
  *       201:
  *         description: Usuario creado
  */
 router.get('/', c.getAll);
 router.post('/', c.create);
+
+/**
+ * @openapi
+ * /api/usuarios/login:
+ *   post:
+ *     tags: [Usuario]
+ *     summary: Iniciar sesión (verifica contraseña con bcrypt)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [correo, contrasena]
+ *             properties:
+ *               correo:    { type: string, example: "usuario@email.com" }
+ *               contrasena: { type: string, example: "secret123" }
+ *     responses:
+ *       200:
+ *         description: Login exitoso, retorna datos del usuario sin la contraseña
+ *       401:
+ *         description: Credenciales inválidas
+ */
+router.post('/login', c.login);
 
 /**
  * @openapi

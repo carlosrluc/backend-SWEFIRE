@@ -20,9 +20,18 @@ const c = require('../controllers/proyecto.controller');
  *   get:
  *     tags: [Proyecto]
  *     summary: Listar todos los proyectos
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de proyectos
+ *         description: Lista de proyectos con metadatos de paginación
  *   post:
  *     tags: [Proyecto]
  *     summary: Crear un proyecto
