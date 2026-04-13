@@ -14,6 +14,15 @@ const c = require('../controllers/usuario.controller');
  *   get:
  *     tags: [Usuario]
  *     summary: Listar todos los usuarios
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
  *     responses:
  *       200:
  *         description: Lista de usuarios (sin contraseña)
@@ -92,5 +101,29 @@ router.post('/', c.create);
 router.get('/:id', c.getById);
 router.put('/:id', c.update);
 router.delete('/:id', c.remove);
+
+/**
+ * @openapi
+ * /api/usuarios/login:
+ *   post:
+ *     tags: [Usuario]
+ *     summary: Iniciar sesión
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [correo, contrasena]
+ *             properties:
+ *               correo: { type: string, example: "usuario@email.com" }
+ *               contrasena: { type: string, example: "secret123" }
+ *     responses:
+ *       200:
+ *         description: Login exitoso, retorna token JWT
+ *       401:
+ *         description: Credenciales inválidas
+ */
+router.post('/login', c.login);
 
 module.exports = router;

@@ -1,5 +1,7 @@
 const router = require('express').Router();
 const c = require('../controllers/cotizacion.controller');
+const auth = require('../middlewares/auth.middleware');
+const { permit } = require('../middlewares/role.middleware');
 
 /**
  * @openapi
@@ -46,8 +48,8 @@ const c = require('../controllers/cotizacion.controller');
  *       201:
  *         description: Cotización creada
  */
-router.get('/', c.getAll);
-router.post('/', c.create);
+router.get('/', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getAll);
+router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.create);
 
 /**
  * @openapi
@@ -99,9 +101,9 @@ router.post('/', c.create);
  *       200:
  *         description: Eliminada
  */
-router.get('/:id', c.getById);
-router.put('/:id', c.update);
-router.delete('/:id', c.remove);
+router.get('/:id', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getById);
+router.put('/:id', auth, permit(['cliente', 'trabajtaller', 'gerente', 'adminproy']), c.update);
+router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
 
 /**
  * @openapi
@@ -142,8 +144,8 @@ router.delete('/:id', c.remove);
  *       201:
  *         description: Servicio agregado
  */
-router.get('/:id/servicios', c.getServicios);
-router.post('/:id/servicios', c.createServicio);
+router.get('/:id/servicios', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getServicios);
+router.post('/:id/servicios', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.createServicio);
 
 /**
  * @openapi
@@ -164,7 +166,7 @@ router.post('/:id/servicios', c.createServicio);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/servicios/:sid', c.deleteServicio);
+router.delete('/:id/servicios/:sid', auth, permit(['gerente', 'adminproy']), c.deleteServicio);
 
 /**
  * @openapi
@@ -205,8 +207,8 @@ router.delete('/:id/servicios/:sid', c.deleteServicio);
  *       201:
  *         description: Camión asignado
  */
-router.get('/:id/camiones', c.getCamiones);
-router.post('/:id/camiones', c.createCamion);
+router.get('/:id/camiones', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getCamiones);
+router.post('/:id/camiones', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.createCamion);
 
 /**
  * @openapi
@@ -227,7 +229,7 @@ router.post('/:id/camiones', c.createCamion);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/camiones/:cid', c.deleteCamion);
+router.delete('/:id/camiones/:cid', auth, permit(['gerente', 'adminproy']), c.deleteCamion);
 
 /**
  * @openapi
@@ -268,8 +270,8 @@ router.delete('/:id/camiones/:cid', c.deleteCamion);
  *       201:
  *         description: Inventario agregado
  */
-router.get('/:id/inventario', c.getInventario);
-router.post('/:id/inventario', c.createInventario);
+router.get('/:id/inventario', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getInventario);
+router.post('/:id/inventario', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.createInventario);
 
 /**
  * @openapi
@@ -290,7 +292,7 @@ router.post('/:id/inventario', c.createInventario);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/inventario/:iid', c.deleteInventario);
+router.delete('/:id/inventario/:iid', auth, permit(['gerente', 'adminproy']), c.deleteInventario);
 
 /**
  * @openapi
@@ -331,8 +333,8 @@ router.delete('/:id/inventario/:iid', c.deleteInventario);
  *       201:
  *         description: Personal asignado
  */
-router.get('/:id/personal', c.getPersonal);
-router.post('/:id/personal', c.createPersonal);
+router.get('/:id/personal', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getPersonal);
+router.post('/:id/personal', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.createPersonal);
 
 /**
  * @openapi
@@ -353,6 +355,6 @@ router.post('/:id/personal', c.createPersonal);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/personal/:pid', c.deletePersonal);
+router.delete('/:id/personal/:pid', auth, permit(['gerente', 'adminproy']), c.deletePersonal);
 
 module.exports = router;

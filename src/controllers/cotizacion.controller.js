@@ -2,14 +2,50 @@ const db = require('../config/db');
 
 // ── COTIZACION_COMERCIAL ──────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM COTIZACION_COMERCIAL')); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+
+        let query = 'SELECT * FROM COTIZACION_COMERCIAL';
+        let countQuery = 'SELECT COUNT(*) as total FROM COTIZACION_COMERCIAL';
+        let args = [];
+        let countArgs = [];
+
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            const condition = ' WHERE DNI_O_RUC = ? OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?)';
+            query += condition;
+            countQuery += condition;
+            args.push(req.user.dni_perfil, req.user.dni_perfil);
+            countArgs.push(req.user.dni_perfil, req.user.dni_perfil);
+        }
+
+        query += ' LIMIT ? OFFSET ?';
+        args.push(limit, offset);
+
+        const rows = await db.query(query, args);
+        const countResult = await db.query(countQuery, countArgs);
+        const total = countResult[0].total;
+
+        res.json({
+            data: rows,
+            pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getById = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ?', [req.params.id]);
-        if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
+        let query = 'SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ?';
+        let args = [req.params.id];
+
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            query += ' AND (DNI_O_RUC = ? OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?))';
+            args.push(req.user.dni_perfil, req.user.dni_perfil);
+        }
+
+        const rows = await db.query(query, args);
+        if (!rows.length) return res.status(404).json({ error: 'No encontrado o sin permiso' });
         res.json(rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -28,6 +64,14 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente } = req.body;
     try {
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            const check = await db.query(
+                'SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC = ? OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?))',
+                [req.params.id, req.user.dni_perfil, req.user.dni_perfil]
+            );
+            if (!check.length) return res.status(403).json({ error: 'No tienes permiso para editar esta cotización' });
+        }
+
         const [result] = await db.query(
             'UPDATE COTIZACION_COMERCIAL SET version=?,nombre=?,id_solicitud=?,DNI_O_RUC=?,precio_total=?,estado=?,comentario_cliente=? WHERE ID=?',
             [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, req.params.id]

@@ -1,5 +1,7 @@
 const router = require('express').Router();
 const c = require('../controllers/proyecto.controller');
+const auth = require('../middlewares/auth.middleware');
+const { permit } = require('../middlewares/role.middleware');
 
 /**
  * @openapi
@@ -45,8 +47,8 @@ const c = require('../controllers/proyecto.controller');
  *       201:
  *         description: Proyecto creado
  */
-router.get('/', c.getAll);
-router.post('/', c.create);
+router.get('/', auth, c.getAll); // anyone logged in can GET
+router.post('/', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.create);
 
 /**
  * @openapi
@@ -97,9 +99,9 @@ router.post('/', c.create);
  *       200:
  *         description: Eliminado
  */
-router.get('/:id', c.getById);
-router.put('/:id', c.update);
-router.delete('/:id', c.remove);
+router.get('/:id', auth, c.getById);
+router.put('/:id', auth, permit(['cliente', 'supervisorcampo', 'abogado', 'gerente', 'adminproy']), c.update);
+router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
 
 /**
  * @openapi
@@ -139,8 +141,8 @@ router.delete('/:id', c.remove);
  *       201:
  *         description: Camión asignado
  */
-router.get('/:id/camiones', c.getCamiones);
-router.post('/:id/camiones', c.createCamion);
+router.get('/:id/camiones', auth, c.getCamiones);
+router.post('/:id/camiones', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.createCamion);
 
 /**
  * @openapi
@@ -161,7 +163,7 @@ router.post('/:id/camiones', c.createCamion);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/camiones/:cid', c.deleteCamion);
+router.delete('/:id/camiones/:cid', auth, permit(['gerente', 'adminproy']), c.deleteCamion);
 
 /**
  * @openapi
@@ -197,8 +199,8 @@ router.delete('/:id/camiones/:cid', c.deleteCamion);
  *       201:
  *         description: Documento creado
  */
-router.get('/:id/documentacion', c.getDocumentacion);
-router.post('/:id/documentacion', c.createDocumentacion);
+router.get('/:id/documentacion', auth, c.getDocumentacion);
+router.post('/:id/documentacion', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.createDocumentacion);
 
 /**
  * @openapi
@@ -219,7 +221,7 @@ router.post('/:id/documentacion', c.createDocumentacion);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/documentacion/:did', c.deleteDocumentacion);
+router.delete('/:id/documentacion/:did', auth, permit(['gerente', 'adminproy']), c.deleteDocumentacion);
 
 /**
  * @openapi
@@ -261,8 +263,8 @@ router.delete('/:id/documentacion/:did', c.deleteDocumentacion);
  *       201:
  *         description: Inventario asignado
  */
-router.get('/:id/inventario', c.getInventario);
-router.post('/:id/inventario', c.createInventario);
+router.get('/:id/inventario', auth, c.getInventario);
+router.post('/:id/inventario', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.createInventario);
 
 /**
  * @openapi
@@ -283,6 +285,6 @@ router.post('/:id/inventario', c.createInventario);
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/inventario/:iid', c.deleteInventario);
+router.delete('/:id/inventario/:iid', auth, permit(['gerente', 'adminproy']), c.deleteInventario);
 
 module.exports = router;

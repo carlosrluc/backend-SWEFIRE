@@ -2,13 +2,52 @@ const db = require('../config/db');
 
 // ── SOLICITUD ─────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM SOLICITUD')); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+
+        let query = 'SELECT * FROM SOLICITUD';
+        let countQuery = 'SELECT COUNT(*) as total FROM SOLICITUD';
+        let args = [];
+        let countArgs = [];
+
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            query += ' WHERE Id_Cliente = ?';
+            countQuery += ' WHERE Id_Cliente = ?';
+            args.push(req.user.dni_perfil);
+            countArgs.push(req.user.dni_perfil);
+        }
+
+        query += ' LIMIT ? OFFSET ?';
+        args.push(limit, offset);
+
+        const rows = await db.query(query, args);
+        const countResult = await db.query(countQuery, countArgs);
+        
+        res.json({
+            data: rows,
+            pagination: {
+                total: countResult[0].total,
+                page,
+                limit,
+                totalPages: Math.ceil(countResult[0].total / limit)
+            }
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getById = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM SOLICITUD WHERE ID = ?', [req.params.id]);
+        let query = 'SELECT * FROM SOLICITUD WHERE ID = ?';
+        let args = [req.params.id];
+
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            query += ' AND Id_Cliente = ?';
+            args.push(req.user.dni_perfil);
+        }
+
+        const rows = await db.query(query, args);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         res.json(rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -17,9 +56,14 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
     const { Id_Cliente, descripcion, ubicacion } = req.body;
     try {
+        let clientIdToUse = Id_Cliente;
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            clientIdToUse = req.user.dni_perfil;
+        }
+
         const [result] = await db.query(
             'INSERT INTO SOLICITUD (Id_Cliente,descripcion,ubicacion) VALUES (?,?,?)',
-            [Id_Cliente, descripcion, ubicacion]
+            [clientIdToUse, descripcion, ubicacion]
         );
         res.status(201).json({ message: 'Solicitud creada', ID: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -28,9 +72,14 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { Id_Cliente, descripcion, ubicacion } = req.body;
     try {
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            const check = await db.query('SELECT ID FROM SOLICITUD WHERE ID = ? AND Id_Cliente = ?', [req.params.id, req.user.dni_perfil]);
+            if (!check.length) return res.status(403).json({ error: 'No autorizado' });
+        }
+
         const [result] = await db.query(
             'UPDATE SOLICITUD SET Id_Cliente=?,descripcion=?,ubicacion=? WHERE ID=?',
-            [Id_Cliente, descripcion, ubicacion, req.params.id]
+            [req.user && req.user.rolNormalizado === 'cliente' ? req.user.dni_perfil : Id_Cliente, descripcion, ubicacion, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Solicitud actualizada' });
@@ -39,8 +88,16 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM SOLICITUD WHERE ID = ?', [req.params.id]);
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        let query = 'DELETE FROM SOLICITUD WHERE ID = ?';
+        let args = [req.params.id];
+        
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            query += ' AND Id_Cliente = ?';
+            args.push(req.user.dni_perfil);
+        }
+
+        const [result] = await db.query(query, args);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado o no autorizado' });
         res.json({ message: 'Solicitud eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
