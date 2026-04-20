@@ -50,6 +50,78 @@ exports.getById = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+exports.getDetalles = async (req, res) => {
+    try {
+        const cotizacionId = req.params.id;
+
+        // Validar permisos si es cliente
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            const check = await db.query(
+                'SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC = ? OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?))',
+                [cotizacionId, req.user.dni_perfil, req.user.dni_perfil]
+            );
+            if (!check.length) return res.status(403).json({ error: 'No tienes permiso para ver esta cotización' });
+        }
+
+        // Obtener datos base de la cotización comercial
+        const baseQuery = 'SELECT comentario_cliente, fecha_emision, fecha_vigencia, observacion FROM COTIZACION_COMERCIAL WHERE ID = ?';
+        const baseResult = await db.query(baseQuery, [cotizacionId]);
+        if (!baseResult.length) return res.status(404).json({ error: 'Cotización no encontrada' });
+
+        const cotizacionBase = baseResult[0];
+
+        // Obtener inventario
+        const invQuery = `
+            SELECT 
+                c.ID_Inventario AS id, 
+                i.nombre_objeto AS nombre_producto, 
+                c.cantidad, 
+                c.precio_comercial AS precio_unitario, 
+                c.intencion 
+            FROM COTIZACION_INVENTARIO c 
+            LEFT JOIN INVENTARIO i ON c.ID_Inventario = i.Id_Objeto 
+            WHERE c.ID_Cotizacion = ?`;
+        const inventarioResult = await db.query(invQuery, [cotizacionId]);
+
+        // Obtener camiones
+        const camQuery = `
+            SELECT 
+                c.Placa as placa, 
+                p.Nombre as nombre_piloto 
+            FROM COTIZACION_CAMION c 
+            LEFT JOIN USUARIO u ON c.ID_Piloto = u.idusuario 
+            LEFT JOIN PERFIL p ON u.dni_perfil = p.DNI 
+            WHERE c.ID_Cotizacion = ?`;
+        const camionesResult = await db.query(camQuery, [cotizacionId]);
+
+        // Obtener servicios
+        // Nota: se agregó 'NULL as placa' por requerimiento especificado, aunque no exista en los servicios
+        const servQuery = `
+            SELECT 
+                NULL as placa,
+                c.fecha_inicio, 
+                c.fecha_finalizacion, 
+                c.precio_comercial, 
+                s.nombre as nombre_servicio 
+            FROM COTIZACION_SERVICIO c 
+            LEFT JOIN SERVICIO s ON c.ID_Servicio = s.ID_Servicio 
+            WHERE c.ID_Cotizacion = ?`;
+        const serviciosResult = await db.query(servQuery, [cotizacionId]);
+
+        res.json({
+            comentario_cliente: cotizacionBase.comentario_cliente,
+            fecha_emision: cotizacionBase.fecha_emision,
+            fecha_vigencia: cotizacionBase.fecha_vigencia,
+            observacion: cotizacionBase.observacion,
+            inventario: inventarioResult,
+            camiones: camionesResult,
+            servicios: serviciosResult
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
 exports.create = async (req, res) => {
     const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente } = req.body;
     try {
@@ -150,11 +222,11 @@ exports.getInventario = async (req, res) => {
 };
 
 exports.createInventario = async (req, res) => {
-    const { ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial } = req.body;
+    const { ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones } = req.body;
     try {
         const [result] = await db.query(
-            'INSERT INTO COTIZACION_INVENTARIO (ID_Cotizacion,ID_Inventario,cantidad,intencion,dias_alquilados,precio_comercial) VALUES (?,?,?,?,?,?)',
-            [req.params.id, ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial]
+            'INSERT INTO COTIZACION_INVENTARIO (ID_Cotizacion,ID_Inventario,cantidad,intencion,dias_alquilados,precio_comercial,fecha_salida_taller,fecha_ingreso_taller,observaciones) VALUES (?,?,?,?,?,?,?,?,?)',
+            [req.params.id, ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones]
         );
         res.status(201).json({ message: 'Inventario en cotización creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }

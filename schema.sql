@@ -309,6 +309,9 @@ CREATE TABLE SOLICITUD_INVENTARIO (
     cantidad        INT,
     intencion       ENUM('comprar','alquilar'),
     dias_alquilados INT,
+    fecha_salida_taller DATETIME,
+    fecha_ingreso_taller DATETIME,
+    observaciones VARCHAR(255),
     FOREIGN KEY (ID_Solicitud) REFERENCES SOLICITUD(ID) ON DELETE CASCADE,
     FOREIGN KEY (ID_Inventario) REFERENCES INVENTARIO(Id_Objeto) ON DELETE CASCADE
 );
@@ -325,6 +328,9 @@ CREATE TABLE COTIZACION_COMERCIAL (
     precio_total    DECIMAL(14,2),
     estado          ENUM('aprobado','rechazado por cliente','descartada'),
     comentario_cliente TEXT,
+    fecha_emision DATE,
+    fecha_vigencia DATE,
+    observacion VARCHAR(255),
     FOREIGN KEY (id_solicitud) REFERENCES SOLICITUD(ID) ON DELETE SET NULL,
     FOREIGN KEY (DNI_O_RUC) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE SET NULL
 );
@@ -531,6 +537,58 @@ CREATE TABLE TRABAJO_RRHH_PDF (
     ID_RRHH         INT         NOT NULL,
     pdf_url         VARCHAR(500),
     FOREIGN KEY (ID_RRHH) REFERENCES TRABAJO_RRHH(id) ON DELETE CASCADE
+);
+
+CREATE TABLE INCIDENCIA (
+    id_incidencia INT AUTO_INCREMENT PRIMARY KEY,
+
+    id_proyecto INT NULL,
+    empresa_involucrada VARCHAR(20) NULL,
+    cotizacion_remuneracion INT NULL,
+
+    comentario TEXT,
+    estado VARCHAR(50),
+
+    FOREIGN KEY (id_proyecto) REFERENCES PROYECTO(id_proyecto) ON DELETE SET NULL,
+    FOREIGN KEY (empresa_involucrada) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE SET NULL,
+    FOREIGN KEY (cotizacion_remuneracion) REFERENCES COTIZACION_COMERCIAL(id) ON DELETE SET NULL
+);
+
+CREATE TABLE INCIDENCIA_OBJETOS (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    id_incidencia INT NOT NULL,
+
+    id_proyecto_inventario INT NULL,
+    id_proyecto_camion INT NULL,
+
+    ocurrencia_inventario ENUM('averia','perdida','robo','por mantener','otro') NULL,
+    ocurrencia_camion ENUM('averia','perdida','robo','por mantener','otro','ninguna') NULL,
+
+    fecha_perdida DATETIME,
+    cantidad INT,
+    ultima_ubicacion TEXT,
+    comentario TEXT,
+    precio_remunerar DECIMAL(10,2),
+
+    FOREIGN KEY (id_incidencia) REFERENCES INCIDENCIA(id_incidencia) ON DELETE CASCADE,
+    FOREIGN KEY (id_proyecto_inventario) REFERENCES PROYECTO_INVENTARIO(id) ON DELETE SET NULL,
+    FOREIGN KEY (id_proyecto_camion) REFERENCES PROYECTO_CAMION(id) ON DELETE SET NULL
+);
+
+CREATE TABLE INVOLUCRADO (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    dni_involucrado VARCHAR(20) NOT NULL,
+    id_trabajo INT NOT NULL,
+    id_incidencia INT NOT NULL,
+
+    version_de_hechos TEXT,
+    comentario TEXT,
+
+    FOREIGN KEY (dni_involucrado) REFERENCES PERFIL(DNI) ON DELETE CASCADE,
+    FOREIGN KEY (id_trabajo) REFERENCES TRABAJO(id_trabajo) ON DELETE CASCADE,
+    FOREIGN KEY (id_incidencia) REFERENCES INCIDENCIA(id_incidencia) ON DELETE CASCADE
 );
 
 -- ============================================================

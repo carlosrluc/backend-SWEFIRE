@@ -116,6 +116,25 @@ router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
 
 /**
  * @openapi
+ * /api/cotizaciones/{id}/detalles:
+ *   get:
+ *     tags: [Cotización]
+ *     summary: Obtener detalles específicos y completos de una cotización
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Información detallada de la cotización encontrada (inventario, camiones, servicios y base)
+ *       404:
+ *         description: No encontrada o sin permiso
+ */
+router.get('/:id/detalles', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getDetalles);
+
+/**
+ * @openapi
  * /api/cotizaciones/{id}/servicios:
  *   get:
  *     tags: [Cotización - Servicios]
@@ -275,6 +294,9 @@ router.delete('/:id/camiones/:cid', auth, permit(['gerente', 'adminproy']), c.de
  *               intencion: { type: string, enum: [comprar, alquilar] }
  *               dias_alquilados: { type: integer }
  *               precio_comercial: { type: number }
+ *               fecha_salida_taller: { type: string, format: date-time }
+ *               fecha_ingreso_taller: { type: string, format: date-time }
+ *               observaciones: { type: string }
  *     responses:
  *       201:
  *         description: Inventario agregado
