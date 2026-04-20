@@ -423,6 +423,65 @@ INSERT INTO TRABAJO_RRHH (Id_trabajo, DNI_Trabajador, estado_pago) VALUES
 (4, '47823561', 'completado'),
 (5, '47823561', 'completado');
 
+INSERT INTO INCIDENCIA 
+(id_proyecto, empresa_involucrada, cotizacion_remuneracion, comentario, estado)
+VALUES
+(1, NULL, NULL, 'Falla en equipo durante instalación', 'abierto'),
+(2, NULL, NULL, 'Pérdida de herramientas en obra', 'en proceso'),
+(3, NULL, NULL, 'Robo de unidad en traslado', 'abierto'),
+(4, NULL, NULL, 'Problema técnico en sistema', 'cerrado'),
+(5, NULL, NULL, 'Falta de mantenimiento', 'pendiente'),
+(6, NULL, NULL, 'Incidencia general sin detalle', 'abierto');
+
+INSERT INTO INVOLUCRADO
+(dni_involucrado, id_trabajo, id_incidencia, version_de_hechos, comentario)
+VALUES
+-- Incidencia 1
+('85672134', 1, 21, 'Equipo ya presentaba fallas', 'Revisar mantenimiento'),
+('63452198', 2, 21, 'Uso inadecuado del equipo', 'Capacitar personal'),
+
+-- Incidencia 2
+('21905467', 3, 22, 'No se reportó a tiempo', 'Falla operativa'),
+
+-- Incidencia 3
+('96783245', 4, 23, 'Robo durante traslado', 'Zona peligrosa'),
+
+-- Incidencia 4
+('47823561', 2, 24, 'Sistema falló inesperadamente', 'Revisar proveedor'),
+('74561023', 5, 24, 'Falta de supervisión', 'Error administrativo'),
+
+-- Incidencia 5
+('10894356', 1, 25, 'Equipos sin revisión', 'Falta control'),
+
+-- Incidencia 6
+('52341789', 6, 25, 'Incidencia menor', 'Sin impacto grave');
+
+
+INSERT INTO INCIDENCIA_OBJETOS
+(id_incidencia, id_proyecto_inventario, id_proyecto_camion,
+ ocurrencia_inventario, ocurrencia_camion,
+ fecha_perdida, cantidad, ultima_ubicacion, comentario, precio_remunerar)
+VALUES
+-- Incidencia 1
+(21, 1, NULL, 'averia', NULL, '2026-04-10 10:00:00', 2, 'Almacén', 'Extintor dañado', 200.00),
+(21, 2, NULL, 'perdida', NULL, '2026-04-11 11:00:00', 1, 'Obra', 'Manguera perdida', 80.00),
+
+-- Incidencia 2
+(22, 3, NULL, 'robo', NULL, '2026-04-12 12:00:00', 3, 'Callao', 'Herramientas robadas', 500.00),
+
+-- Incidencia 3
+(23, NULL, 1, NULL, 'robo', '2026-04-13 20:00:00', 1, 'Ruta Lima', 'Camión robado', 25000.00),
+
+-- Incidencia 4
+(24, 4, NULL, 'averia', NULL, '2026-04-14 09:00:00', 2, 'Taller', 'Falla técnica', 300.00),
+(24, NULL, 2, NULL, 'averia', '2026-04-14 10:00:00', 1, 'Taller', 'Camión con fallas', 1200.00),
+
+-- Incidencia 5
+(25, 1, NULL, 'por mantener', NULL, '2026-04-15 08:00:00', 5, 'Almacén', 'Equipos sin mantenimiento', 0.00),
+
+-- Incidencia 6
+(22, NULL, 3, NULL, 'ninguna', '2026-04-16 07:00:00', 1, 'Sin ubicación', 'Caso general', 50.00);
+
 -- Actualizar FK de PROYECTO a TRABAJO
 UPDATE PROYECTO SET ID_Trabajo = 1 WHERE id_Proyecto = 1;
 UPDATE PROYECTO SET ID_Trabajo = 2 WHERE id_Proyecto = 2;

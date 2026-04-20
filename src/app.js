@@ -19,6 +19,7 @@ const cotizacionRoutes = require('./routes/cotizacion');
 const presupuestoRoutes = require('./routes/presupuesto');
 const proyectoRoutes = require('./routes/proyecto');
 const trabajoRoutes = require('./routes/trabajo');
+const incidenciaRoutes = require('./routes/incidencia');
 
 const app = express();
 
@@ -37,7 +38,7 @@ const swaggerOptions = {
                 'API REST completa para el proyecto SWEFIRE. ' +
                 'Permite gestionar (CRUD) todas las tablas de la base de datos MariaDB: ' +
                 'Perfiles, Usuarios, Clientes, Fabricantes, Inventario, Camiones, ' +
-                'Servicios, Solicitudes, Cotizaciones, Presupuestos, Proyectos y Trabajos.',
+                'Servicios, Solicitudes, Cotizaciones, Presupuestos, Proyectos, Trabajos e Incidencias.',
         },
         servers: [
             {
@@ -66,6 +67,7 @@ app.use('/api/cotizaciones', cotizacionRoutes);
 app.use('/api/presupuestos', presupuestoRoutes);
 app.use('/api/proyectos', proyectoRoutes);
 app.use('/api/trabajos', trabajoRoutes);
+app.use('/api/incidencias', incidenciaRoutes);
 //update
 // ── DB health check inline ────────────────────────────────────────────────────
 const pool = require('./config/db');
