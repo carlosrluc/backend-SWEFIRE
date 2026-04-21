@@ -126,4 +126,24 @@ router.delete('/:id', c.remove);
  */
 router.post('/login', c.login);
 
+/**
+ * @openapi
+ * /api/usuarios/temp-pass/{correo}:
+ *   get:
+ *     tags: [Usuario]
+ *     summary: Obtener la contraseña en texto plano (TEMPORAL PARA FRONTEND)
+ *     description: Retorna la contraseña sin hashear usada en la creación. Este endpoint será removido en el futuro.
+ *     parameters:
+ *       - in: path
+ *         name: correo
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Contraseña deshasheada devuelta exitosamente
+ *       404:
+ *         description: Usuario no encontrado
+ */
+router.get('/temp-pass/:correo', c.getTempPassword);
+
 module.exports = router;
