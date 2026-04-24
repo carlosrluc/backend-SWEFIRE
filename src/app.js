@@ -46,12 +46,34 @@ const swaggerOptions = {
                 description: process.env.RENDER_EXTERNAL_URL ? 'Servidor de Producción' : 'Servidor Local'
             },
         ],
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                }
+            }
+        },
+        security: [{
+            bearerAuth: []
+        }],
     },
     apis: [path.join(__dirname, 'routes', '*.js')],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+const authMiddleware = require('./middlewares/auth.middleware');
+app.use('/api', (req, res, next) => {
+    // Rutas excluidas de JWT
+    const bypassPaths = ['/usuarios/login', '/health', '/db-health'];
+    if (bypassPaths.includes(req.path) || req.path.startsWith('/usuarios/temp-pass/')) {
+        return next();
+    }
+    return authMiddleware(req, res, next);
+});
 
 // ── API Routes ────────────────────────────────────────────────────────────────
 app.use('/api/health', healthRoutes);

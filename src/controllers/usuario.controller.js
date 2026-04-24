@@ -55,12 +55,12 @@ exports.create = async (req, res) => {
             [dni_perfil, nombre || 'Pendiente', apellido || 'Pendiente', rol || 'Cliente']
         );
 
-        const saltRounds = 12;
+        const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
 
         const [result] = await db.query(
-            'INSERT INTO USUARIO (dni_perfil,rol,contrasena,correo) VALUES (?,?,?,?)',
-            [dni_perfil, rol, hashedPassword, correo]
+            'INSERT INTO USUARIO (dni_perfil,rol,contrasena,correo,temp_pass_unhashed) VALUES (?,?,?,?,?)',
+            [dni_perfil, rol, hashedPassword, correo, contrasena]
         );
         res.status(201).json({ message: 'Usuario creado y perfil asegurado', idusuario: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -121,7 +121,17 @@ exports.login = async (req, res) => {
             { expiresIn: '24h' }
         );
 
-        const { contrasena: unneeded, ...userData } = user;
+        const { contrasena: unneeded, temp_pass_unhashed: tempUnneeded, ...userData } = user;
         res.json({ message: 'Login exitoso', token, user: userData });
     } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getTempPassword = async (req, res) => {
+    try {
+        const rows = await db.query('SELECT temp_pass_unhashed FROM USUARIO WHERE correo = ?', [req.params.correo]);
+        if (!rows.length) return res.status(404).json({ error: 'Usuario no encontrado' });
+        res.json({ correo: req.params.correo, password: rows[0].temp_pass_unhashed });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 };
