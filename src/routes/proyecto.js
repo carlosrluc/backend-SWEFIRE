@@ -109,6 +109,25 @@ router.post('/', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'ger
  *         description: Eliminado
  */
 router.get('/:id', auth, c.getById);
+
+/**
+ * @openapi
+ * /api/proyectos/{id}/proyecto_todo:
+ *   get:
+ *     tags: [Proyecto]
+ *     summary: Obtener toda la información del proyecto incluyendo camiones, inventario y envío
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Información completa del proyecto
+ *       404:
+ *         description: Proyecto no encontrado
+ */
+router.get('/:id/proyecto_todo', auth, c.proyecto_todo);
 router.put('/:id', auth, permit(['cliente', 'supervisorcampo', 'abogado', 'gerente', 'adminproy']), c.update);
 router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
 
