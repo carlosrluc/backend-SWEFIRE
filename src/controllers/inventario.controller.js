@@ -8,7 +8,10 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const rows = await db.query(
-            'SELECT * FROM INVENTARIO LIMIT ? OFFSET ?',
+            `SELECT I.*, F.nombre_comercial as Fabricante_Nombre 
+             FROM INVENTARIO I 
+             LEFT JOIN FABRICANTE F ON I.ID_Fabricante = F.ID_Fabricante 
+             LIMIT ? OFFSET ?`,
             [limit, offset]
         );
 
@@ -29,7 +32,13 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM INVENTARIO WHERE Id_Objeto = ?', [req.params.id]);
+        const rows = await db.query(
+            `SELECT I.*, F.nombre_comercial as Fabricante_Nombre 
+             FROM INVENTARIO I 
+             LEFT JOIN FABRICANTE F ON I.ID_Fabricante = F.ID_Fabricante 
+             WHERE I.Id_Objeto = ?`, 
+            [req.params.id]
+        );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         res.json(rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }

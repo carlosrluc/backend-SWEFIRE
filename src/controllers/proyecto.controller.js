@@ -8,7 +8,12 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const rows = await db.query(
-            'SELECT * FROM PROYECTO LIMIT ? OFFSET ?',
+            `SELECT P.*, C.nombre_comercial as Cliente_Nombre, CC.nombre as Cotizacion_Nombre, T.comentario as Trabajo_Comentario 
+             FROM PROYECTO P 
+             LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
+             LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
+             LEFT JOIN TRABAJO T ON P.ID_Trabajo = T.Id_trabajo 
+             LIMIT ? OFFSET ?`,
             [limit, offset]
         );
 
@@ -29,7 +34,15 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM PROYECTO WHERE id_Proyecto = ?', [req.params.id]);
+        const rows = await db.query(
+            `SELECT P.*, C.nombre_comercial as Cliente_Nombre, CC.nombre as Cotizacion_Nombre, T.comentario as Trabajo_Comentario 
+             FROM PROYECTO P 
+             LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
+             LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
+             LEFT JOIN TRABAJO T ON P.ID_Trabajo = T.Id_trabajo 
+             WHERE P.id_Proyecto = ?`, 
+            [req.params.id]
+        );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         res.json(rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -76,7 +89,7 @@ exports.remove = async (req, res) => {
 
 // ── PROYECTO_CAMION ───────────────────────────────────────────────────────────
 exports.getCamiones = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM PROYECTO_CAMION WHERE id_Proyecto = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT PC.*, C.nombre as Camion_Nombre FROM PROYECTO_CAMION PC LEFT JOIN CAMION C ON PC.Placa = C.Placa WHERE PC.id_Proyecto = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createCamion = async (req, res) => {
@@ -119,7 +132,7 @@ exports.deleteDocumentacion = async (req, res) => {
 
 // ── PROYECTO_INVENTARIO ───────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM PROYECTO_INVENTARIO WHERE id_Proyecto = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT PI.*, I.nombre_objeto as Objeto_Nombre FROM PROYECTO_INVENTARIO PI LEFT JOIN INVENTARIO I ON PI.Id_Objeto = I.Id_Objeto WHERE PI.id_Proyecto = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createInventario = async (req, res) => {

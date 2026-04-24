@@ -7,14 +7,14 @@ exports.getAll = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        let query = 'SELECT * FROM SOLICITUD';
-        let countQuery = 'SELECT COUNT(*) as total FROM SOLICITUD';
+        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC';
+        let countQuery = 'SELECT COUNT(*) as total FROM SOLICITUD S';
         let args = [];
         let countArgs = [];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            query += ' WHERE Id_Cliente = ?';
-            countQuery += ' WHERE Id_Cliente = ?';
+            query += ' WHERE S.Id_Cliente = ?';
+            countQuery += ' WHERE S.Id_Cliente = ?';
             args.push(req.user.dni_perfil);
             countArgs.push(req.user.dni_perfil);
         }
@@ -39,11 +39,11 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        let query = 'SELECT * FROM SOLICITUD WHERE ID = ?';
+        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC WHERE S.ID = ?';
         let args = [req.params.id];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            query += ' AND Id_Cliente = ?';
+            query += ' AND S.Id_Cliente = ?';
             args.push(req.user.dni_perfil);
         }
 
@@ -158,7 +158,7 @@ exports.deleteServicio = async (req, res) => {
 
 // ── SOLICITUD_INVENTARIO ──────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM SOLICITUD_INVENTARIO WHERE ID_Solicitud = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 

@@ -8,7 +8,10 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const rows = await db.query(
-            'SELECT * FROM CAMION LIMIT ? OFFSET ?',
+            `SELECT C.*, F.nombre_comercial as Fabricante_Nombre 
+             FROM CAMION C 
+             LEFT JOIN FABRICANTE F ON C.ID_Fabricante = F.ID_Fabricante 
+             LIMIT ? OFFSET ?`,
             [limit, offset]
         );
 
@@ -29,7 +32,13 @@ exports.getAll = async (req, res) => {
 
 exports.getByPlaca = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM CAMION WHERE Placa = ?', [req.params.placa]);
+        const rows = await db.query(
+            `SELECT C.*, F.nombre_comercial as Fabricante_Nombre 
+             FROM CAMION C 
+             LEFT JOIN FABRICANTE F ON C.ID_Fabricante = F.ID_Fabricante 
+             WHERE C.Placa = ?`, 
+            [req.params.placa]
+        );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         res.json(rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -107,7 +116,7 @@ exports.deleteMantenimiento = async (req, res) => {
 
 // ── CAMION_INVENTARIO ─────────────────────────────────────────────────────────
 exports.getCamionInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM CAMION_INVENTARIO WHERE Placa = ?', [req.params.placa])); }
+    try { res.json(await db.query('SELECT CI.*, I.nombre_objeto as Objeto_Nombre FROM CAMION_INVENTARIO CI LEFT JOIN INVENTARIO I ON CI.Id_Objeto = I.Id_Objeto WHERE CI.Placa = ?', [req.params.placa])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
