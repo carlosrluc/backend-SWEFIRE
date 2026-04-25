@@ -68,7 +68,7 @@ exports.remove = async (req, res) => {
 
 // ── TRABAJO_JORNADA ───────────────────────────────────────────────────────────
 exports.getJornadas = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM TRABAJO_JORNADA WHERE Id_trabajo = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT TJ.*, P.Nombre as Trabajador_Nombre, P.Apellido as Trabajador_Apellido FROM TRABAJO_JORNADA TJ LEFT JOIN PERFIL P ON TJ.DNI_Trabajador = P.DNI WHERE TJ.Id_trabajo = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createJornada = async (req, res) => {
@@ -91,7 +91,7 @@ exports.deleteJornada = async (req, res) => {
 
 // ── TRABAJO_RRHH ──────────────────────────────────────────────────────────────
 exports.getRRHH = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM TRABAJO_RRHH WHERE Id_trabajo = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT TR.*, P.Nombre as Trabajador_Nombre, P.Apellido as Trabajador_Apellido FROM TRABAJO_RRHH TR LEFT JOIN PERFIL P ON TR.DNI_Trabajador = P.DNI WHERE TR.Id_trabajo = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createRRHH = async (req, res) => {

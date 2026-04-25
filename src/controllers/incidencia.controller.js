@@ -7,7 +7,14 @@ exports.getAll = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        const [rows] = await db.query('SELECT * FROM INCIDENCIA LIMIT ? OFFSET ?', [limit, offset]);
+        const [rows] = await db.query(
+            `SELECT INC.*, CC.nombre as Cotizacion_Nombre, C.nombre_comercial as Cliente_Nombre 
+             FROM INCIDENCIA INC 
+             LEFT JOIN COTIZACION_COMERCIAL CC ON INC.cotizacion_remuneracion = CC.ID 
+             LEFT JOIN CLIENTE C ON INC.empresa_involucrada = C.DNI_O_RUC 
+             LIMIT ? OFFSET ?`, 
+            [limit, offset]
+        );
         const [countResult] = await db.query('SELECT COUNT(*) as total FROM INCIDENCIA');
         const total = countResult.total;
 
@@ -20,7 +27,14 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM INCIDENCIA WHERE id_incidencia = ?', [req.params.id]);
+        const rows = await db.query(
+            `SELECT INC.*, CC.nombre as Cotizacion_Nombre, C.nombre_comercial as Cliente_Nombre 
+             FROM INCIDENCIA INC 
+             LEFT JOIN COTIZACION_COMERCIAL CC ON INC.cotizacion_remuneracion = CC.ID 
+             LEFT JOIN CLIENTE C ON INC.empresa_involucrada = C.DNI_O_RUC 
+             WHERE INC.id_incidencia = ?`, 
+            [req.params.id]
+        );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         res.json(rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -87,7 +101,14 @@ exports.deleteObjeto = async (req, res) => {
 // ── INVOLUCRADO ────────────────────────────────────────────────────────
 exports.getInvolucrados = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM INVOLUCRADO WHERE id_incidencia = ?', [req.params.id]);
+        const rows = await db.query(
+            `SELECT I.*, T.comentario as Trabajo_Comentario, P.Nombre as Involucrado_Nombre, P.Apellido as Involucrado_Apellido 
+             FROM INVOLUCRADO I 
+             LEFT JOIN TRABAJO T ON I.id_trabajo = T.Id_trabajo 
+             LEFT JOIN PERFIL P ON I.dni_involucrado = P.DNI 
+             WHERE I.id_incidencia = ?`, 
+            [req.params.id]
+        );
         res.json(rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };

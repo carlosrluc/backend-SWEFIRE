@@ -7,13 +7,13 @@ exports.getAll = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        let query = 'SELECT * FROM COTIZACION_COMERCIAL';
-        let countQuery = 'SELECT COUNT(*) as total FROM COTIZACION_COMERCIAL';
+        let query = 'SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC';
+        let countQuery = 'SELECT COUNT(*) as total FROM COTIZACION_COMERCIAL C_C';
         let args = [];
         let countArgs = [];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            const condition = ' WHERE DNI_O_RUC = ? OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?)';
+            const condition = ' WHERE C_C.DNI_O_RUC = ? OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?)';
             query += condition;
             countQuery += condition;
             args.push(req.user.dni_perfil, req.user.dni_perfil);
@@ -36,11 +36,11 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        let query = 'SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ?';
+        let query = 'SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC WHERE C_C.ID = ?';
         let args = [req.params.id];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            query += ' AND (DNI_O_RUC = ? OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?))';
+            query += ' AND (C_C.DNI_O_RUC = ? OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?))';
             args.push(req.user.dni_perfil, req.user.dni_perfil);
         }
 
@@ -163,7 +163,7 @@ exports.remove = async (req, res) => {
 
 // ── COTIZACION_SERVICIO ───────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM COTIZACION_SERVICIO WHERE ID_Cotizacion = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT CS.*, S.nombre as Servicio_Nombre FROM COTIZACION_SERVICIO CS LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio WHERE CS.ID_Cotizacion = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -190,7 +190,7 @@ exports.deleteServicio = async (req, res) => {
 
 // ── COTIZACION_CAMION ─────────────────────────────────────────────────────────
 exports.getCamiones = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT CC.*, C.nombre as Camion_Nombre, P.Nombre as Piloto_Nombre, P.Apellido as Piloto_Apellido FROM COTIZACION_CAMION CC LEFT JOIN CAMION C ON CC.Placa = C.Placa LEFT JOIN USUARIO U ON CC.ID_Piloto = U.idusuario LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI WHERE CC.ID_Cotizacion = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -217,7 +217,7 @@ exports.deleteCamion = async (req, res) => {
 
 // ── COTIZACION_INVENTARIO ─────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM COTIZACION_INVENTARIO WHERE ID_Cotizacion = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT CI.*, I.nombre_objeto as Objeto_Nombre FROM COTIZACION_INVENTARIO CI LEFT JOIN INVENTARIO I ON CI.ID_Inventario = I.Id_Objeto WHERE CI.ID_Cotizacion = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -244,7 +244,7 @@ exports.deleteInventario = async (req, res) => {
 
 // ── COTIZACION_PERSONAL ───────────────────────────────────────────────────────
 exports.getPersonal = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM COTIZACION_PERSONAL WHERE ID_Cotizacion = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT CP.*, P.Nombre as Personal_Nombre, P.Apellido as Personal_Apellido FROM COTIZACION_PERSONAL CP LEFT JOIN USUARIO U ON CP.ID_Usuario = U.idusuario LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI WHERE CP.ID_Cotizacion = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 

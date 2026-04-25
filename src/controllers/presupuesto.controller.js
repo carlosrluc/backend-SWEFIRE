@@ -8,7 +8,10 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const rows = await db.query(
-            'SELECT * FROM PRESUPUESTO_INTERNO LIMIT ? OFFSET ?',
+            `SELECT PI.*, CC.nombre as Cotizacion_Nombre 
+             FROM PRESUPUESTO_INTERNO PI 
+             LEFT JOIN COTIZACION_COMERCIAL CC ON PI.ID_Cotizacion = CC.ID 
+             LIMIT ? OFFSET ?`,
             [limit, offset]
         );
 
@@ -29,7 +32,13 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM PRESUPUESTO_INTERNO WHERE ID = ?', [req.params.id]);
+        const rows = await db.query(
+            `SELECT PI.*, CC.nombre as Cotizacion_Nombre 
+             FROM PRESUPUESTO_INTERNO PI 
+             LEFT JOIN COTIZACION_COMERCIAL CC ON PI.ID_Cotizacion = CC.ID 
+             WHERE PI.ID = ?`, 
+            [req.params.id]
+        );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         res.json(rows[0]);
     } catch (e) { res.status(500).json({ error: e.message }); }

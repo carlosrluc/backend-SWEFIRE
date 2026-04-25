@@ -12,7 +12,10 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const rows = await db.query(
-            'SELECT idusuario,dni_perfil,rol,correo FROM USUARIO LIMIT ? OFFSET ?',
+            `SELECT U.idusuario, U.dni_perfil, U.rol, U.correo, P.Nombre as Perfil_Nombre, P.Apellido as Perfil_Apellido 
+             FROM USUARIO U 
+             LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI 
+             LIMIT ? OFFSET ?`,
             [limit, offset]
         );
         const countResult = await db.query('SELECT COUNT(*) as total FROM USUARIO');
@@ -33,7 +36,10 @@ exports.getAll = async (req, res) => {
 exports.getById = async (req, res) => {
     try {
         const rows = await db.query(
-            'SELECT idusuario,dni_perfil,rol,correo FROM USUARIO WHERE idusuario = ?',
+            `SELECT U.idusuario, U.dni_perfil, U.rol, U.correo, P.Nombre as Perfil_Nombre, P.Apellido as Perfil_Apellido 
+             FROM USUARIO U 
+             LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI 
+             WHERE U.idusuario = ?`,
             [req.params.id]
         );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
