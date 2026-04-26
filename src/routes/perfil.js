@@ -406,4 +406,159 @@ router.post('/:dni/certificaciones', c.createCertificacion);
 router.put('/:dni/certificaciones/:id', c.updateCertificacion);
 router.delete('/:dni/certificaciones/:id', c.deleteCertificacion);
 
+// ── NUEVAS RUTAS DE RELACIONES Y ASOCIACIONES POR PERFIL ──
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/solicitudes:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener solicitudes de clientes en los que este perfil es contacto
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de solicitudes
+ */
+router.get('/:dni/solicitudes', c.getSolicitudesPorPerfil);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/cotizaciones:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener cotizaciones de clientes en los que este perfil es contacto
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de cotizaciones
+ */
+router.get('/:dni/cotizaciones', c.getCotizacionesPorPerfil);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/proyectos:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener proyectos de clientes en los que este perfil es contacto
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de proyectos
+ */
+router.get('/:dni/proyectos', c.getProyectosPorPerfil);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/incidencias:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener incidencias de clientes en los que este perfil es contacto
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de incidencias
+ */
+router.get('/:dni/incidencias', c.getIncidenciasPorPerfil);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/trabajos_jornada:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener las jornadas de trabajo del perfil
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de jornadas
+ */
+router.get('/:dni/trabajos_jornada', c.getTrabajosJornadaPorPerfil);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/trabajos_rrhh:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener los registros de RRHH de trabajo del perfil
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de registros RRHH
+ */
+router.get('/:dni/trabajos_rrhh', c.getTrabajosRRHHPorPerfil);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/involucrado:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener los registros donde el perfil es involucrado
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de registros
+ */
+router.get('/:dni/involucrado', c.getInvolucradoPorPerfil);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/credenciales_rrhh:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener las credenciales de RRHH del perfil
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de credenciales
+ */
+router.get('/:dni/credenciales_rrhh', c.getCredencialesRRHHPorPerfil);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/empresas_contacto:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener las empresas en las que este perfil es contacto
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de empresas
+ */
+router.get('/:dni/empresas_contacto', c.getEmpresasContactoPorPerfil);
+
 module.exports = router;

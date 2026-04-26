@@ -238,3 +238,81 @@ exports.getConductoresDisponibles = async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 };
+
+// ── RELACIONES VÍA CLIENTE_CONTACTO ───────────────────────────────────────────
+exports.getSolicitudesPorPerfil = async (req, res) => {
+    try {
+        const sql = `
+            SELECT S.* 
+            FROM SOLICITUD S
+            JOIN CLIENTE_CONTACTO CC ON S.Id_Cliente = CC.DNI_O_RUC
+            WHERE CC.DNI_perfil = ?`;
+        res.json(await db.query(sql, [req.params.dni]));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getCotizacionesPorPerfil = async (req, res) => {
+    try {
+        const sql = `
+            SELECT C.* 
+            FROM COTIZACION_COMERCIAL C
+            JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
+            WHERE CC.DNI_perfil = ?`;
+        res.json(await db.query(sql, [req.params.dni]));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getProyectosPorPerfil = async (req, res) => {
+    try {
+        const sql = `
+            SELECT P.* 
+            FROM PROYECTO P
+            JOIN CLIENTE_CONTACTO CC ON P.Id_Cliente = CC.DNI_O_RUC
+            WHERE CC.DNI_perfil = ?`;
+        res.json(await db.query(sql, [req.params.dni]));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getIncidenciasPorPerfil = async (req, res) => {
+    try {
+        const sql = `
+            SELECT I.* 
+            FROM INCIDENCIA I
+            JOIN CLIENTE_CONTACTO CC ON I.empresa_involucrada = CC.DNI_O_RUC
+            WHERE CC.DNI_perfil = ?`;
+        res.json(await db.query(sql, [req.params.dni]));
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// ── TABLAS CON PK DE PERFIL ───────────────────────────────────────────────────
+exports.getTrabajosJornadaPorPerfil = async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM TRABAJO_JORNADA WHERE DNI_Trabajador = ?', [req.params.dni])); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getTrabajosRRHHPorPerfil = async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM TRABAJO_RRHH WHERE DNI_Trabajador = ?', [req.params.dni])); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getInvolucradoPorPerfil = async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM INVOLUCRADO WHERE dni_involucrado = ?', [req.params.dni])); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getCredencialesRRHHPorPerfil = async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM PERFIL_CREDENCIALES_RRHH WHERE DNI_perfil = ?', [req.params.dni])); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getEmpresasContactoPorPerfil = async (req, res) => {
+    try { 
+        const sql = `
+            SELECT C.*, CC.cargo_en_empresa, CC.lugar_trabajo
+            FROM CLIENTE C
+            JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
+            WHERE CC.DNI_perfil = ?`;
+        res.json(await db.query(sql, [req.params.dni])); 
+    }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
