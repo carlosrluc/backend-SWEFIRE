@@ -378,4 +378,72 @@ router.post('/:id/telefonos-fijo', c.createTelefonoFijo);
  */
 router.delete('/:id/telefonos-fijo/:cid', c.deleteTelefonoFijo);
 
+/**
+ * @openapi
+ * /api/clientes/{id}/solicitudes:
+ *   get:
+ *     tags: [Cliente]
+ *     summary: Obtener solicitudes del cliente
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de solicitudes
+ */
+router.get('/:id/solicitudes', c.getSolicitudes);
+
+/**
+ * @openapi
+ * /api/clientes/{id}/cotizaciones:
+ *   get:
+ *     tags: [Cliente]
+ *     summary: Obtener cotizaciones del cliente
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de cotizaciones
+ */
+router.get('/:id/cotizaciones', c.getCotizaciones);
+
+/**
+ * @openapi
+ * /api/clientes/{id}/proyectos:
+ *   get:
+ *     tags: [Cliente]
+ *     summary: Obtener proyectos del cliente
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de proyectos
+ */
+router.get('/:id/proyectos', c.getProyectos);
+
+/**
+ * @openapi
+ * /api/clientes/{id}/incidencias:
+ *   get:
+ *     tags: [Cliente]
+ *     summary: Obtener incidencias del cliente
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Lista de incidencias
+ */
+router.get('/:id/incidencias', c.getIncidencias);
+
 module.exports = router;

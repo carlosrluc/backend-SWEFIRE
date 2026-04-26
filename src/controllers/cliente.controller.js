@@ -185,3 +185,24 @@ exports.deleteTelefonoFijo = async (req, res) => {
         res.json({ message: 'Teléfono fijo eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+// ── RELACIONES (SOLICITUD, COTIZACION, PROYECTO, INCIDENCIA) ──────────────────
+exports.getSolicitudes = async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM SOLICITUD WHERE Id_Cliente = ?', [req.params.id])); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getCotizaciones = async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM COTIZACION_COMERCIAL WHERE DNI_O_RUC = ?', [req.params.id])); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getProyectos = async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM PROYECTO WHERE Id_Cliente = ?', [req.params.id])); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getIncidencias = async (req, res) => {
+    try { res.json(await db.query('SELECT * FROM INCIDENCIA WHERE empresa_involucrada = ?', [req.params.id])); }
+    catch (e) { res.status(500).json({ error: e.message }); }
+};
