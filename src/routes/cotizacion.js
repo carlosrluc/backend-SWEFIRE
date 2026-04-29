@@ -53,6 +53,8 @@ const { permit } = require('../middlewares/role.middleware');
  *               precio_total: { type: number }
  *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada] }
  *               comentario_cliente: { type: string }
+ *               tasa_cambio: { type: number }
+ *               condiciones: { type: string }
  *     responses:
  *       201:
  *         description: Cotización creada
@@ -95,6 +97,8 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
  *               precio_total: { type: number }
  *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada] }
  *               comentario_cliente: { type: string }
+ *               tasa_cambio: { type: number }
+ *               condiciones: { type: string }
  *     responses:
  *       200:
  *         description: Actualizada
@@ -168,12 +172,47 @@ router.get('/:id/detalles', auth, permit(['cliente', 'abogado', 'trabajtaller', 
  *               fecha_finalizacion: { type: string, format: date }
  *               jornada: { type: string }
  *               precio_comercial: { type: number }
+ *               ubicacion: { type: string }
  *     responses:
  *       201:
  *         description: Servicio agregado
  */
 router.get('/:id/servicios', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getServicios);
 router.post('/:id/servicios', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.createServicio);
+
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/servicios/{sid}:
+ *   put:
+ *     tags: [Cotización - Servicios]
+ *     summary: Actualizar servicio de la cotización
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: sid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ID_Servicio: { type: integer }
+ *               fecha_inicio: { type: string, format: date }
+ *               fecha_finalizacion: { type: string, format: date }
+ *               jornada: { type: string }
+ *               precio_comercial: { type: number }
+ *               ubicacion: { type: string }
+ *     responses:
+ *       200:
+ *         description: Servicio actualizado
+ */
+router.put('/:id/servicios/:sid', auth, permit(['trabajtaller', 'gerente', 'adminproy']), c.updateServicio);
 
 /**
  * @openapi
@@ -231,12 +270,47 @@ router.delete('/:id/servicios/:sid', auth, permit(['gerente', 'adminproy']), c.d
  *               fecha_hora_entrada: { type: string, format: date-time }
  *               fecha_hora_salida: { type: string, format: date-time }
  *               ID_Piloto: { type: integer }
+ *               preciounit: { type: number }
  *     responses:
  *       201:
  *         description: Camión asignado
  */
 router.get('/:id/camiones', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getCamiones);
 router.post('/:id/camiones', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.createCamion);
+
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/camiones/{cid}:
+ *   put:
+ *     tags: [Cotización - Camiones]
+ *     summary: Actualizar camión asignado
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: cid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               Placa: { type: string }
+ *               uso: { type: string }
+ *               fecha_hora_entrada: { type: string, format: date-time }
+ *               fecha_hora_salida: { type: string, format: date-time }
+ *               ID_Piloto: { type: integer }
+ *               preciounit: { type: number }
+ *     responses:
+ *       200:
+ *         description: Camión actualizado
+ */
+router.put('/:id/camiones/:cid', auth, permit(['trabajtaller', 'gerente', 'adminproy']), c.updateCamion);
 
 /**
  * @openapi
@@ -294,6 +368,7 @@ router.delete('/:id/camiones/:cid', auth, permit(['gerente', 'adminproy']), c.de
  *               intencion: { type: string, enum: [comprar, alquilar] }
  *               dias_alquilados: { type: integer }
  *               precio_comercial: { type: number }
+ *               costo_comercial: { type: number }
  *               fecha_salida_taller: { type: string, format: date-time }
  *               fecha_ingreso_taller: { type: string, format: date-time }
  *               observaciones: { type: string }
@@ -303,6 +378,43 @@ router.delete('/:id/camiones/:cid', auth, permit(['gerente', 'adminproy']), c.de
  */
 router.get('/:id/inventario', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getInventario);
 router.post('/:id/inventario', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.createInventario);
+
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/inventario/{iid}:
+ *   put:
+ *     tags: [Cotización - Inventario]
+ *     summary: Actualizar inventario de la cotización
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ID_Inventario: { type: integer }
+ *               cantidad: { type: integer }
+ *               intencion: { type: string, enum: [comprar, alquilar] }
+ *               dias_alquilados: { type: integer }
+ *               precio_comercial: { type: number }
+ *               costo_comercial: { type: number }
+ *               fecha_salida_taller: { type: string, format: date-time }
+ *               fecha_ingreso_taller: { type: string, format: date-time }
+ *               observaciones: { type: string }
+ *     responses:
+ *       200:
+ *         description: Inventario actualizado
+ */
+router.put('/:id/inventario/:iid', auth, permit(['trabajtaller', 'gerente', 'adminproy']), c.updateInventario);
 
 /**
  * @openapi
@@ -366,6 +478,39 @@ router.delete('/:id/inventario/:iid', auth, permit(['gerente', 'adminproy']), c.
  */
 router.get('/:id/personal', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getPersonal);
 router.post('/:id/personal', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.createPersonal);
+
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/personal/{pid}:
+ *   put:
+ *     tags: [Cotización - Personal]
+ *     summary: Actualizar personal asignado
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: pid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ID_Usuario: { type: integer }
+ *               rol_en_trabajo: { type: string }
+ *               fecha_entrada: { type: string, format: date }
+ *               fecha_salida: { type: string, format: date }
+ *               dias_trabajados: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Personal actualizado
+ */
+router.put('/:id/personal/:pid', auth, permit(['trabajtaller', 'gerente', 'adminproy']), c.updatePersonal);
 
 /**
  * @openapi

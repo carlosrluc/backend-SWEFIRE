@@ -41,6 +41,7 @@ const c = require('../controllers/usuario.controller');
  *               rol: { type: string, example: "admin" }
  *               contrasena: { type: string, example: "secret123" }
  *               correo: { type: string, example: "usuario@email.com" }
+ *               temp_pass_unhashed: { type: string, example: "secret123" }
  *     responses:
  *       201:
  *         description: Usuario creado
@@ -83,6 +84,7 @@ router.post('/', c.create);
  *               rol: { type: string }
  *               contrasena: { type: string }
  *               correo: { type: string }
+ *               temp_pass_unhashed: { type: string }
  *     responses:
  *       200:
  *         description: Usuario actualizado
