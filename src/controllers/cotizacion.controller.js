@@ -168,13 +168,25 @@ exports.getServicios = async (req, res) => {
 };
 
 exports.createServicio = async (req, res) => {
-    const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial } = req.body;
+    const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion } = req.body;
     try {
         const [result] = await db.query(
-            'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion,ID_Servicio,fecha_inicio,fecha_finalizacion,jornada,precio_comercial) VALUES (?,?,?,?,?,?)',
-            [req.params.id, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial]
+            'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion,ID_Servicio,fecha_inicio,fecha_finalizacion,jornada,precio_comercial,ubicacion) VALUES (?,?,?,?,?,?,?)',
+            [req.params.id, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion]
         );
         res.status(201).json({ message: 'Servicio en cotización creado', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateServicio = async (req, res) => {
+    const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion } = req.body;
+    try {
+        const [result] = await db.query(
+            'UPDATE COTIZACION_SERVICIO SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=?, ubicacion=? WHERE id=? AND ID_Cotizacion=?',
+            [ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion, req.params.sid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Servicio en cotización actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -195,13 +207,25 @@ exports.getCamiones = async (req, res) => {
 };
 
 exports.createCamion = async (req, res) => {
-    const { Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto } = req.body;
+    const { Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit } = req.body;
     try {
         const [result] = await db.query(
-            'INSERT INTO COTIZACION_CAMION (ID_Cotizacion,Placa,uso,fecha_hora_entrada,fecha_hora_salida,ID_Piloto) VALUES (?,?,?,?,?,?)',
-            [req.params.id, Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto]
+            'INSERT INTO COTIZACION_CAMION (ID_Cotizacion,Placa,uso,fecha_hora_entrada,fecha_hora_salida,ID_Piloto,preciounit) VALUES (?,?,?,?,?,?,?)',
+            [req.params.id, Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit]
         );
         res.status(201).json({ message: 'Camión en cotización creado', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateCamion = async (req, res) => {
+    const { Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit } = req.body;
+    try {
+        const [result] = await db.query(
+            'UPDATE COTIZACION_CAMION SET Placa=?, uso=?, fecha_hora_entrada=?, fecha_hora_salida=?, ID_Piloto=?, preciounit=? WHERE id=? AND ID_Cotizacion=?',
+            [Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit, req.params.cid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Camión en cotización actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -222,13 +246,25 @@ exports.getInventario = async (req, res) => {
 };
 
 exports.createInventario = async (req, res) => {
-    const { ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones } = req.body;
+    const { ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, costo_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones } = req.body;
     try {
         const [result] = await db.query(
-            'INSERT INTO COTIZACION_INVENTARIO (ID_Cotizacion,ID_Inventario,cantidad,intencion,dias_alquilados,precio_comercial,fecha_salida_taller,fecha_ingreso_taller,observaciones) VALUES (?,?,?,?,?,?,?,?,?)',
-            [req.params.id, ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones]
+            'INSERT INTO COTIZACION_INVENTARIO (ID_Cotizacion,ID_Inventario,cantidad,intencion,dias_alquilados,precio_comercial,costo_comercial,fecha_salida_taller,fecha_ingreso_taller,observaciones) VALUES (?,?,?,?,?,?,?,?,?,?)',
+            [req.params.id, ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, costo_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones]
         );
         res.status(201).json({ message: 'Inventario en cotización creado', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateInventario = async (req, res) => {
+    const { ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, costo_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones } = req.body;
+    try {
+        const [result] = await db.query(
+            'UPDATE COTIZACION_INVENTARIO SET ID_Inventario=?, cantidad=?, intencion=?, dias_alquilados=?, precio_comercial=?, costo_comercial=?, fecha_salida_taller=?, fecha_ingreso_taller=?, observaciones=? WHERE id=? AND ID_Cotizacion=?',
+            [ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, costo_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones, req.params.iid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Inventario en cotización actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -256,6 +292,18 @@ exports.createPersonal = async (req, res) => {
             [req.params.id, ID_Usuario, rol_en_trabajo, fecha_entrada, fecha_salida, dias_trabajados]
         );
         res.status(201).json({ message: 'Personal en cotización creado', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updatePersonal = async (req, res) => {
+    const { ID_Usuario, rol_en_trabajo, fecha_entrada, fecha_salida, dias_trabajados } = req.body;
+    try {
+        const [result] = await db.query(
+            'UPDATE COTIZACION_PERSONAL SET ID_Usuario=?, rol_en_trabajo=?, fecha_entrada=?, fecha_salida=?, dias_trabajados=? WHERE id=? AND ID_Cotizacion=?',
+            [ID_Usuario, rol_en_trabajo, fecha_entrada, fecha_salida, dias_trabajados, req.params.pid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Personal en cotización actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

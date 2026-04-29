@@ -119,6 +119,18 @@ exports.createMedio = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+exports.updateMedio = async (req, res) => {
+    const { cliente_email, cliente_telefono } = req.body;
+    try {
+        const [result] = await db.query(
+            'UPDATE SOLICITUD_MEDIO_COMUNICACION SET cliente_email=?, cliente_telefono=? WHERE id=? AND ID_Solicitud=?',
+            [cliente_email, cliente_telefono, req.params.mid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Medio de comunicación actualizado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
 exports.deleteMedio = async (req, res) => {
     try {
         const [result] = await db.query(
@@ -136,13 +148,25 @@ exports.getServicios = async (req, res) => {
 };
 
 exports.createServicio = async (req, res) => {
-    const { ID_Servicio, fecha_servicio, horario_servicio } = req.body;
+    const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio } = req.body;
     try {
         const [result] = await db.query(
-            'INSERT INTO SOLICITUD_SERVICIO (ID_Solicitud,ID_Servicio,fecha_servicio,horario_servicio) VALUES (?,?,?,?)',
-            [req.params.id, ID_Servicio, fecha_servicio, horario_servicio]
+            'INSERT INTO SOLICITUD_SERVICIO (ID_Solicitud,ID_Servicio,fecha_inicio_servicio,fecha_fin_servicio,horario_servicio) VALUES (?,?,?,?,?)',
+            [req.params.id, ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio]
         );
         res.status(201).json({ message: 'Servicio en solicitud creado', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateServicio = async (req, res) => {
+    const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio } = req.body;
+    try {
+        const [result] = await db.query(
+            'UPDATE SOLICITUD_SERVICIO SET ID_Servicio=?, fecha_inicio_servicio=?, fecha_fin_servicio=?, horario_servicio=? WHERE id=? AND ID_Solicitud=?',
+            [ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio, req.params.sid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Servicio en solicitud actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -170,6 +194,18 @@ exports.createInventario = async (req, res) => {
             [req.params.id, ID_Inventario, cantidad, intencion, dias_alquilados]
         );
         res.status(201).json({ message: 'Inventario en solicitud creado', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateInventario = async (req, res) => {
+    const { ID_Inventario, cantidad, intencion, dias_alquilados } = req.body;
+    try {
+        const [result] = await db.query(
+            'UPDATE SOLICITUD_INVENTARIO SET ID_Inventario=?, cantidad=?, intencion=?, dias_alquilados=? WHERE id=? AND ID_Solicitud=?',
+            [ID_Inventario, cantidad, intencion, dias_alquilados, req.params.iid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Inventario en solicitud actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

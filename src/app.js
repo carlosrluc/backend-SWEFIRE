@@ -26,6 +26,7 @@ const app = express();
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // ── Swagger ───────────────────────────────────────────────────────────────────
 const swaggerOptions = {
@@ -49,9 +50,13 @@ const swaggerOptions = {
         components: {
             securitySchemes: {
                 bearerAuth: {
-                    type: 'http',
-                    scheme: 'bearer',
-                    bearerFormat: 'JWT',
+                    type: 'oauth2',
+                    flows: {
+                        password: {
+                            tokenUrl: '/api/usuarios/login',
+                            scopes: {}
+                        }
+                    }
                 }
             }
         },

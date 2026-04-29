@@ -46,6 +46,10 @@ const c = require('../controllers/solicitud.controller');
  *               Id_Cliente: { type: string, example: "20512345678" }
  *               descripcion: { type: string }
  *               ubicacion: { type: string }
+ *               productoenvio: { type: string }
+ *               camionesenvio: { type: string }
+ *               obsgenerales: { type: string }
+ *               obseleccion: { type: string }
  *     responses:
  *       201:
  *         description: Solicitud creada
@@ -87,6 +91,10 @@ router.post('/', c.create);
  *               Id_Cliente: { type: string }
  *               descripcion: { type: string }
  *               ubicacion: { type: string }
+ *               productoenvio: { type: string }
+ *               camionesenvio: { type: string }
+ *               obsgenerales: { type: string }
+ *               obseleccion: { type: string }
  *     responses:
  *       200:
  *         description: Actualizada
@@ -147,6 +155,36 @@ router.post('/:id/medios', c.createMedio);
 /**
  * @openapi
  * /api/solicitudes/{id}/medios/{mid}:
+ *   put:
+ *     tags: [Solicitud - Medios de Comunicación]
+ *     summary: Actualizar medio de comunicación
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: mid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cliente_email: { type: string }
+ *               cliente_telefono: { type: string }
+ *     responses:
+ *       200:
+ *         description: Medio actualizado
+ */
+router.put('/:id/medios/:mid', c.updateMedio);
+
+/**
+ * @openapi
+ * /api/solicitudes/{id}/medios/{mid}:
  *   delete:
  *     tags: [Solicitud - Medios de Comunicación]
  *     summary: Eliminar medio de comunicación
@@ -196,7 +234,8 @@ router.delete('/:id/medios/:mid', c.deleteMedio);
  *             required: [ID_Servicio]
  *             properties:
  *               ID_Servicio: { type: integer }
- *               fecha_servicio: { type: string, format: date }
+ *               fecha_inicio_servicio: { type: string, format: date }
+ *               fecha_fin_servicio: { type: string, format: date }
  *               horario_servicio: { type: string }
  *     responses:
  *       201:
@@ -204,6 +243,38 @@ router.delete('/:id/medios/:mid', c.deleteMedio);
  */
 router.get('/:id/servicios', c.getServicios);
 router.post('/:id/servicios', c.createServicio);
+
+/**
+ * @openapi
+ * /api/solicitudes/{id}/servicios/{sid}:
+ *   put:
+ *     tags: [Solicitud - Servicios]
+ *     summary: Actualizar servicio de la solicitud
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: sid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ID_Servicio: { type: integer }
+ *               fecha_inicio_servicio: { type: string, format: date }
+ *               fecha_fin_servicio: { type: string, format: date }
+ *               horario_servicio: { type: string }
+ *     responses:
+ *       200:
+ *         description: Servicio actualizado
+ */
+router.put('/:id/servicios/:sid', c.updateServicio);
 
 /**
  * @openapi
@@ -266,6 +337,38 @@ router.delete('/:id/servicios/:sid', c.deleteServicio);
  */
 router.get('/:id/inventario', c.getInventario);
 router.post('/:id/inventario', c.createInventario);
+
+/**
+ * @openapi
+ * /api/solicitudes/{id}/inventario/{iid}:
+ *   put:
+ *     tags: [Solicitud - Inventario]
+ *     summary: Actualizar inventario de la solicitud
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               ID_Inventario: { type: integer }
+ *               cantidad: { type: integer }
+ *               intencion: { type: string, enum: [comprar, alquilar] }
+ *               dias_alquilados: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Inventario actualizado
+ */
+router.put('/:id/inventario/:iid', c.updateInventario);
 
 /**
  * @openapi

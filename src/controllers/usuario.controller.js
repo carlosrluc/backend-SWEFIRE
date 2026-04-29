@@ -104,7 +104,8 @@ exports.remove = async (req, res) => {
 };
 
 exports.login = async (req, res) => {
-    const { correo, contrasena } = req.body;
+    const correo = req.body.correo || req.body.username;
+    const contrasena = req.body.contrasena || req.body.password;
     try {
         const rows = await db.query('SELECT * FROM USUARIO WHERE correo = ?', [correo]);
         if (!rows.length) return res.status(401).json({ error: 'Credenciales inválidas' });
@@ -128,7 +129,7 @@ exports.login = async (req, res) => {
         );
 
         const { contrasena: unneeded, temp_pass_unhashed: tempUnneeded, ...userData } = user;
-        res.json({ message: 'Login exitoso', token, user: userData });
+        res.json({ message: 'Login exitoso', token, access_token: token, user: userData });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

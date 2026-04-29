@@ -4,591 +4,775 @@
 
 CREATE DATABASE IF NOT EXISTS swefire_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE swefire_db;
-
--- ============================================================
--- TABLA: PERFIL
--- ============================================================
-CREATE TABLE PERFIL (
-    DNI             VARCHAR(20)     PRIMARY KEY,
-    Nombre          VARCHAR(100)    NOT NULL,
-    Apellido        VARCHAR(100)    NOT NULL,
-    Genero          VARCHAR(20),
-    RUC             VARCHAR(20),
-    fecha_nacimiento DATE,
-    correo_contacto  VARCHAR(150),
-    telefono_contacto VARCHAR(20),
-    estado_civil    VARCHAR(30),
-    distrito_residencia VARCHAR(100),
-    seguro_vida_ley ENUM('si','no') DEFAULT 'no',
-    aficiones       TEXT,
-    experiencia     TEXT,
-    comentarios     TEXT,
-    estado          ENUM('inhabilitado','en trabajo','disponible') DEFAULT 'disponible',
-    alergias        TEXT,              -- se guarda como texto separado por comas o JSON
-    condicion_medica TEXT,
-    profesion       VARCHAR(100),
-    nro_cta_bancaria VARCHAR(50),
-    cv              VARCHAR(500),      -- ruta al PDF
-    foto_perfil     VARCHAR(500)       -- ruta a la imagen
+CREATE TABLE "CLIENTE" (
+  "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "nombre_comercial" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "razon_social" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "rubro" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ubicacion_facturacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "observacion" text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY ("DNI_O_RUC")
 );
 
--- Subtabla: educacion (pertenece a PERFIL)
-CREATE TABLE PERFIL_EDUCACION (
-    id              INT             AUTO_INCREMENT PRIMARY KEY,
-    DNI_perfil      VARCHAR(20)     NOT NULL,
-    nombre_educacion VARCHAR(150),
-    nivel_educacion VARCHAR(50),
-    institucion     VARCHAR(150),
-    FOREIGN KEY (DNI_perfil) REFERENCES PERFIL(DNI) ON DELETE CASCADE
+
+-- swefire_db.FABRICANTE definition
+
+CREATE TABLE "FABRICANTE" (
+  "ID_Fabricante" int NOT NULL AUTO_INCREMENT,
+  "nombre_comercial" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ubicacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "rubro" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "descripcion" text COLLATE utf8mb4_unicode_ci,
+  "comentarios" text COLLATE utf8mb4_unicode_ci,
+  "pago" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("ID_Fabricante")
 );
 
--- Subtabla: brevete (pertenece a PERFIL)
-CREATE TABLE PERFIL_BREVETE (
-    id              INT             AUTO_INCREMENT PRIMARY KEY,
-    DNI_perfil      VARCHAR(20)     NOT NULL,
-    categoria       VARCHAR(20),
-    pdf_brevete     VARCHAR(500),
-    fecha_vencimiento DATE,
-    FOREIGN KEY (DNI_perfil) REFERENCES PERFIL(DNI) ON DELETE CASCADE
+
+-- swefire_db.PERFIL definition
+
+CREATE TABLE "PERFIL" (
+  "DNI" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "Nombre" varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "Apellido" varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "Genero" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "RUC" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_nacimiento" date DEFAULT NULL,
+  "correo_contacto" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "telefono_contacto" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "estado_civil" varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "distrito_residencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "seguro_vida_ley" enum('si','no') COLLATE utf8mb4_unicode_ci DEFAULT 'no',
+  "aficiones" text COLLATE utf8mb4_unicode_ci,
+  "experiencia" text COLLATE utf8mb4_unicode_ci,
+  "comentarios" text COLLATE utf8mb4_unicode_ci,
+  "estado" enum('inhabilitado','en trabajo','disponible') COLLATE utf8mb4_unicode_ci DEFAULT 'disponible',
+  "alergias" text COLLATE utf8mb4_unicode_ci,
+  "condicion_medica" text COLLATE utf8mb4_unicode_ci,
+  "profesion" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nro_cta_bancaria" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "cv" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "foto_perfil" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("DNI")
 );
 
--- Subtabla: certificaciones (pertenece a PERFIL)
-CREATE TABLE PERFIL_CERTIFICACION (
-    id              INT             AUTO_INCREMENT PRIMARY KEY,
-    DNI_perfil      VARCHAR(20)     NOT NULL,
-    nombre          VARCHAR(150),
-    institucion     VARCHAR(150),
-    fecha_validez   DATE,
-    foto            VARCHAR(500),
-    FOREIGN KEY (DNI_perfil) REFERENCES PERFIL(DNI) ON DELETE CASCADE
+
+-- swefire_db.SERVICIO definition
+
+CREATE TABLE "SERVICIO" (
+  "ID_Servicio" int NOT NULL AUTO_INCREMENT,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text COLLATE utf8mb4_unicode_ci,
+  "precio_regular" decimal(12,2) DEFAULT NULL,
+  "condicional_precio" text COLLATE utf8mb4_unicode_ci,
+  "observaciones" text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY ("ID_Servicio")
 );
 
--- Subtabla: credenciales RRHH (pertenece a PERFIL)
-CREATE TABLE PERFIL_CREDENCIALES_RRHH (
-    id              INT             AUTO_INCREMENT PRIMARY KEY,
-    DNI_perfil      VARCHAR(20)     NOT NULL,
-    usuario_RRHH    VARCHAR(100),
-    contrasena_RRHH VARCHAR(255),
-    FOREIGN KEY (DNI_perfil) REFERENCES PERFIL(DNI) ON DELETE CASCADE
+
+-- swefire_db.CAMION definition
+
+CREATE TABLE "CAMION" (
+  "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "nombre" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ano_fabricacion" year DEFAULT NULL,
+  "modelo" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "color" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "caracteristicas" text COLLATE utf8mb4_unicode_ci,
+  "revision_tecnica" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_prox_revision" date DEFAULT NULL,
+  "ID_Fabricante" int DEFAULT NULL,
+  "tarjeta_propiedad" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "vencimiento_tarjeta" date DEFAULT NULL,
+  "soat_n_poliza" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "soat_empresa" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "soat_precio" decimal(10,2) DEFAULT NULL,
+  "soat_dia_pago" date DEFAULT NULL,
+  PRIMARY KEY ("Placa"),
+  KEY "ID_Fabricante" ("ID_Fabricante"),
+  CONSTRAINT "CAMION_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE SET NULL
 );
 
--- ============================================================
--- TABLA: USUARIO
--- ============================================================
-CREATE TABLE USUARIO (
-    idusuario       INT             AUTO_INCREMENT PRIMARY KEY,
-    dni_perfil      VARCHAR(20)     NOT NULL,
-    rol             VARCHAR(50),
-    contrasena      VARCHAR(255)    NOT NULL,
-    correo          VARCHAR(150)    NOT NULL UNIQUE,
-    FOREIGN KEY (dni_perfil) REFERENCES PERFIL(DNI) ON DELETE CASCADE
+
+-- swefire_db.CAMION_MANTENIMIENTO definition
+
+CREATE TABLE "CAMION_MANTENIMIENTO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "fecha_ultimo_mant" date DEFAULT NULL,
+  "responsable" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "razon" text COLLATE utf8mb4_unicode_ci,
+  "contacto_responsable" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "pdf_mantenimiento" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "Placa" ("Placa"),
+  CONSTRAINT "CAMION_MANTENIMIENTO_ibfk_1" FOREIGN KEY ("Placa") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: CLIENTE
--- ============================================================
-CREATE TABLE CLIENTE (
-    DNI_O_RUC       VARCHAR(20)     PRIMARY KEY,
-    nombre_comercial VARCHAR(150),
-    razon_social    VARCHAR(150),
-    rubro           VARCHAR(100),
-    ubicacion_facturacion VARCHAR(255),
-    observacion     TEXT
+
+-- swefire_db.CLIENTE_CONTACTO definition
+
+CREATE TABLE "CLIENTE_CONTACTO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "DNI_perfil" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "cargo_en_empresa" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "lugar_trabajo" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "DNI_O_RUC" ("DNI_O_RUC"),
+  KEY "DNI_perfil" ("DNI_perfil"),
+  CONSTRAINT "CLIENTE_CONTACTO_ibfk_1" FOREIGN KEY ("DNI_O_RUC") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE,
+  CONSTRAINT "CLIENTE_CONTACTO_ibfk_2" FOREIGN KEY ("DNI_perfil") REFERENCES "PERFIL" ("DNI") ON DELETE SET NULL
 );
 
--- Subtabla: contactos del cliente (pertenece a CLIENTE)
-CREATE TABLE CLIENTE_CONTACTO (
-    id              INT             AUTO_INCREMENT PRIMARY KEY,
-    DNI_O_RUC       VARCHAR(20)     NOT NULL,
-    DNI_perfil      VARCHAR(20),    -- FK a PERFIL
-    cargo_en_empresa VARCHAR(100),
-    lugar_trabajo   VARCHAR(150),
-    FOREIGN KEY (DNI_O_RUC) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE CASCADE,
-    FOREIGN KEY (DNI_perfil) REFERENCES PERFIL(DNI) ON DELETE SET NULL
+
+-- swefire_db.CLIENTE_CORREO definition
+
+CREATE TABLE "CLIENTE_CORREO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "correo" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "rama" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "DNI_O_RUC" ("DNI_O_RUC"),
+  CONSTRAINT "CLIENTE_CORREO_ibfk_1" FOREIGN KEY ("DNI_O_RUC") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE
 );
 
--- Subtabla: teléfonos móviles del cliente
-CREATE TABLE CLIENTE_TELEFONO_MOVIL (
-    id              INT             AUTO_INCREMENT PRIMARY KEY,
-    DNI_O_RUC       VARCHAR(20)     NOT NULL,
-    telefono        VARCHAR(20),
-    persona         VARCHAR(100),
-    FOREIGN KEY (DNI_O_RUC) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE CASCADE
+
+-- swefire_db.CLIENTE_TELEFONO_FIJO definition
+
+CREATE TABLE "CLIENTE_TELEFONO_FIJO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "numero" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "anexo" varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "descripcion_anexo" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "DNI_O_RUC" ("DNI_O_RUC"),
+  CONSTRAINT "CLIENTE_TELEFONO_FIJO_ibfk_1" FOREIGN KEY ("DNI_O_RUC") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE
 );
 
--- Subtabla: correos de la empresa
-CREATE TABLE CLIENTE_CORREO (
-    id              INT             AUTO_INCREMENT PRIMARY KEY,
-    DNI_O_RUC       VARCHAR(20)     NOT NULL,
-    correo          VARCHAR(150),
-    rama            VARCHAR(100),
-    FOREIGN KEY (DNI_O_RUC) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE CASCADE
+
+-- swefire_db.CLIENTE_TELEFONO_MOVIL definition
+
+CREATE TABLE "CLIENTE_TELEFONO_MOVIL" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "telefono" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "persona" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "DNI_O_RUC" ("DNI_O_RUC"),
+  CONSTRAINT "CLIENTE_TELEFONO_MOVIL_ibfk_1" FOREIGN KEY ("DNI_O_RUC") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE
 );
 
--- Subtabla: teléfonos fijos del cliente
-CREATE TABLE CLIENTE_TELEFONO_FIJO (
-    id              INT             AUTO_INCREMENT PRIMARY KEY,
-    DNI_O_RUC       VARCHAR(20)     NOT NULL,
-    numero          VARCHAR(20),
-    anexo           VARCHAR(10),
-    descripcion_anexo VARCHAR(150),
-    FOREIGN KEY (DNI_O_RUC) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE CASCADE
+
+-- swefire_db.FABRICANTE_CONTACTO definition
+
+CREATE TABLE "FABRICANTE_CONTACTO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Fabricante" int NOT NULL,
+  "persona_contacto" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "correo_contacto" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "numero_contacto" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "anexo_contacto" varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "area_contacto" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "idioma" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Fabricante" ("ID_Fabricante"),
+  CONSTRAINT "FABRICANTE_CONTACTO_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: FABRICANTE
--- ============================================================
-CREATE TABLE FABRICANTE (
-    ID_Fabricante   INT             AUTO_INCREMENT PRIMARY KEY,
-    nombre_comercial VARCHAR(150),
-    ubicacion       VARCHAR(255),
-    rubro           VARCHAR(100),
-    descripcion     TEXT,
-    comentarios     TEXT,
-    pago            VARCHAR(100)
+
+-- swefire_db.INVENTARIO definition
+
+CREATE TABLE "INVENTARIO" (
+  "Id_Objeto" int NOT NULL AUTO_INCREMENT,
+  "lugar_almacenaje" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "cantidad" int DEFAULT '0',
+  "nombre_objeto" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "ID_Fabricante" int DEFAULT NULL,
+  "orden_compra" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_compra" date DEFAULT NULL,
+  "factura" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "garantia" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "numero_serial" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ano_fabricacion" year DEFAULT NULL,
+  "peso" decimal(10,2) DEFAULT NULL,
+  "estado" enum('disponible','en mantenimiento','malogrado','en trabajo') COLLATE utf8mb4_unicode_ci DEFAULT 'disponible',
+  "precio_compra" decimal(12,2) DEFAULT NULL,
+  "precio_envio" decimal(12,2) DEFAULT NULL,
+  "responsable_envio" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "precio_comercial" decimal(12,2) DEFAULT NULL,
+  "mant_requerimiento" enum('si','no') COLLATE utf8mb4_unicode_ci DEFAULT 'no',
+  "mant_ultimo" date DEFAULT NULL,
+  "mant_fecha_caducidad" date DEFAULT NULL,
+  "mant_responsable" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "mant_contacto" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("Id_Objeto"),
+  KEY "ID_Fabricante" ("ID_Fabricante"),
+  CONSTRAINT "INVENTARIO_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE SET NULL
 );
 
--- Subtabla: contactos del fabricante
-CREATE TABLE FABRICANTE_CONTACTO (
-    id                  INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Fabricante       INT         NOT NULL,
-    persona_contacto    VARCHAR(100),
-    correo_contacto     VARCHAR(150),
-    numero_contacto     VARCHAR(20),
-    anexo_contacto      VARCHAR(10),
-    area_contacto       VARCHAR(100),
-    idioma              VARCHAR(50),
-    FOREIGN KEY (ID_Fabricante) REFERENCES FABRICANTE(ID_Fabricante) ON DELETE CASCADE
+
+-- swefire_db.INVENTARIO_USO definition
+
+CREATE TABLE "INVENTARIO_USO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "Id_Objeto" int NOT NULL,
+  "uso" enum('venta','alquiler','uso en proyectos') COLLATE utf8mb4_unicode_ci NOT NULL,
+  PRIMARY KEY ("id"),
+  KEY "Id_Objeto" ("Id_Objeto"),
+  CONSTRAINT "INVENTARIO_USO_ibfk_1" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: INVENTARIO
--- ============================================================
-CREATE TABLE INVENTARIO (
-    Id_Objeto           INT         AUTO_INCREMENT PRIMARY KEY,
-    lugar_almacenaje    VARCHAR(150),
-    cantidad            INT         DEFAULT 0,
-    nombre_objeto       VARCHAR(150) NOT NULL,
-    ID_Fabricante       INT,
-    orden_compra        VARCHAR(100),
-    fecha_compra        DATE,
-    factura             VARCHAR(500),
-    garantia            VARCHAR(150),
-    numero_serial       VARCHAR(100),
-    ano_fabricacion     YEAR,
-    peso                DECIMAL(10,2),
-    estado              ENUM('disponible','en mantenimiento','malogrado','en trabajo') DEFAULT 'disponible',
-    precio_compra       DECIMAL(12,2),
-    precio_envio        DECIMAL(12,2),
-    responsable_envio   VARCHAR(100),
-    precio_comercial    DECIMAL(12,2),
-    -- mantenimiento (objeto único, va inline)
-    mant_requerimiento  ENUM('si','no') DEFAULT 'no',
-    mant_ultimo         DATE,
-    mant_fecha_caducidad DATE,
-    mant_responsable    VARCHAR(100),
-    mant_contacto       VARCHAR(100),
-    FOREIGN KEY (ID_Fabricante) REFERENCES FABRICANTE(ID_Fabricante) ON DELETE SET NULL
+
+-- swefire_db.PERFIL_BREVETE definition
+
+CREATE TABLE "PERFIL_BREVETE" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "DNI_perfil" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "categoria" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "pdf_brevete" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_vencimiento" date DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "DNI_perfil" ("DNI_perfil"),
+  CONSTRAINT "PERFIL_BREVETE_ibfk_1" FOREIGN KEY ("DNI_perfil") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
 );
 
--- Subtabla: uso del inventario (puede ser varios a la vez)
-CREATE TABLE INVENTARIO_USO (
-    id          INT     AUTO_INCREMENT PRIMARY KEY,
-    Id_Objeto   INT     NOT NULL,
-    uso         ENUM('venta','alquiler','uso en proyectos') NOT NULL,
-    FOREIGN KEY (Id_Objeto) REFERENCES INVENTARIO(Id_Objeto) ON DELETE CASCADE
+
+-- swefire_db.PERFIL_CERTIFICACION definition
+
+CREATE TABLE "PERFIL_CERTIFICACION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "DNI_perfil" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "institucion" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_validez" date DEFAULT NULL,
+  "foto" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "DNI_perfil" ("DNI_perfil"),
+  CONSTRAINT "PERFIL_CERTIFICACION_ibfk_1" FOREIGN KEY ("DNI_perfil") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: CAMION
--- ============================================================
-CREATE TABLE CAMION (
-    Placa               VARCHAR(20)  PRIMARY KEY,
-    nombre              VARCHAR(100),
-    ano_fabricacion     YEAR,
-    modelo              VARCHAR(100),
-    color               VARCHAR(50),
-    caracteristicas     TEXT,
-    revision_tecnica    VARCHAR(500),   -- PDF
-    fecha_prox_revision DATE,
-    ID_Fabricante       INT,
-    tarjeta_propiedad   VARCHAR(500),   -- PDF
-    vencimiento_tarjeta DATE,
-    -- SOAT (objeto único, va inline)
-    soat_n_poliza       VARCHAR(100),
-    soat_empresa        VARCHAR(100),
-    soat_precio         DECIMAL(10,2),
-    soat_dia_pago       DATE,
-    FOREIGN KEY (ID_Fabricante) REFERENCES FABRICANTE(ID_Fabricante) ON DELETE SET NULL
+
+-- swefire_db.PERFIL_CREDENCIALES_RRHH definition
+
+CREATE TABLE "PERFIL_CREDENCIALES_RRHH" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "DNI_perfil" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "usuario_RRHH" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "contrasena_RRHH" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "DNI_perfil" ("DNI_perfil"),
+  CONSTRAINT "PERFIL_CREDENCIALES_RRHH_ibfk_1" FOREIGN KEY ("DNI_perfil") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
 );
 
--- Subtabla: mantenimiento del camión
-CREATE TABLE CAMION_MANTENIMIENTO (
-    id                      INT         AUTO_INCREMENT PRIMARY KEY,
-    Placa                   VARCHAR(20) NOT NULL,
-    fecha_ultimo_mant       DATE,
-    responsable             VARCHAR(100),
-    razon                   TEXT,
-    contacto_responsable    VARCHAR(100),
-    pdf_mantenimiento       VARCHAR(500),
-    FOREIGN KEY (Placa) REFERENCES CAMION(Placa) ON DELETE CASCADE
+
+-- swefire_db.PERFIL_EDUCACION definition
+
+CREATE TABLE "PERFIL_EDUCACION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "DNI_perfil" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "nombre_educacion" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nivel_educacion" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "institucion" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "DNI_perfil" ("DNI_perfil"),
+  CONSTRAINT "PERFIL_EDUCACION_ibfk_1" FOREIGN KEY ("DNI_perfil") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
 );
 
--- Subtabla: inventario del camión
-CREATE TABLE CAMION_INVENTARIO (
-    id                  INT         AUTO_INCREMENT PRIMARY KEY,
-    Placa               VARCHAR(20) NOT NULL,
-    Id_Objeto           INT         NOT NULL,
-    cantidad_requerida  INT         DEFAULT 0,
-    cantidad_actual     INT         DEFAULT 0,
-    ubicacion_en_camion VARCHAR(100),
-    requerido_legal     ENUM('si','no') DEFAULT 'no',
-    FOREIGN KEY (Placa) REFERENCES CAMION(Placa) ON DELETE CASCADE,
-    FOREIGN KEY (Id_Objeto) REFERENCES INVENTARIO(Id_Objeto) ON DELETE CASCADE
+
+-- swefire_db.SERVICIO_PERSONAL_REQUERIDO definition
+
+CREATE TABLE "SERVICIO_PERSONAL_REQUERIDO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Servicio" int NOT NULL,
+  "profesion" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "cantidad" int DEFAULT NULL,
+  "disponibilidad" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "requerimiento_legal" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Servicio" ("ID_Servicio"),
+  CONSTRAINT "SERVICIO_PERSONAL_REQUERIDO_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: SERVICIO
--- ============================================================
-CREATE TABLE SERVICIO (
-    ID_Servicio         INT         AUTO_INCREMENT PRIMARY KEY,
-    nombre              VARCHAR(150) NOT NULL,
-    descripcion         TEXT,
-    precio_regular      DECIMAL(12,2),
-    condicional_precio  TEXT,
-    observaciones       TEXT
+
+-- swefire_db.SOLICITUD definition
+
+CREATE TABLE "SOLICITUD" (
+  "ID" int NOT NULL AUTO_INCREMENT,
+  "Id_Cliente" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text COLLATE utf8mb4_unicode_ci,
+  "ubicacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ProductoEnvio" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "CamionesEnvio" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ObsGenerales" text COLLATE utf8mb4_unicode_ci,
+  "ObsEleccion" text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY ("ID"),
+  KEY "Id_Cliente" ("Id_Cliente"),
+  CONSTRAINT "SOLICITUD_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE
 );
 
--- Subtabla: personal requerido por servicio
-CREATE TABLE SERVICIO_PERSONAL_REQUERIDO (
-    id                  INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Servicio         INT         NOT NULL,
-    profesion           VARCHAR(100),
-    cantidad            INT,
-    disponibilidad      VARCHAR(100),
-    requerimiento_legal VARCHAR(150),
-    FOREIGN KEY (ID_Servicio) REFERENCES SERVICIO(ID_Servicio) ON DELETE CASCADE
+
+-- swefire_db.SOLICITUD_INVENTARIO definition
+
+CREATE TABLE "SOLICITUD_INVENTARIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Solicitud" int NOT NULL,
+  "ID_Inventario" int NOT NULL,
+  "cantidad" int DEFAULT NULL,
+  "intencion" enum('comprar','alquilar') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "dias_alquilados" int DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Solicitud" ("ID_Solicitud"),
+  KEY "ID_Inventario" ("ID_Inventario"),
+  CONSTRAINT "SOLICITUD_INVENTARIO_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "SOLICITUD_INVENTARIO_ibfk_2" FOREIGN KEY ("ID_Inventario") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: SOLICITUD
--- ============================================================
-CREATE TABLE SOLICITUD (
-    ID              INT         AUTO_INCREMENT PRIMARY KEY,
-    Id_Cliente      VARCHAR(20) NOT NULL,
-    descripcion     TEXT,
-    ubicacion       VARCHAR(255),
-    FOREIGN KEY (Id_Cliente) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE CASCADE
+
+-- swefire_db.SOLICITUD_MEDIO_COMUNICACION definition
+
+CREATE TABLE "SOLICITUD_MEDIO_COMUNICACION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Solicitud" int NOT NULL,
+  "cliente_email" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "cliente_telefono" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Solicitud" ("ID_Solicitud"),
+  CONSTRAINT "SOLICITUD_MEDIO_COMUNICACION_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE
 );
 
--- Subtabla: medios de comunicación de la solicitud
-CREATE TABLE SOLICITUD_MEDIO_COMUNICACION (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Solicitud    INT         NOT NULL,
-    cliente_email   VARCHAR(150),
-    cliente_telefono VARCHAR(20),
-    FOREIGN KEY (ID_Solicitud) REFERENCES SOLICITUD(ID) ON DELETE CASCADE
+
+-- swefire_db.SOLICITUD_SERVICIO definition
+
+CREATE TABLE "SOLICITUD_SERVICIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Solicitud" int NOT NULL,
+  "ID_Servicio" int NOT NULL,
+  "fecha_inicio_servicio" date DEFAULT NULL,
+  "horario_servicio" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_fin_servicio" date DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Solicitud" ("ID_Solicitud"),
+  KEY "ID_Servicio" ("ID_Servicio"),
+  CONSTRAINT "SOLICITUD_SERVICIO_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "SOLICITUD_SERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE
 );
 
--- Subtabla: servicios de la solicitud
-CREATE TABLE SOLICITUD_SERVICIO (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Solicitud    INT         NOT NULL,
-    ID_Servicio     INT         NOT NULL,
-    fecha_servicio  DATE,
-    horario_servicio VARCHAR(50),
-    FOREIGN KEY (ID_Solicitud) REFERENCES SOLICITUD(ID) ON DELETE CASCADE,
-    FOREIGN KEY (ID_Servicio) REFERENCES SERVICIO(ID_Servicio) ON DELETE CASCADE
+
+-- swefire_db.USUARIO definition
+
+CREATE TABLE "USUARIO" (
+  "idusuario" int NOT NULL AUTO_INCREMENT,
+  "dni_perfil" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "rol" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "contrasena" varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "correo" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "temp_pass_unhashed" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("idusuario"),
+  UNIQUE KEY "correo" ("correo"),
+  KEY "dni_perfil" ("dni_perfil"),
+  CONSTRAINT "USUARIO_ibfk_1" FOREIGN KEY ("dni_perfil") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
 );
 
--- Subtabla: inventario requerido en la solicitud
-CREATE TABLE SOLICITUD_INVENTARIO (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Solicitud    INT         NOT NULL,
-    ID_Inventario   INT         NOT NULL,
-    cantidad        INT,
-    intencion       ENUM('comprar','alquilar'),
-    dias_alquilados INT,
-    fecha_salida_taller DATETIME,
-    fecha_ingreso_taller DATETIME,
-    observaciones VARCHAR(255),
-    FOREIGN KEY (ID_Solicitud) REFERENCES SOLICITUD(ID) ON DELETE CASCADE,
-    FOREIGN KEY (ID_Inventario) REFERENCES INVENTARIO(Id_Objeto) ON DELETE CASCADE
+
+-- swefire_db.CAMION_INVENTARIO definition
+
+CREATE TABLE "CAMION_INVENTARIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "Id_Objeto" int NOT NULL,
+  "cantidad_requerida" int DEFAULT '0',
+  "cantidad_actual" int DEFAULT '0',
+  "ubicacion_en_camion" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "requerido_legal" enum('si','no') COLLATE utf8mb4_unicode_ci DEFAULT 'no',
+  PRIMARY KEY ("id"),
+  KEY "Placa" ("Placa"),
+  KEY "Id_Objeto" ("Id_Objeto"),
+  CONSTRAINT "CAMION_INVENTARIO_ibfk_1" FOREIGN KEY ("Placa") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE,
+  CONSTRAINT "CAMION_INVENTARIO_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: COTIZACION_COMERCIAL
--- ============================================================
-CREATE TABLE COTIZACION_COMERCIAL (
-    ID              INT         AUTO_INCREMENT PRIMARY KEY,
-    version         INT         DEFAULT 1,
-    nombre          VARCHAR(150),
-    id_solicitud    INT,
-    DNI_O_RUC       VARCHAR(20),
-    precio_total    DECIMAL(14,2),
-    estado          ENUM('aprobado','rechazado por cliente','descartada'),
-    comentario_cliente TEXT,
-    fecha_emision DATE,
-    fecha_vigencia DATE,
-    observacion VARCHAR(255),
-    FOREIGN KEY (id_solicitud) REFERENCES SOLICITUD(ID) ON DELETE SET NULL,
-    FOREIGN KEY (DNI_O_RUC) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE SET NULL
+
+-- swefire_db.COTIZACION_COMERCIAL definition
+
+CREATE TABLE "COTIZACION_COMERCIAL" (
+  "ID" int NOT NULL AUTO_INCREMENT,
+  "version" int DEFAULT '1',
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "id_solicitud" int DEFAULT NULL,
+  "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "precio_total" decimal(14,2) DEFAULT NULL,
+  "estado" enum('aprobado','rechazado por cliente','descartada') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "comentario_cliente" text COLLATE utf8mb4_unicode_ci,
+  "fecha_emision" date DEFAULT NULL,
+  "fecha_vigencia" date DEFAULT NULL,
+  "observacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "Tasa_Cambio" float DEFAULT NULL,
+  "condiciones" text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY ("ID"),
+  KEY "id_solicitud" ("id_solicitud"),
+  KEY "DNI_O_RUC" ("DNI_O_RUC"),
+  CONSTRAINT "COTIZACION_COMERCIAL_ibfk_1" FOREIGN KEY ("id_solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE SET NULL,
+  CONSTRAINT "COTIZACION_COMERCIAL_ibfk_2" FOREIGN KEY ("DNI_O_RUC") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE SET NULL
 );
 
--- Subtabla: servicios ofrecidos en la cotización
-CREATE TABLE COTIZACION_SERVICIO (
-    id                  INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Cotizacion       INT         NOT NULL,
-    ID_Servicio         INT         NOT NULL,
-    fecha_inicio        DATE,
-    fecha_finalizacion  DATE,
-    jornada             VARCHAR(100),
-    precio_comercial    DECIMAL(12,2),
-    FOREIGN KEY (ID_Cotizacion) REFERENCES COTIZACION_COMERCIAL(ID) ON DELETE CASCADE,
-    FOREIGN KEY (ID_Servicio) REFERENCES SERVICIO(ID_Servicio) ON DELETE CASCADE
+
+-- swefire_db.COTIZACION_INVENTARIO definition
+
+CREATE TABLE "COTIZACION_INVENTARIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Cotizacion" int NOT NULL,
+  "ID_Inventario" int NOT NULL,
+  "cantidad" int DEFAULT NULL,
+  "intencion" enum('comprar','alquilar') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "dias_alquilados" int DEFAULT NULL,
+  "precio_comercial" decimal(12,2) DEFAULT NULL,
+  "fecha_salida_taller" datetime DEFAULT NULL,
+  "fecha_ingreso_taller" datetime DEFAULT NULL,
+  "observaciones" text COLLATE utf8mb4_unicode_ci,
+  "Costo_Comercial" float DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Cotizacion" ("ID_Cotizacion"),
+  KEY "ID_Inventario" ("ID_Inventario"),
+  CONSTRAINT "COTIZACION_INVENTARIO_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_INVENTARIO_ibfk_2" FOREIGN KEY ("ID_Inventario") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
 );
 
--- Subtabla: camiones para el servicio
-CREATE TABLE COTIZACION_CAMION (
-    id                  INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Cotizacion       INT         NOT NULL,
-    Placa               VARCHAR(20) NOT NULL,
-    uso                 VARCHAR(100),
-    fecha_hora_entrada  DATETIME,
-    fecha_hora_salida   DATETIME,
-    ID_Piloto           INT,        -- FK a USUARIO
-    FOREIGN KEY (ID_Cotizacion) REFERENCES COTIZACION_COMERCIAL(ID) ON DELETE CASCADE,
-    FOREIGN KEY (Placa) REFERENCES CAMION(Placa) ON DELETE CASCADE,
-    FOREIGN KEY (ID_Piloto) REFERENCES USUARIO(idusuario) ON DELETE SET NULL
+
+-- swefire_db.COTIZACION_PERSONAL definition
+
+CREATE TABLE "COTIZACION_PERSONAL" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Cotizacion" int NOT NULL,
+  "ID_Usuario" int NOT NULL,
+  "rol_en_trabajo" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_entrada" date DEFAULT NULL,
+  "fecha_salida" date DEFAULT NULL,
+  "dias_trabajados" int DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Cotizacion" ("ID_Cotizacion"),
+  KEY "ID_Usuario" ("ID_Usuario"),
+  CONSTRAINT "COTIZACION_PERSONAL_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_PERSONAL_ibfk_2" FOREIGN KEY ("ID_Usuario") REFERENCES "USUARIO" ("idusuario") ON DELETE CASCADE
 );
 
--- Subtabla: inventario disponible en la cotización
-CREATE TABLE COTIZACION_INVENTARIO (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Cotizacion   INT         NOT NULL,
-    ID_Inventario   INT         NOT NULL,
-    cantidad        INT,
-    intencion       ENUM('comprar','alquilar'),
-    dias_alquilados INT,
-    precio_comercial DECIMAL(12,2),
-    FOREIGN KEY (ID_Cotizacion) REFERENCES COTIZACION_COMERCIAL(ID) ON DELETE CASCADE,
-    FOREIGN KEY (ID_Inventario) REFERENCES INVENTARIO(Id_Objeto) ON DELETE CASCADE
+
+-- swefire_db.COTIZACION_SERVICIO definition
+
+CREATE TABLE "COTIZACION_SERVICIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Cotizacion" int NOT NULL,
+  "ID_Servicio" int NOT NULL,
+  "fecha_inicio" date DEFAULT NULL,
+  "fecha_finalizacion" date DEFAULT NULL,
+  "jornada" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "precio_comercial" decimal(12,2) DEFAULT NULL,
+  "Ubicacion" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Cotizacion" ("ID_Cotizacion"),
+  KEY "ID_Servicio" ("ID_Servicio"),
+  CONSTRAINT "COTIZACION_SERVICIO_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_SERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE
 );
 
--- Subtabla: personal en la cotización
-CREATE TABLE COTIZACION_PERSONAL (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Cotizacion   INT         NOT NULL,
-    ID_Usuario      INT         NOT NULL,
-    rol_en_trabajo  VARCHAR(100),
-    fecha_entrada   DATE,
-    fecha_salida    DATE,
-    dias_trabajados INT,
-    FOREIGN KEY (ID_Cotizacion) REFERENCES COTIZACION_COMERCIAL(ID) ON DELETE CASCADE,
-    FOREIGN KEY (ID_Usuario) REFERENCES USUARIO(idusuario) ON DELETE CASCADE
+
+-- swefire_db.PRESUPUESTO_INTERNO definition
+
+CREATE TABLE "PRESUPUESTO_INTERNO" (
+  "ID" int NOT NULL AUTO_INCREMENT,
+  "ID_Cotizacion" int NOT NULL,
+  "costos_indirectos" decimal(12,2) DEFAULT NULL,
+  "coste_total_estimado" decimal(14,2) DEFAULT NULL,
+  PRIMARY KEY ("ID"),
+  KEY "ID_Cotizacion" ("ID_Cotizacion"),
+  CONSTRAINT "PRESUPUESTO_INTERNO_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: PRESUPUESTO_INTERNO
--- ============================================================
-CREATE TABLE PRESUPUESTO_INTERNO (
-    ID                  INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Cotizacion       INT         NOT NULL,
-    costos_indirectos   DECIMAL(12,2),
-    coste_total_estimado DECIMAL(14,2),
-    FOREIGN KEY (ID_Cotizacion) REFERENCES COTIZACION_COMERCIAL(ID) ON DELETE CASCADE
+
+-- swefire_db.PRESUPUESTO_MANO_OBRA definition
+
+CREATE TABLE "PRESUPUESTO_MANO_OBRA" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Presupuesto" int NOT NULL,
+  "profesion_ejercida" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "costo_x_hora" decimal(10,2) DEFAULT NULL,
+  "costo_general" decimal(12,2) DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Presupuesto" ("ID_Presupuesto"),
+  CONSTRAINT "PRESUPUESTO_MANO_OBRA_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
 );
 
-CREATE TABLE PRESUPUESTO_MATERIAL_DIRECTO (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Presupuesto  INT         NOT NULL,
-    nombre          VARCHAR(150),
-    costo           DECIMAL(12,2),
-    FOREIGN KEY (ID_Presupuesto) REFERENCES PRESUPUESTO_INTERNO(ID) ON DELETE CASCADE
+
+-- swefire_db.PRESUPUESTO_MATERIAL_DIRECTO definition
+
+CREATE TABLE "PRESUPUESTO_MATERIAL_DIRECTO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Presupuesto" int NOT NULL,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "costo" decimal(12,2) DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Presupuesto" ("ID_Presupuesto"),
+  CONSTRAINT "PRESUPUESTO_MATERIAL_DIRECTO_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
 );
 
-CREATE TABLE PRESUPUESTO_MANO_OBRA (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Presupuesto  INT         NOT NULL,
-    profesion_ejercida VARCHAR(100),
-    costo_x_hora    DECIMAL(10,2),
-    costo_general   DECIMAL(12,2),
-    FOREIGN KEY (ID_Presupuesto) REFERENCES PRESUPUESTO_INTERNO(ID) ON DELETE CASCADE
+
+-- swefire_db.PRESUPUESTO_SERVICIO definition
+
+CREATE TABLE "PRESUPUESTO_SERVICIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Presupuesto" int NOT NULL,
+  "nombre_servicio" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "costo" decimal(12,2) DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Presupuesto" ("ID_Presupuesto"),
+  CONSTRAINT "PRESUPUESTO_SERVICIO_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
 );
 
-CREATE TABLE PRESUPUESTO_SERVICIO (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Presupuesto  INT         NOT NULL,
-    nombre_servicio VARCHAR(150),
-    costo           DECIMAL(12,2),
-    FOREIGN KEY (ID_Presupuesto) REFERENCES PRESUPUESTO_INTERNO(ID) ON DELETE CASCADE
+
+-- swefire_db.COTIZACION_CAMION definition
+
+CREATE TABLE "COTIZACION_CAMION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Cotizacion" int NOT NULL,
+  "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "uso" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_hora_entrada" datetime DEFAULT NULL,
+  "fecha_hora_salida" datetime DEFAULT NULL,
+  "ID_Piloto" int DEFAULT NULL,
+  "PrecioUnit" float DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Cotizacion" ("ID_Cotizacion"),
+  KEY "Placa" ("Placa"),
+  KEY "ID_Piloto" ("ID_Piloto"),
+  CONSTRAINT "COTIZACION_CAMION_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_CAMION_ibfk_2" FOREIGN KEY ("Placa") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_CAMION_ibfk_3" FOREIGN KEY ("ID_Piloto") REFERENCES "USUARIO" ("idusuario") ON DELETE SET NULL
 );
 
-CREATE TABLE PRESUPUESTO_COSTO_INDIRECTO (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Presupuesto  INT         NOT NULL,
-    nombre_costo    VARCHAR(150),
-    costo           DECIMAL(12,2),
-    FOREIGN KEY (ID_Presupuesto) REFERENCES PRESUPUESTO_INTERNO(ID) ON DELETE CASCADE
+
+-- swefire_db.PRESUPUESTO_COSTO_INDIRECTO definition
+
+CREATE TABLE "PRESUPUESTO_COSTO_INDIRECTO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Presupuesto" int NOT NULL,
+  "nombre_costo" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "costo" decimal(12,2) DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Presupuesto" ("ID_Presupuesto"),
+  CONSTRAINT "PRESUPUESTO_COSTO_INDIRECTO_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
 );
 
-CREATE TABLE PRESUPUESTO_GASTO_ADMIN (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_Presupuesto  INT         NOT NULL,
-    nombre_gasto    VARCHAR(150),
-    costo           DECIMAL(12,2),
-    FOREIGN KEY (ID_Presupuesto) REFERENCES PRESUPUESTO_INTERNO(ID) ON DELETE CASCADE
+
+-- swefire_db.PRESUPUESTO_GASTO_ADMIN definition
+
+CREATE TABLE "PRESUPUESTO_GASTO_ADMIN" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Presupuesto" int NOT NULL,
+  "nombre_gasto" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "costo" decimal(12,2) DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Presupuesto" ("ID_Presupuesto"),
+  CONSTRAINT "PRESUPUESTO_GASTO_ADMIN_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
 );
 
--- ============================================================
--- TABLA: PROYECTO
--- ============================================================
-CREATE TABLE PROYECTO (
-    id_Proyecto         INT         AUTO_INCREMENT PRIMARY KEY,
-    descripcion_servicio TEXT,
-    ID_Trabajo          INT,        -- FK a TRABAJO (se agrega al final)
-    Id_Cliente          VARCHAR(20),
-    ubicacion           VARCHAR(255),
-    id_cotizacion       INT,
-    orden_servicio      VARCHAR(500),   -- PDF
-    informe_final       VARCHAR(500),   -- PDF
-    factura             VARCHAR(500),   -- PDF
-    fecha_inicio        DATE,
-    fecha_fin           DATE,
-    observaciones       TEXT,
-    estado              ENUM('Pendiente','En Ejecución','Completado','En proceso legal') DEFAULT 'Pendiente',
-    FOREIGN KEY (Id_Cliente) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE SET NULL,
-    FOREIGN KEY (id_cotizacion) REFERENCES COTIZACION_COMERCIAL(ID) ON DELETE SET NULL
+
+-- swefire_db.INCIDENCIA definition
+
+CREATE TABLE "INCIDENCIA" (
+  "id_incidencia" int NOT NULL AUTO_INCREMENT,
+  "id_proyecto" int DEFAULT NULL,
+  "empresa_involucrada" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "cotizacion_remuneracion" int DEFAULT NULL,
+  "comentario" text COLLATE utf8mb4_unicode_ci,
+  "estado" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id_incidencia"),
+  KEY "id_proyecto" ("id_proyecto"),
+  KEY "empresa_involucrada" ("empresa_involucrada"),
+  KEY "cotizacion_remuneracion" ("cotizacion_remuneracion"),
+  CONSTRAINT "INCIDENCIA_ibfk_1" FOREIGN KEY ("id_proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE SET NULL,
+  CONSTRAINT "INCIDENCIA_ibfk_2" FOREIGN KEY ("empresa_involucrada") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE SET NULL,
+  CONSTRAINT "INCIDENCIA_ibfk_3" FOREIGN KEY ("cotizacion_remuneracion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE SET NULL
 );
 
--- Subtabla: camiones ingresados al proyecto
-CREATE TABLE PROYECTO_CAMION (
-    id                  INT         AUTO_INCREMENT PRIMARY KEY,
-    id_Proyecto         INT         NOT NULL,
-    Placa               VARCHAR(20) NOT NULL,
-    personal_manejando  INT,        -- FK a USUARIO
-    fecha_hora_entrada  DATETIME,
-    fecha_hora_salida   DATETIME,
-    FOREIGN KEY (id_Proyecto) REFERENCES PROYECTO(id_Proyecto) ON DELETE CASCADE,
-    FOREIGN KEY (Placa) REFERENCES CAMION(Placa) ON DELETE CASCADE,
-    FOREIGN KEY (personal_manejando) REFERENCES USUARIO(idusuario) ON DELETE SET NULL
+
+-- swefire_db.INCIDENCIA_OBJETOS definition
+
+CREATE TABLE "INCIDENCIA_OBJETOS" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_incidencia" int NOT NULL,
+  "id_proyecto_inventario" int DEFAULT NULL,
+  "id_proyecto_camion" int DEFAULT NULL,
+  "ocurrencia_inventario" enum('averia','perdida','robo','por mantener','otro') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ocurrencia_camion" enum('averia','perdida','robo','por mantener','otro','ninguna') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_perdida" datetime DEFAULT NULL,
+  "cantidad" int DEFAULT NULL,
+  "ultima_ubicacion" text COLLATE utf8mb4_unicode_ci,
+  "comentario" text COLLATE utf8mb4_unicode_ci,
+  "precio_remunerar" decimal(10,2) DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "id_incidencia" ("id_incidencia"),
+  KEY "id_proyecto_inventario" ("id_proyecto_inventario"),
+  KEY "id_proyecto_camion" ("id_proyecto_camion"),
+  CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_1" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE CASCADE,
+  CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_2" FOREIGN KEY ("id_proyecto_inventario") REFERENCES "PROYECTO_INVENTARIO" ("id") ON DELETE SET NULL,
+  CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_3" FOREIGN KEY ("id_proyecto_camion") REFERENCES "PROYECTO_CAMION" ("id") ON DELETE SET NULL
 );
 
--- Subtabla: documentación extra del proyecto
-CREATE TABLE PROYECTO_DOCUMENTACION (
-    id          INT         AUTO_INCREMENT PRIMARY KEY,
-    id_Proyecto INT         NOT NULL,
-    pdf_url     VARCHAR(500),
-    FOREIGN KEY (id_Proyecto) REFERENCES PROYECTO(id_Proyecto) ON DELETE CASCADE
+
+-- swefire_db.INVOLUCRADO definition
+
+CREATE TABLE "INVOLUCRADO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "dni_involucrado" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "id_trabajo" int NOT NULL,
+  "id_incidencia" int NOT NULL,
+  "version_de_hechos" text COLLATE utf8mb4_unicode_ci,
+  "comentario" text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY ("id"),
+  KEY "dni_involucrado" ("dni_involucrado"),
+  KEY "id_trabajo" ("id_trabajo"),
+  KEY "id_incidencia" ("id_incidencia"),
+  CONSTRAINT "INVOLUCRADO_ibfk_1" FOREIGN KEY ("dni_involucrado") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE,
+  CONSTRAINT "INVOLUCRADO_ibfk_2" FOREIGN KEY ("id_trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE CASCADE,
+  CONSTRAINT "INVOLUCRADO_ibfk_3" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE CASCADE
 );
 
--- Subtabla: inventario del proyecto
-CREATE TABLE PROYECTO_INVENTARIO (
-    id                  INT         AUTO_INCREMENT PRIMARY KEY,
-    id_Proyecto         INT         NOT NULL,
-    Id_Objeto           INT         NOT NULL,
-    cantidad_objeto     INT,
-    estado_post         ENUM('aceptable','robado','averiado','desconocido'),
-    fecha_salida        DATE,
-    fecha_retorno       DATE,
-    metodo_traslado     VARCHAR(100),
-    FOREIGN KEY (id_Proyecto) REFERENCES PROYECTO(id_Proyecto) ON DELETE CASCADE,
-    FOREIGN KEY (Id_Objeto) REFERENCES INVENTARIO(Id_Objeto) ON DELETE CASCADE
+
+-- swefire_db.PROYECTO definition
+
+CREATE TABLE "PROYECTO" (
+  "id_Proyecto" int NOT NULL AUTO_INCREMENT,
+  "descripcion_servicio" text COLLATE utf8mb4_unicode_ci,
+  "ID_Trabajo" int DEFAULT NULL,
+  "Id_Cliente" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ubicacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "id_cotizacion" int DEFAULT NULL,
+  "orden_servicio" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "informe_final" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "factura" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_inicio" date DEFAULT NULL,
+  "fecha_fin" date DEFAULT NULL,
+  "observaciones" text COLLATE utf8mb4_unicode_ci,
+  "estado" enum('Pendiente','En Ejecución','Completado','En proceso legal') COLLATE utf8mb4_unicode_ci DEFAULT 'Pendiente',
+  PRIMARY KEY ("id_Proyecto"),
+  KEY "Id_Cliente" ("Id_Cliente"),
+  KEY "id_cotizacion" ("id_cotizacion"),
+  KEY "fk_proyecto_trabajo" ("ID_Trabajo"),
+  CONSTRAINT "fk_proyecto_trabajo" FOREIGN KEY ("ID_Trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE SET NULL,
+  CONSTRAINT "PROYECTO_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE SET NULL,
+  CONSTRAINT "PROYECTO_ibfk_2" FOREIGN KEY ("id_cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE SET NULL
 );
 
--- ============================================================
--- TABLA: TRABAJO
--- ============================================================
-CREATE TABLE TRABAJO (
-    Id_trabajo      INT         AUTO_INCREMENT PRIMARY KEY,
-    Id_Proyecto     INT,
-    fecha           DATE,
-    horario         VARCHAR(100),
-    asistencia      TEXT,
-    comentario      TEXT,
-    FOREIGN KEY (Id_Proyecto) REFERENCES PROYECTO(id_Proyecto) ON DELETE SET NULL
+
+-- swefire_db.PROYECTO_CAMION definition
+
+CREATE TABLE "PROYECTO_CAMION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_Proyecto" int NOT NULL,
+  "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "personal_manejando" int DEFAULT NULL,
+  "fecha_hora_entrada" datetime DEFAULT NULL,
+  "fecha_hora_salida" datetime DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "id_Proyecto" ("id_Proyecto"),
+  KEY "Placa" ("Placa"),
+  KEY "personal_manejando" ("personal_manejando"),
+  CONSTRAINT "PROYECTO_CAMION_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_CAMION_ibfk_2" FOREIGN KEY ("Placa") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_CAMION_ibfk_3" FOREIGN KEY ("personal_manejando") REFERENCES "USUARIO" ("idusuario") ON DELETE SET NULL
 );
 
--- Subtabla: jornada de trabajo
-CREATE TABLE TRABAJO_JORNADA (
-    id                  INT         AUTO_INCREMENT PRIMARY KEY,
-    Id_trabajo          INT         NOT NULL,
-    DNI_Trabajador      VARCHAR(20) NOT NULL,
-    dia                 DATE,
-    horario_entrada     TIME,
-    horario_salida      TIME,
-    FOREIGN KEY (Id_trabajo) REFERENCES TRABAJO(Id_trabajo) ON DELETE CASCADE,
-    FOREIGN KEY (DNI_Trabajador) REFERENCES PERFIL(DNI) ON DELETE CASCADE
+
+-- swefire_db.PROYECTO_DOCUMENTACION definition
+
+CREATE TABLE "PROYECTO_DOCUMENTACION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_Proyecto" int NOT NULL,
+  "pdf_url" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "id_Proyecto" ("id_Proyecto"),
+  CONSTRAINT "PROYECTO_DOCUMENTACION_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE
 );
 
--- Subtabla: RRHH del trabajador en el trabajo
-CREATE TABLE TRABAJO_RRHH (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    Id_trabajo      INT         NOT NULL,
-    DNI_Trabajador  VARCHAR(20) NOT NULL,
-    estado_pago     ENUM('completado','por realizar','no pagar aun','devolucion pendiente'),
-    FOREIGN KEY (Id_trabajo) REFERENCES TRABAJO(Id_trabajo) ON DELETE CASCADE,
-    FOREIGN KEY (DNI_Trabajador) REFERENCES PERFIL(DNI) ON DELETE CASCADE
+
+-- swefire_db.PROYECTO_INVENTARIO definition
+
+CREATE TABLE "PROYECTO_INVENTARIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_Proyecto" int NOT NULL,
+  "Id_Objeto" int NOT NULL,
+  "cantidad_objeto" int DEFAULT NULL,
+  "estado_post" enum('aceptable','robado','averiado','desconocido') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_salida" date DEFAULT NULL,
+  "fecha_retorno" date DEFAULT NULL,
+  "metodo_traslado" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "id_Proyecto" ("id_Proyecto"),
+  KEY "Id_Objeto" ("Id_Objeto"),
+  CONSTRAINT "PROYECTO_INVENTARIO_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_INVENTARIO_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
 );
 
--- Subtabla: PDFs de RRHH
-CREATE TABLE TRABAJO_RRHH_PDF (
-    id              INT         AUTO_INCREMENT PRIMARY KEY,
-    ID_RRHH         INT         NOT NULL,
-    pdf_url         VARCHAR(500),
-    FOREIGN KEY (ID_RRHH) REFERENCES TRABAJO_RRHH(id) ON DELETE CASCADE
+
+-- swefire_db.TRABAJO definition
+
+CREATE TABLE "TRABAJO" (
+  "Id_trabajo" int NOT NULL AUTO_INCREMENT,
+  "Id_Proyecto" int DEFAULT NULL,
+  "fecha" date DEFAULT NULL,
+  "horario" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "asistencia" text COLLATE utf8mb4_unicode_ci,
+  "comentario" text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY ("Id_trabajo"),
+  KEY "fk_trabajo_proyecto" ("Id_Proyecto"),
+  CONSTRAINT "fk_trabajo_proyecto" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE SET NULL,
+  CONSTRAINT "TRABAJO_ibfk_1" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE SET NULL
 );
 
-CREATE TABLE INCIDENCIA (
-    id_incidencia INT AUTO_INCREMENT PRIMARY KEY,
 
-    id_proyecto INT NULL,
-    empresa_involucrada VARCHAR(20) NULL,
-    cotizacion_remuneracion INT NULL,
+-- swefire_db.TRABAJO_JORNADA definition
 
-    comentario TEXT,
-    estado VARCHAR(50),
-
-    FOREIGN KEY (id_proyecto) REFERENCES PROYECTO(id_proyecto) ON DELETE SET NULL,
-    FOREIGN KEY (empresa_involucrada) REFERENCES CLIENTE(DNI_O_RUC) ON DELETE SET NULL,
-    FOREIGN KEY (cotizacion_remuneracion) REFERENCES COTIZACION_COMERCIAL(id) ON DELETE SET NULL
+CREATE TABLE "TRABAJO_JORNADA" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "Id_trabajo" int NOT NULL,
+  "DNI_Trabajador" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "dia" date DEFAULT NULL,
+  "horario_entrada" time DEFAULT NULL,
+  "horario_salida" time DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "Id_trabajo" ("Id_trabajo"),
+  KEY "DNI_Trabajador" ("DNI_Trabajador"),
+  CONSTRAINT "TRABAJO_JORNADA_ibfk_1" FOREIGN KEY ("Id_trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE CASCADE,
+  CONSTRAINT "TRABAJO_JORNADA_ibfk_2" FOREIGN KEY ("DNI_Trabajador") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
 );
 
-CREATE TABLE INCIDENCIA_OBJETOS (
-    id INT AUTO_INCREMENT PRIMARY KEY,
 
-    id_incidencia INT NOT NULL,
+-- swefire_db.TRABAJO_RRHH definition
 
-    id_proyecto_inventario INT NULL,
-    id_proyecto_camion INT NULL,
-
-    ocurrencia_inventario ENUM('averia','perdida','robo','por mantener','otro') NULL,
-    ocurrencia_camion ENUM('averia','perdida','robo','por mantener','otro','ninguna') NULL,
-
-    fecha_perdida DATETIME,
-    cantidad INT,
-    ultima_ubicacion TEXT,
-    comentario TEXT,
-    precio_remunerar DECIMAL(10,2),
-
-    FOREIGN KEY (id_incidencia) REFERENCES INCIDENCIA(id_incidencia) ON DELETE CASCADE,
-    FOREIGN KEY (id_proyecto_inventario) REFERENCES PROYECTO_INVENTARIO(id) ON DELETE SET NULL,
-    FOREIGN KEY (id_proyecto_camion) REFERENCES PROYECTO_CAMION(id) ON DELETE SET NULL
+CREATE TABLE "TRABAJO_RRHH" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "Id_trabajo" int NOT NULL,
+  "DNI_Trabajador" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "estado_pago" enum('completado','por realizar','no pagar aun','devolucion pendiente') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "Id_trabajo" ("Id_trabajo"),
+  KEY "DNI_Trabajador" ("DNI_Trabajador"),
+  CONSTRAINT "TRABAJO_RRHH_ibfk_1" FOREIGN KEY ("Id_trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE CASCADE,
+  CONSTRAINT "TRABAJO_RRHH_ibfk_2" FOREIGN KEY ("DNI_Trabajador") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
 );
 
-CREATE TABLE INVOLUCRADO (
-    id INT AUTO_INCREMENT PRIMARY KEY,
 
-    dni_involucrado VARCHAR(20) NOT NULL,
-    id_trabajo INT NOT NULL,
-    id_incidencia INT NOT NULL,
+-- swefire_db.TRABAJO_RRHH_PDF definition
 
-    version_de_hechos TEXT,
-    comentario TEXT,
-
-    FOREIGN KEY (dni_involucrado) REFERENCES PERFIL(DNI) ON DELETE CASCADE,
-    FOREIGN KEY (id_trabajo) REFERENCES TRABAJO(id_trabajo) ON DELETE CASCADE,
-    FOREIGN KEY (id_incidencia) REFERENCES INCIDENCIA(id_incidencia) ON DELETE CASCADE
+CREATE TABLE "TRABAJO_RRHH_PDF" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_RRHH" int NOT NULL,
+  "pdf_url" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_RRHH" ("ID_RRHH"),
+  CONSTRAINT "TRABAJO_RRHH_PDF_ibfk_1" FOREIGN KEY ("ID_RRHH") REFERENCES "TRABAJO_RRHH" ("id") ON DELETE CASCADE
 );
 
 -- ============================================================
