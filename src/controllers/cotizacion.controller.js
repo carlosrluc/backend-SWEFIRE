@@ -129,6 +129,11 @@ exports.create = async (req, res) => {
             'INSERT INTO COTIZACION_COMERCIAL (version,nombre,id_solicitud,DNI_O_RUC,precio_total,estado,comentario_cliente) VALUES (?,?,?,?,?,?,?)',
             [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente]
         );
+
+        if (id_solicitud) {
+            await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID = ?`, [id_solicitud]);
+        }
+
         res.status(201).json({ message: 'Cotización creada', ID: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -149,6 +154,10 @@ exports.update = async (req, res) => {
             [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+
+        await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
+        await db.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
+
         res.json({ message: 'Cotización actualizada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -157,6 +166,9 @@ exports.remove = async (req, res) => {
     try {
         const [result] = await db.query('DELETE FROM COTIZACION_COMERCIAL WHERE ID = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+
+        await db.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
+
         res.json({ message: 'Cotización eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };

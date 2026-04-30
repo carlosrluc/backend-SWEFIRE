@@ -308,6 +308,8 @@ CREATE TABLE "SOLICITUD" (
   "CamionesEnvio" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "ObsGenerales" text COLLATE utf8mb4_unicode_ci,
   "ObsEleccion" text COLLATE utf8mb4_unicode_ci,
+    "estado" enum('pendiente','aceptado','rechazado') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "Respuesta" text COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY ("ID"),
   KEY "Id_Cliente" ("Id_Cliente"),
   CONSTRAINT "SOLICITUD_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE

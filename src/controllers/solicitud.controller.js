@@ -54,7 +54,8 @@ exports.getById = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
-    const { Id_Cliente, descripcion, ubicacion } = req.body;
+    const { Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, Respuesta } = req.body;
+    const estado = 'pendiente';
     try {
         let clientIdToUse = Id_Cliente;
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -62,15 +63,15 @@ exports.create = async (req, res) => {
         }
 
         const [result] = await db.query(
-            'INSERT INTO SOLICITUD (Id_Cliente,descripcion,ubicacion) VALUES (?,?,?)',
-            [clientIdToUse, descripcion, ubicacion]
+            'INSERT INTO SOLICITUD (Id_Cliente,descripcion,ubicacion,ProductoEnvio,CamionesEnvio,ObsGenerales,ObsEleccion,estado,Respuesta) VALUES (?,?,?,?,?,?,?,?,?)',
+            [clientIdToUse, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta]
         );
         res.status(201).json({ message: 'Solicitud creada', ID: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.update = async (req, res) => {
-    const { Id_Cliente, descripcion, ubicacion } = req.body;
+    const { Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta } = req.body;
     try {
         if (req.user && req.user.rolNormalizado === 'cliente') {
             const check = await db.query('SELECT ID FROM SOLICITUD WHERE ID = ? AND Id_Cliente = ?', [req.params.id, req.user.dni_perfil]);
@@ -78,8 +79,8 @@ exports.update = async (req, res) => {
         }
 
         const [result] = await db.query(
-            'UPDATE SOLICITUD SET Id_Cliente=?,descripcion=?,ubicacion=? WHERE ID=?',
-            [req.user && req.user.rolNormalizado === 'cliente' ? req.user.dni_perfil : Id_Cliente, descripcion, ubicacion, req.params.id]
+            'UPDATE SOLICITUD SET Id_Cliente=?,descripcion=?,ubicacion=?,ProductoEnvio=?,CamionesEnvio=?,ObsGenerales=?,ObsEleccion=?,estado=?,Respuesta=? WHERE ID=?',
+            [req.user && req.user.rolNormalizado === 'cliente' ? req.user.dni_perfil : Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Solicitud actualizada' });

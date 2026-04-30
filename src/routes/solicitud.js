@@ -50,6 +50,8 @@ const c = require('../controllers/solicitud.controller');
  *               camionesenvio: { type: string }
  *               obsgenerales: { type: string }
  *               obseleccion: { type: string }
+ *               estado: { type: string, enum: ['pendiente','aceptado','rechazado'] }
+ *               Respuesta: { type: string }
  *     responses:
  *       201:
  *         description: Solicitud creada
@@ -95,6 +97,8 @@ router.post('/', c.create);
  *               camionesenvio: { type: string }
  *               obsgenerales: { type: string }
  *               obseleccion: { type: string }
+ *               estado: { type: string, enum: ['pendiente','aceptado','rechazado'] }
+ *               Respuesta: { type: string }
  *     responses:
  *       200:
  *         description: Actualizada
