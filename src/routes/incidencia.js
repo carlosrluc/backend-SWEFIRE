@@ -50,6 +50,23 @@ router.post('/', auth, permit(['abogado', 'gerente', 'adminproy', 'supervisorcam
 
 /**
  * @openapi
+ * /api/incidencias/proyecto/{id_proyecto}:
+ *   get:
+ *     tags: [Incidencias]
+ *     summary: Obtener incidencias por ID de proyecto
+ *     parameters:
+ *       - in: path
+ *         name: id_proyecto
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Lista de incidencias del proyecto
+ */
+router.get('/proyecto/:id_proyecto', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy', 'supervisorcampo']), c.getByProyecto);
+
+/**
+ * @openapi
  * /api/incidencias/{id}:
  *   get:
  *     tags: [Incidencias]

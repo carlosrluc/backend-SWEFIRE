@@ -209,6 +209,31 @@ exports.deleteCertificacion = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+exports.getTrabajadoresDisponibles = async (req, res) => {
+    const { fecha } = req.query;
+    try {
+        if (!fecha) {
+            return res.status(400).json({ error: 'Se requiere el parámetro fecha (YYYY-MM-DD)' });
+        }
+
+        const sql = `
+            SELECT p.DNI as dni, p.Nombre as nombre, p.Apellido as apellidos, u.rol
+            FROM PERFIL p
+            JOIN USUARIO u ON p.DNI = u.dni_perfil
+            WHERE (LOWER(u.rol) IN ('supervisorcampo', 'trabajtaller', 'trabajcampo'))
+            AND p.DNI NOT IN (
+                SELECT DNI_Trabajador 
+                FROM TRABAJO_JORNADA 
+                WHERE dia = ?
+            )
+        `;
+        const rows = await db.query(sql, [fecha]);
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
 exports.getConductoresDisponibles = async (req, res) => {
     const { fecha } = req.query;
     try {

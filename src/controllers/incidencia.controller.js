@@ -40,6 +40,20 @@ exports.getById = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+exports.getByProyecto = async (req, res) => {
+    try {
+        const rows = await db.query(
+            `SELECT INC.*, CC.nombre as Cotizacion_Nombre, C.nombre_comercial as Cliente_Nombre 
+             FROM INCIDENCIA INC 
+             LEFT JOIN COTIZACION_COMERCIAL CC ON INC.cotizacion_remuneracion = CC.ID 
+             LEFT JOIN CLIENTE C ON INC.empresa_involucrada = C.DNI_O_RUC 
+             WHERE INC.id_proyecto = ?`, 
+            [req.params.id_proyecto]
+        );
+        res.json(rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
 exports.create = async (req, res) => {
     const { id_proyecto, empresa_involucrada, cotizacion_remuneracion, comentario, estado } = req.body;
     try {

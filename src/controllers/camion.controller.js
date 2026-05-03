@@ -47,15 +47,15 @@ exports.getByPlaca = async (req, res) => {
 exports.create = async (req, res) => {
     const { Placa, nombre, ano_fabricacion, modelo, color, caracteristicas,
         revision_tecnica, fecha_prox_revision, ID_Fabricante, tarjeta_propiedad,
-        vencimiento_tarjeta, soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago } = req.body;
+        vencimiento_tarjeta, soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado } = req.body;
     try {
         await db.query(
             `INSERT INTO CAMION (Placa,nombre,ano_fabricacion,modelo,color,caracteristicas,revision_tecnica,
              fecha_prox_revision,ID_Fabricante,tarjeta_propiedad,vencimiento_tarjeta,soat_n_poliza,
-             soat_empresa,soat_precio,soat_dia_pago) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             soat_empresa,soat_precio,soat_dia_pago,Estado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [Placa, nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
              fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
-             soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago]
+             soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado]
         );
         res.status(201).json({ message: 'Camión creado', Placa });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -69,7 +69,7 @@ exports.update = async (req, res) => {
         const [result] = await db.query(
             `UPDATE CAMION SET nombre=?,ano_fabricacion=?,modelo=?,color=?,caracteristicas=?,revision_tecnica=?,
              fecha_prox_revision=?,ID_Fabricante=?,tarjeta_propiedad=?,vencimiento_tarjeta=?,soat_n_poliza=?,
-             soat_empresa=?,soat_precio=?,soat_dia_pago=? WHERE Placa=?`,
+             soat_empresa=?,soat_precio=?,soat_dia_pago=?,Estado=? WHERE Placa=?`,
             [nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
              fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
              soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, req.params.placa]

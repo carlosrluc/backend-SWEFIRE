@@ -7,17 +7,52 @@ exports.getAll = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        const rows = await db.query(
-            `SELECT P.*, C.nombre_comercial as Cliente_Nombre, CC.nombre as Cotizacion_Nombre, T.comentario as Trabajo_Comentario 
-             FROM PROYECTO P 
-             LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
-             LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
-             LEFT JOIN TRABAJO T ON P.ID_Trabajo = T.Id_trabajo 
-             LIMIT ? OFFSET ?`,
-            [limit, offset]
-        );
+        const { buscar, fecha_inicio, fecha_fin, estado } = req.query;
 
-        const countResult = await db.query('SELECT COUNT(*) as total FROM PROYECTO');
+        let whereClauses = [];
+        let queryParams = [];
+
+        if (buscar) {
+            whereClauses.push('(P.descripcion_servicio LIKE ? OR C.nombre_comercial LIKE ? OR P.ubicacion LIKE ?)');
+            const searchPattern = `%${buscar}%`;
+            queryParams.push(searchPattern, searchPattern, searchPattern);
+        }
+
+        if (fecha_inicio) {
+            whereClauses.push('P.fecha_inicio >= ?');
+            queryParams.push(fecha_inicio);
+        }
+
+        if (fecha_fin) {
+            whereClauses.push('P.fecha_fin <= ?');
+            queryParams.push(fecha_fin);
+        }
+
+        if (estado) {
+            whereClauses.push('P.estado = ?');
+            queryParams.push(estado);
+        }
+
+        const whereString = whereClauses.length > 0 ? 'WHERE ' + whereClauses.join(' AND ') : '';
+
+        const queryStr = `
+            SELECT P.*, C.nombre_comercial as Cliente_Nombre, CC.nombre as Cotizacion_Nombre, T.comentario as Trabajo_Comentario 
+            FROM PROYECTO P 
+            LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
+            LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
+            LEFT JOIN TRABAJO T ON P.ID_Trabajo = T.Id_trabajo 
+            ${whereString}
+            LIMIT ? OFFSET ?`;
+
+        const rows = await db.query(queryStr, [...queryParams, limit, offset]);
+
+        const countQueryStr = `
+            SELECT COUNT(*) as total 
+            FROM PROYECTO P 
+            LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
+            ${whereString}`;
+        
+        const countResult = await db.query(countQueryStr, queryParams);
         const total = countResult[0].total;
 
         res.json({
@@ -168,11 +203,11 @@ exports.getCamiones = async (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createCamion = async (req, res) => {
-    const { Placa, personal_manejando, fecha_hora_entrada, fecha_hora_salida } = req.body;
+    const { Placa, personal_manejando, fecha_hora_entrada, fecha_hora_salida, estado, razon } = req.body;
     try {
         const [r] = await db.query(
             'INSERT INTO PROYECTO_CAMION (id_Proyecto,Placa,personal_manejando,fecha_hora_entrada,fecha_hora_salida) VALUES (?,?,?,?,?)',
-            [req.params.id, Placa, personal_manejando, fecha_hora_entrada, fecha_hora_salida]
+            [req.params.id, Placa, personal_manejando, fecha_hora_entrada, fecha_hora_salida, estado, razon]
         );
         res.status(201).json({ message: 'Camión en proyecto creado', id: r.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -211,11 +246,11 @@ exports.getInventario = async (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createInventario = async (req, res) => {
-    const { Id_Objeto, cantidad_objeto, estado_post, fecha_salida, fecha_retorno, metodo_traslado } = req.body;
+    const { Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon } = req.body;
     try {
         const [r] = await db.query(
-            'INSERT INTO PROYECTO_INVENTARIO (id_Proyecto,Id_Objeto,cantidad_objeto,estado_post,fecha_salida,fecha_retorno,metodo_traslado) VALUES (?,?,?,?,?,?,?)',
-            [req.params.id, Id_Objeto, cantidad_objeto, estado_post, fecha_salida, fecha_retorno, metodo_traslado]
+            'INSERT INTO PROYECTO_INVENTARIO (id_Proyecto,Id_Objeto,cantidad_objeto,estado,fecha_salida,fecha_retorno,metodo_traslado,razon) VALUES (?,?,?,?,?,?,?,?)',
+            [req.params.id, Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon]
         );
         res.status(201).json({ message: 'Inventario en proyecto creado', id: r.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }

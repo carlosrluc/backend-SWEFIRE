@@ -165,6 +165,8 @@ router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
  *               personal_manejando: { type: integer }
  *               fecha_hora_entrada: { type: string, format: date-time }
  *               fecha_hora_salida: { type: string, format: date-time }
+ *               estado: { type: string, enum: [aceptable, robado, averiado, desconocido] }
+ *               razon: { type: string }
  *     responses:
  *       201:
  *         description: Camión asignado
@@ -283,7 +285,8 @@ router.delete('/:id/documentacion/:did', auth, permit(['gerente', 'adminproy']),
  *             properties:
  *               Id_Objeto: { type: integer }
  *               cantidad_objeto: { type: integer }
- *               estado_post: { type: string, enum: [aceptable, robado, averiado, desconocido] }
+ *               estado: { type: string, enum: [aceptable, robado, averiado, desconocido] }
+ *               razon: { type: string }
  *               fecha_salida: { type: string, format: date }
  *               fecha_retorno: { type: string, format: date }
  *               metodo_traslado: { type: string }

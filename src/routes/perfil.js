@@ -34,6 +34,24 @@ const c = require('../controllers/perfil.controller');
  *       400:
  *         description: Fecha faltante
  */
+/**
+ * @openapi
+ * /api/perfiles/trabajadores/disponibles:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener trabajadores disponibles en una fecha
+ *     parameters:
+ *       - in: query
+ *         name: fecha
+ *         required: true
+ *         schema: { type: string, format: date }
+ *         description: Fecha para la cual verificar disponibilidad (YYYY-MM-DD)
+ *     responses:
+ *       200:
+ *         description: Lista de trabajadores disponibles
+ */
+router.get('/trabajadores/disponibles', c.getTrabajadoresDisponibles);
+
 router.get('/conductores/disponibles', c.getConductoresDisponibles);
 
 /**

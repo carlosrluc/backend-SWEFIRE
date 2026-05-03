@@ -79,7 +79,7 @@ exports.update = async (req, res) => {
         }
 
         const [result] = await db.query(
-            'UPDATE SOLICITUD SET Id_Cliente=?,descripcion=?,ubicacion=?,ProductoEnvio=?,CamionesEnvio=?,ObsGenerales=?,ObsEleccion=?,estado=?,Respuesta=? WHERE ID=?',
+            'UPDATE SOLICITUD SET Id_Cliente=?,descripcion=?,ubicacion=?,ProductoEnvio=?,CamionesEnvio=?,ObsGenerales=?,ObsEleccion=?,estado=?,Respuesta=?,FechaCreacion=? WHERE ID=?',
             [req.user && req.user.rolNormalizado === 'cliente' ? req.user.dni_perfil : Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

@@ -4,6 +4,8 @@
 
 CREATE DATABASE IF NOT EXISTS swefire_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE swefire_db;
+-- swefire_db.CLIENTE definition
+
 CREATE TABLE "CLIENTE" (
   "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   "nombre_comercial" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -88,6 +90,7 @@ CREATE TABLE "CAMION" (
   "soat_empresa" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "soat_precio" decimal(10,2) DEFAULT NULL,
   "soat_dia_pago" date DEFAULT NULL,
+  "Estado" enum('Operacional','Ocupado','En mantenimiento','inoperativo','descalificado') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("Placa"),
   KEY "ID_Fabricante" ("ID_Fabricante"),
   CONSTRAINT "CAMION_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE SET NULL
@@ -308,8 +311,9 @@ CREATE TABLE "SOLICITUD" (
   "CamionesEnvio" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "ObsGenerales" text COLLATE utf8mb4_unicode_ci,
   "ObsEleccion" text COLLATE utf8mb4_unicode_ci,
-    "estado" enum('pendiente','aceptado','rechazado') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "estado" enum('pendiente','aceptado','rechazado') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "Respuesta" text COLLATE utf8mb4_unicode_ci,
+  "FechaCreacion" date DEFAULT NULL,
   PRIMARY KEY ("ID"),
   KEY "Id_Cliente" ("Id_Cliente"),
   CONSTRAINT "SOLICITUD_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE
@@ -435,6 +439,7 @@ CREATE TABLE "COTIZACION_INVENTARIO" (
   "fecha_ingreso_taller" datetime DEFAULT NULL,
   "observaciones" text COLLATE utf8mb4_unicode_ci,
   "Costo_Comercial" float DEFAULT NULL,
+  "Razon" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "ID_Cotizacion" ("ID_Cotizacion"),
   KEY "ID_Inventario" ("ID_Inventario"),
@@ -544,6 +549,7 @@ CREATE TABLE "COTIZACION_CAMION" (
   "fecha_hora_salida" datetime DEFAULT NULL,
   "ID_Piloto" int DEFAULT NULL,
   "PrecioUnit" float DEFAULT NULL,
+  "Razon" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "ID_Cotizacion" ("ID_Cotizacion"),
   KEY "Placa" ("Placa"),
@@ -677,6 +683,8 @@ CREATE TABLE "PROYECTO_CAMION" (
   "personal_manejando" int DEFAULT NULL,
   "fecha_hora_entrada" datetime DEFAULT NULL,
   "fecha_hora_salida" datetime DEFAULT NULL,
+  "estado" enum('aceptable','robado','averiado','desconocido') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "razon" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "id_Proyecto" ("id_Proyecto"),
   KEY "Placa" ("Placa"),
@@ -706,10 +714,11 @@ CREATE TABLE "PROYECTO_INVENTARIO" (
   "id_Proyecto" int NOT NULL,
   "Id_Objeto" int NOT NULL,
   "cantidad_objeto" int DEFAULT NULL,
-  "estado_post" enum('aceptable','robado','averiado','desconocido') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "estado" enum('aceptable','robado','averiado','desconocido') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_salida" date DEFAULT NULL,
   "fecha_retorno" date DEFAULT NULL,
   "metodo_traslado" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "razon" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "id_Proyecto" ("id_Proyecto"),
   KEY "Id_Objeto" ("Id_Objeto"),
@@ -725,8 +734,8 @@ CREATE TABLE "TRABAJO" (
   "Id_Proyecto" int DEFAULT NULL,
   "fecha" date DEFAULT NULL,
   "horario" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "asistencia" text COLLATE utf8mb4_unicode_ci,
   "comentario" text COLLATE utf8mb4_unicode_ci,
+  "asistencia" enum('Programada','Cancelada','Realizada') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("Id_trabajo"),
   KEY "fk_trabajo_proyecto" ("Id_Proyecto"),
   CONSTRAINT "fk_trabajo_proyecto" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE SET NULL,

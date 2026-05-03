@@ -52,6 +52,7 @@ const c = require('../controllers/solicitud.controller');
  *               obseleccion: { type: string }
  *               estado: { type: string, enum: ['pendiente','aceptado','rechazado'] }
  *               Respuesta: { type: string }
+ *               FechaCreacion: { type: string, format: date }
  *     responses:
  *       201:
  *         description: Solicitud creada
@@ -99,6 +100,7 @@ router.post('/', c.create);
  *               obseleccion: { type: string }
  *               estado: { type: string, enum: ['pendiente','aceptado','rechazado'] }
  *               Respuesta: { type: string }
+ *               FechaCreacion: { type: string, format: date }
  *     responses:
  *       200:
  *         description: Actualizada

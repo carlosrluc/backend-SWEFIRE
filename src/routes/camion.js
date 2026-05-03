@@ -56,6 +56,7 @@ const c = require('../controllers/camion.controller');
  *               soat_empresa: { type: string }
  *               soat_precio: { type: number }
  *               soat_dia_pago: { type: string, format: date }
+ *               Estado: { type: string, enum: ['Operacional','Ocupado','En mantenimiento','inoperativo','descalificado'] }
  *     responses:
  *       201:
  *         description: Camión creado
@@ -101,6 +102,7 @@ router.post('/', c.create);
  *               soat_empresa: { type: string }
  *               soat_precio: { type: number }
  *               soat_dia_pago: { type: string, format: date }
+ *               Estado: { type: string, enum: ['Operacional','Ocupado','En mantenimiento','inoperativo','descalificado'] }
  *     responses:
  *       200:
  *         description: Camión actualizado

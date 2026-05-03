@@ -36,7 +36,7 @@ const c = require('../controllers/trabajo.controller');
  *               Id_Proyecto: { type: integer }
  *               fecha: { type: string, format: date }
  *               horario: { type: string }
- *               asistencia: { type: string }
+ *               asistencia: { type: string, enum: [Programada, Cancelada, Realizada] }
  *               comentario: { type: string }
  *     responses:
  *       201:
@@ -78,7 +78,7 @@ router.post('/', c.create);
  *             properties:
  *               fecha: { type: string, format: date }
  *               horario: { type: string }
- *               asistencia: { type: string }
+ *               asistencia: { type: string, enum: [Programada, Cancelada, Realizada] }
  *               comentario: { type: string }
  *     responses:
  *       200:
