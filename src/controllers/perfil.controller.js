@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { formatQuotation } = require('./cotizacion.controller');
 
 // ── PERFIL ────────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
@@ -279,11 +280,13 @@ exports.getSolicitudesPorPerfil = async (req, res) => {
 exports.getCotizacionesPorPerfil = async (req, res) => {
     try {
         const sql = `
-            SELECT C.* 
+            SELECT C.*, CL.nombre_comercial as Cliente_Nombre 
             FROM COTIZACION_COMERCIAL C
             JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
+            LEFT JOIN CLIENTE CL ON C.DNI_O_RUC = CL.DNI_O_RUC
             WHERE CC.DNI_perfil = ?`;
-        res.json(await db.query(sql, [req.params.dni]));
+        const rows = await db.query(sql, [req.params.dni]);
+        res.json(rows.map(r => formatQuotation(r, req.user ? req.user.rolNormalizado : null)));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

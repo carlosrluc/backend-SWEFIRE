@@ -1,5 +1,42 @@
 const db = require('../config/db');
 
+exports.formatQuotation = (row, rol) => {
+    let estadoFormateado = "pendiente";
+    if (row.estado === "aprobado") estadoFormateado = "aprobado";
+    else if (row.estado === "rechazado por cliente" || row.estado === "descartada") estadoFormateado = "rechazado";
+
+    const quotation = {
+        ID: row.ID,
+        nombre: row.nombre || "",
+        precioTotal: row.precio_total ? row.precio_total.toString() : "0.00",
+        version: row.version || 1,
+        condiciones: {
+            fechaEmision: row.fecha_emision ? new Date(row.fecha_emision).toISOString().split('T')[0] : "",
+            fechaVigencia: row.fecha_vigencia ? new Date(row.fecha_vigencia).toISOString().split('T')[0] : "",
+            condiciones: row.condiciones || "",
+            observaciones: row.observacion || ""
+        },
+        estado: estadoFormateado,
+        tasaCambio: {
+            tasaCompra: row.Tasa_Cambio || 0,
+            tasaVenta: row.Tasa_Cambio || 0
+        },
+        mensajes: {
+            comentarioCliente: row.comentario_cliente || ""
+        },
+        // Atributos originales no mencionados en el JSON
+        id_solicitud: row.id_solicitud,
+        DNI_O_RUC: row.DNI_O_RUC,
+        Tasa_Cambio: row.Tasa_Cambio
+    };
+
+    if (rol !== 'cliente' && row.Cliente_Nombre) {
+        quotation.nombreCliente = row.Cliente_Nombre;
+    }
+
+    return quotation;
+};
+
 // ── COTIZACION_COMERCIAL ──────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
     try {
@@ -33,7 +70,7 @@ exports.getAll = async (req, res) => {
         const total = countResult[0].total;
 
         res.json({
-            data: rows,
+            data: rows.map(r => exports.formatQuotation(r, req.user ? req.user.rolNormalizado : null)),
             pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -56,7 +93,7 @@ exports.getById = async (req, res) => {
 
         const rows = await db.query(query, args);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado o sin permiso' });
-        res.json(rows[0]);
+        res.json(exports.formatQuotation(rows[0], req.user ? req.user.rolNormalizado : null));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
