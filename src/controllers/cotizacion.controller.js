@@ -13,11 +13,16 @@ exports.getAll = async (req, res) => {
         let countArgs = [];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            const condition = ' WHERE C_C.DNI_O_RUC = ? OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?)';
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+
+            const placeholders = clientIds.map(() => '?').join(',');
+            const condition = ` WHERE C_C.DNI_O_RUC IN (${placeholders}) OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders}))`;
             query += condition;
             countQuery += condition;
-            args.push(req.user.dni_perfil, req.user.dni_perfil);
-            countArgs.push(req.user.dni_perfil, req.user.dni_perfil);
+            args.push(...clientIds, ...clientIds);
+            countArgs.push(...clientIds, ...clientIds);
         }
 
         query += ' LIMIT ? OFFSET ?';
@@ -40,8 +45,13 @@ exports.getById = async (req, res) => {
         let args = [req.params.id];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            query += ' AND (C_C.DNI_O_RUC = ? OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?))';
-            args.push(req.user.dni_perfil, req.user.dni_perfil);
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+
+            const placeholders = clientIds.map(() => '?').join(',');
+            query += ` AND (C_C.DNI_O_RUC IN (${placeholders}) OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`;
+            args.push(...clientIds, ...clientIds);
         }
 
         const rows = await db.query(query, args);
@@ -56,9 +66,14 @@ exports.getDetalles = async (req, res) => {
 
         // Validar permisos si es cliente
         if (req.user && req.user.rolNormalizado === 'cliente') {
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+
+            const placeholders = clientIds.map(() => '?').join(',');
             const check = await db.query(
-                'SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC = ? OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?))',
-                [cotizacionId, req.user.dni_perfil, req.user.dni_perfil]
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                [cotizacionId, ...clientIds, ...clientIds]
             );
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para ver esta cotización' });
         }
@@ -142,9 +157,14 @@ exports.update = async (req, res) => {
     const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente } = req.body;
     try {
         if (req.user && req.user.rolNormalizado === 'cliente') {
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+
+            const placeholders = clientIds.map(() => '?').join(',');
             const check = await db.query(
-                'SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC = ? OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente = ?))',
-                [req.params.id, req.user.dni_perfil, req.user.dni_perfil]
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                [req.params.id, ...clientIds, ...clientIds]
             );
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para editar esta cotización' });
         }

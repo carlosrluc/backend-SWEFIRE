@@ -13,10 +13,14 @@ exports.getAll = async (req, res) => {
         let countArgs = [];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            query += ' WHERE S.Id_Cliente = ?';
-            countQuery += ' WHERE S.Id_Cliente = ?';
-            args.push(req.user.dni_perfil);
-            countArgs.push(req.user.dni_perfil);
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil); // Por si su DNI es directamente un cliente
+
+            query += ` WHERE S.Id_Cliente IN (${clientIds.map(() => '?').join(',')})`;
+            countQuery += ` WHERE S.Id_Cliente IN (${clientIds.map(() => '?').join(',')})`;
+            args.push(...clientIds);
+            countArgs.push(...clientIds);
         }
 
         query += ' LIMIT ? OFFSET ?';
@@ -43,8 +47,12 @@ exports.getById = async (req, res) => {
         let args = [req.params.id];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            query += ' AND S.Id_Cliente = ?';
-            args.push(req.user.dni_perfil);
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+
+            query += ` AND S.Id_Cliente IN (${clientIds.map(() => '?').join(',')})`;
+            args.push(...clientIds);
         }
 
         const rows = await db.query(query, args);
@@ -59,7 +67,12 @@ exports.create = async (req, res) => {
     try {
         let clientIdToUse = Id_Cliente;
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            clientIdToUse = req.user.dni_perfil;
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            if (contactos.length > 0) {
+                clientIdToUse = contactos[0].DNI_O_RUC;
+            } else {
+                clientIdToUse = req.user.dni_perfil;
+            }
         }
 
         const [result] = await db.query(
@@ -71,16 +84,23 @@ exports.create = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
-    const { Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta } = req.body;
+    const { Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta, FechaCreacion } = req.body;
     try {
+        let clientIdToUse = Id_Cliente;
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            const check = await db.query('SELECT ID FROM SOLICITUD WHERE ID = ? AND Id_Cliente = ?', [req.params.id, req.user.dni_perfil]);
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            if (contactos.length > 0) {
+                clientIdToUse = contactos[0].DNI_O_RUC;
+            } else {
+                clientIdToUse = req.user.dni_perfil;
+            }
+            const check = await db.query('SELECT ID FROM SOLICITUD WHERE ID = ? AND Id_Cliente = ?', [req.params.id, clientIdToUse]);
             if (!check.length) return res.status(403).json({ error: 'No autorizado' });
         }
 
         const [result] = await db.query(
             'UPDATE SOLICITUD SET Id_Cliente=?,descripcion=?,ubicacion=?,ProductoEnvio=?,CamionesEnvio=?,ObsGenerales=?,ObsEleccion=?,estado=?,Respuesta=?,FechaCreacion=? WHERE ID=?',
-            [req.user && req.user.rolNormalizado === 'cliente' ? req.user.dni_perfil : Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta, req.params.id]
+            [clientIdToUse, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta, FechaCreacion, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Solicitud actualizada' });
@@ -93,8 +113,12 @@ exports.remove = async (req, res) => {
         let args = [req.params.id];
         
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            query += ' AND Id_Cliente = ?';
-            args.push(req.user.dni_perfil);
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+
+            query += ` AND Id_Cliente IN (${clientIds.map(() => '?').join(',')})`;
+            args.push(...clientIds);
         }
 
         const [result] = await db.query(query, args);
