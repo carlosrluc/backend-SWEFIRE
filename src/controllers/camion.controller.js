@@ -64,15 +64,15 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
         fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
-        soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago } = req.body;
+        soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             `UPDATE CAMION SET nombre=?,ano_fabricacion=?,modelo=?,color=?,caracteristicas=?,revision_tecnica=?,
              fecha_prox_revision=?,ID_Fabricante=?,tarjeta_propiedad=?,vencimiento_tarjeta=?,soat_n_poliza=?,
              soat_empresa=?,soat_precio=?,soat_dia_pago=?,Estado=? WHERE Placa=?`,
             [nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
              fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
-             soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, req.params.placa]
+             soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado, req.params.placa]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Camión actualizado' });
@@ -81,7 +81,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM CAMION WHERE Placa = ?', [req.params.placa]);
+        const result = await db.query('DELETE FROM CAMION WHERE Placa = ?', [req.params.placa]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Camión eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -96,7 +96,7 @@ exports.getMantenimientos = async (req, res) => {
 exports.createMantenimiento = async (req, res) => {
     const { fecha_ultimo_mant, responsable, razon, contacto_responsable, pdf_mantenimiento } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO CAMION_MANTENIMIENTO (Placa,fecha_ultimo_mant,responsable,razon,contacto_responsable,pdf_mantenimiento) VALUES (?,?,?,?,?,?)',
             [req.params.placa, fecha_ultimo_mant, responsable, razon, contacto_responsable, pdf_mantenimiento]
         );
@@ -106,7 +106,7 @@ exports.createMantenimiento = async (req, res) => {
 
 exports.deleteMantenimiento = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM CAMION_MANTENIMIENTO WHERE id=? AND Placa=?', [req.params.mid, req.params.placa]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -123,7 +123,7 @@ exports.getCamionInventario = async (req, res) => {
 exports.createCamionInventario = async (req, res) => {
     const { Id_Objeto, cantidad_requerida, cantidad_actual, ubicacion_en_camion, requerido_legal } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO CAMION_INVENTARIO (Placa,Id_Objeto,cantidad_requerida,cantidad_actual,ubicacion_en_camion,requerido_legal) VALUES (?,?,?,?,?,?)',
             [req.params.placa, Id_Objeto, cantidad_requerida, cantidad_actual, ubicacion_en_camion, requerido_legal]
         );
@@ -133,7 +133,7 @@ exports.createCamionInventario = async (req, res) => {
 
 exports.deleteCamionInventario = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM CAMION_INVENTARIO WHERE id=? AND Placa=?', [req.params.iid, req.params.placa]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

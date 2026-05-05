@@ -96,8 +96,15 @@ router.post('/', c.create);
  *             type: object
  *             properties:
  *               nombre: { type: string }
+ *               ano_fabricacion: { type: integer }
  *               modelo: { type: string }
  *               color: { type: string }
+ *               caracteristicas: { type: string }
+ *               revision_tecnica: { type: string }
+ *               fecha_prox_revision: { type: string, format: date }
+ *               ID_Fabricante: { type: integer }
+ *               tarjeta_propiedad: { type: string }
+ *               vencimiento_tarjeta: { type: string, format: date }
  *               soat_n_poliza: { type: string }
  *               soat_empresa: { type: string }
  *               soat_precio: { type: number }

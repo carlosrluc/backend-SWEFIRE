@@ -50,7 +50,7 @@ exports.create = async (req, res) => {
         estado, precio_compra, precio_envio, responsable_envio, precio_comercial,
         mant_requerimiento, mant_ultimo, mant_fecha_caducidad, mant_responsable, mant_contacto } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             `INSERT INTO INVENTARIO (lugar_almacenaje,cantidad,nombre_objeto,ID_Fabricante,orden_compra,
              fecha_compra,factura,garantia,numero_serial,ano_fabricacion,peso,estado,precio_compra,
              precio_envio,responsable_envio,precio_comercial,mant_requerimiento,mant_ultimo,
@@ -71,7 +71,7 @@ exports.update = async (req, res) => {
         estado, precio_compra, precio_envio, responsable_envio, precio_comercial,
         mant_requerimiento, mant_ultimo, mant_fecha_caducidad, mant_responsable, mant_contacto } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             `UPDATE INVENTARIO SET lugar_almacenaje=?,cantidad=?,nombre_objeto=?,ID_Fabricante=?,orden_compra=?,
              fecha_compra=?,factura=?,garantia=?,numero_serial=?,ano_fabricacion=?,peso=?,estado=?,precio_compra=?,
              precio_envio=?,responsable_envio=?,precio_comercial=?,mant_requerimiento=?,mant_ultimo=?,
@@ -89,7 +89,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM INVENTARIO WHERE Id_Objeto = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM INVENTARIO WHERE Id_Objeto = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Inventario eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -104,7 +104,7 @@ exports.getUsos = async (req, res) => {
 exports.createUso = async (req, res) => {
     const { uso } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO INVENTARIO_USO (Id_Objeto, uso) VALUES (?,?)',
             [req.params.id, uso]
         );
@@ -114,7 +114,7 @@ exports.createUso = async (req, res) => {
 
 exports.deleteUso = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM INVENTARIO_USO WHERE id=? AND Id_Objeto=?', [req.params.uid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

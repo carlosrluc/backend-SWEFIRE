@@ -38,7 +38,7 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
     const { nombre, descripcion, precio_regular, condicional_precio, observaciones } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO SERVICIO (nombre,descripcion,precio_regular,condicional_precio,observaciones) VALUES (?,?,?,?,?)',
             [nombre, descripcion, precio_regular, condicional_precio, observaciones]
         );
@@ -49,7 +49,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { nombre, descripcion, precio_regular, condicional_precio, observaciones } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE SERVICIO SET nombre=?,descripcion=?,precio_regular=?,condicional_precio=?,observaciones=? WHERE ID_Servicio=?',
             [nombre, descripcion, precio_regular, condicional_precio, observaciones, req.params.id]
         );
@@ -60,7 +60,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -75,7 +75,7 @@ exports.getPersonal = async (req, res) => {
 exports.createPersonal = async (req, res) => {
     const { profesion, cantidad, disponibilidad, requerimiento_legal } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO SERVICIO_PERSONAL_REQUERIDO (ID_Servicio,profesion,cantidad,disponibilidad,requerimiento_legal) VALUES (?,?,?,?,?)',
             [req.params.id, profesion, cantidad, disponibilidad, requerimiento_legal]
         );
@@ -85,7 +85,7 @@ exports.createPersonal = async (req, res) => {
 
 exports.deletePersonal = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM SERVICIO_PERSONAL_REQUERIDO WHERE id=? AND ID_Servicio=?', [req.params.pid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

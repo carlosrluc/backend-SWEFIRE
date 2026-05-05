@@ -38,7 +38,7 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
     const { nombre_comercial, ubicacion, rubro, descripcion, comentarios, pago } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO FABRICANTE (nombre_comercial,ubicacion,rubro,descripcion,comentarios,pago) VALUES (?,?,?,?,?,?)',
             [nombre_comercial, ubicacion, rubro, descripcion, comentarios, pago]
         );
@@ -49,7 +49,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { nombre_comercial, ubicacion, rubro, descripcion, comentarios, pago } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE FABRICANTE SET nombre_comercial=?,ubicacion=?,rubro=?,descripcion=?,comentarios=?,pago=? WHERE ID_Fabricante=?',
             [nombre_comercial, ubicacion, rubro, descripcion, comentarios, pago, req.params.id]
         );
@@ -60,7 +60,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM FABRICANTE WHERE ID_Fabricante = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM FABRICANTE WHERE ID_Fabricante = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Fabricante eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -75,7 +75,7 @@ exports.getContactos = async (req, res) => {
 exports.createContacto = async (req, res) => {
     const { persona_contacto, correo_contacto, numero_contacto, anexo_contacto, area_contacto, idioma } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO FABRICANTE_CONTACTO (ID_Fabricante,persona_contacto,correo_contacto,numero_contacto,anexo_contacto,area_contacto,idioma) VALUES (?,?,?,?,?,?,?)',
             [req.params.id, persona_contacto, correo_contacto, numero_contacto, anexo_contacto, area_contacto, idioma]
         );
@@ -86,7 +86,7 @@ exports.createContacto = async (req, res) => {
 exports.updateContacto = async (req, res) => {
     const { persona_contacto, correo_contacto, numero_contacto, anexo_contacto, area_contacto, idioma } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE FABRICANTE_CONTACTO SET persona_contacto=?,correo_contacto=?,numero_contacto=?,anexo_contacto=?,area_contacto=?,idioma=? WHERE id=? AND ID_Fabricante=?',
             [persona_contacto, correo_contacto, numero_contacto, anexo_contacto, area_contacto, idioma, req.params.cid, req.params.id]
         );
@@ -97,7 +97,7 @@ exports.updateContacto = async (req, res) => {
 
 exports.deleteContacto = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM FABRICANTE_CONTACTO WHERE id=? AND ID_Fabricante=?', [req.params.cid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

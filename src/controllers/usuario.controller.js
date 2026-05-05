@@ -64,7 +64,7 @@ exports.create = async (req, res) => {
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
 
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO USUARIO (dni_perfil,rol,contrasena,correo,temp_pass_unhashed) VALUES (?,?,?,?,?)',
             [dni_perfil, rol, hashedPassword, correo, contrasena]
         );
@@ -79,12 +79,12 @@ exports.update = async (req, res) => {
         if (contrasena) {
             const saltRounds = 12;
             const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
-            [result] = await db.query(
+            result = await db.query(
                 'UPDATE USUARIO SET dni_perfil=?,rol=?,contrasena=?,correo=? WHERE idusuario=?',
                 [dni_perfil, rol, hashedPassword, correo, req.params.id]
             );
         } else {
-            [result] = await db.query(
+            result = await db.query(
                 'UPDATE USUARIO SET dni_perfil=?,rol=?,correo=? WHERE idusuario=?',
                 [dni_perfil, rol, correo, req.params.id]
             );
@@ -97,7 +97,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM USUARIO WHERE idusuario = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM USUARIO WHERE idusuario = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Usuario eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }

@@ -47,7 +47,7 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
     const { ID_Cotizacion, costos_indirectos, coste_total_estimado } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PRESUPUESTO_INTERNO (ID_Cotizacion,costos_indirectos,coste_total_estimado) VALUES (?,?,?)',
             [ID_Cotizacion, costos_indirectos, coste_total_estimado]
         );
@@ -58,7 +58,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { ID_Cotizacion, costos_indirectos, coste_total_estimado } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE PRESUPUESTO_INTERNO SET ID_Cotizacion=?,costos_indirectos=?,coste_total_estimado=? WHERE ID=?',
             [ID_Cotizacion, costos_indirectos, coste_total_estimado, req.params.id]
         );
@@ -69,7 +69,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM PRESUPUESTO_INTERNO WHERE ID = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM PRESUPUESTO_INTERNO WHERE ID = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Presupuesto eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -85,7 +85,7 @@ const makeSubCRUD = (table, idCol, fields, insertFields) => ({
     create: async (req, res) => {
         const vals = fields.map(f => req.body[f]);
         try {
-            const [result] = await db.query(
+            const result = await db.query(
                 `INSERT INTO ${table} (${idCol},${insertFields}) VALUES (${fields.map(() => '?').join(',')},${fields.map(() => '?').join(',')})`,
                 [req.params.id, ...vals, req.params.id, ...vals]
             );
@@ -94,7 +94,7 @@ const makeSubCRUD = (table, idCol, fields, insertFields) => ({
     },
     remove: async (req, res) => {
         try {
-            const [result] = await db.query(`DELETE FROM ${table} WHERE id=? AND ${idCol}=?`, [req.params.sid, req.params.id]);
+            const result = await db.query(`DELETE FROM ${table} WHERE id=? AND ${idCol}=?`, [req.params.sid, req.params.id]);
             if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
             res.json({ message: 'Eliminado' });
         } catch (e) { res.status(500).json({ error: e.message }); }
@@ -109,7 +109,7 @@ exports.getMaterialDirecto = async (req, res) => {
 exports.createMaterialDirecto = async (req, res) => {
     const { nombre, costo } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PRESUPUESTO_MATERIAL_DIRECTO (ID_Presupuesto,nombre,costo) VALUES (?,?,?)',
             [req.params.id, nombre, costo]
         );
@@ -118,7 +118,7 @@ exports.createMaterialDirecto = async (req, res) => {
 };
 exports.deleteMaterialDirecto = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM PRESUPUESTO_MATERIAL_DIRECTO WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
+        const result = await db.query('DELETE FROM PRESUPUESTO_MATERIAL_DIRECTO WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Material directo eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -132,7 +132,7 @@ exports.getManoObra = async (req, res) => {
 exports.createManoObra = async (req, res) => {
     const { profesion_ejercida, costo_x_hora, costo_general } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PRESUPUESTO_MANO_OBRA (ID_Presupuesto,profesion_ejercida,costo_x_hora,costo_general) VALUES (?,?,?,?)',
             [req.params.id, profesion_ejercida, costo_x_hora, costo_general]
         );
@@ -141,7 +141,7 @@ exports.createManoObra = async (req, res) => {
 };
 exports.deleteManoObra = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM PRESUPUESTO_MANO_OBRA WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
+        const result = await db.query('DELETE FROM PRESUPUESTO_MANO_OBRA WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Mano de obra eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -155,7 +155,7 @@ exports.getServicio = async (req, res) => {
 exports.createServicio = async (req, res) => {
     const { nombre_servicio, costo } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PRESUPUESTO_SERVICIO (ID_Presupuesto,nombre_servicio,costo) VALUES (?,?,?)',
             [req.params.id, nombre_servicio, costo]
         );
@@ -164,7 +164,7 @@ exports.createServicio = async (req, res) => {
 };
 exports.deleteServicio = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM PRESUPUESTO_SERVICIO WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
+        const result = await db.query('DELETE FROM PRESUPUESTO_SERVICIO WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio de presupuesto eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -178,7 +178,7 @@ exports.getCostoIndirecto = async (req, res) => {
 exports.createCostoIndirecto = async (req, res) => {
     const { nombre_costo, costo } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PRESUPUESTO_COSTO_INDIRECTO (ID_Presupuesto,nombre_costo,costo) VALUES (?,?,?)',
             [req.params.id, nombre_costo, costo]
         );
@@ -187,7 +187,7 @@ exports.createCostoIndirecto = async (req, res) => {
 };
 exports.deleteCostoIndirecto = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM PRESUPUESTO_COSTO_INDIRECTO WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
+        const result = await db.query('DELETE FROM PRESUPUESTO_COSTO_INDIRECTO WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Costo indirecto eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -201,7 +201,7 @@ exports.getGastoAdmin = async (req, res) => {
 exports.createGastoAdmin = async (req, res) => {
     const { nombre_gasto, costo } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PRESUPUESTO_GASTO_ADMIN (ID_Presupuesto,nombre_gasto,costo) VALUES (?,?,?)',
             [req.params.id, nombre_gasto, costo]
         );
@@ -210,7 +210,7 @@ exports.createGastoAdmin = async (req, res) => {
 };
 exports.deleteGastoAdmin = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM PRESUPUESTO_GASTO_ADMIN WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
+        const result = await db.query('DELETE FROM PRESUPUESTO_GASTO_ADMIN WHERE id=? AND ID_Presupuesto=?', [req.params.sid, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Gasto admin eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }

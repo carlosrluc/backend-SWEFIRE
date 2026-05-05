@@ -75,7 +75,7 @@ exports.create = async (req, res) => {
             }
         }
 
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO SOLICITUD (Id_Cliente,descripcion,ubicacion,ProductoEnvio,CamionesEnvio,ObsGenerales,ObsEleccion,estado,Respuesta) VALUES (?,?,?,?,?,?,?,?,?)',
             [clientIdToUse, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta]
         );
@@ -98,7 +98,7 @@ exports.update = async (req, res) => {
             if (!check.length) return res.status(403).json({ error: 'No autorizado' });
         }
 
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE SOLICITUD SET Id_Cliente=?,descripcion=?,ubicacion=?,ProductoEnvio=?,CamionesEnvio=?,ObsGenerales=?,ObsEleccion=?,estado=?,Respuesta=?,FechaCreacion=? WHERE ID=?',
             [clientIdToUse, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta, FechaCreacion, req.params.id]
         );
@@ -121,7 +121,7 @@ exports.remove = async (req, res) => {
             args.push(...clientIds);
         }
 
-        const [result] = await db.query(query, args);
+        const result = await db.query(query, args);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado o no autorizado' });
         res.json({ message: 'Solicitud eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -136,7 +136,7 @@ exports.getMedios = async (req, res) => {
 exports.createMedio = async (req, res) => {
     const { cliente_email, cliente_telefono } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO SOLICITUD_MEDIO_COMUNICACION (ID_Solicitud,cliente_email,cliente_telefono) VALUES (?,?,?)',
             [req.params.id, cliente_email, cliente_telefono]
         );
@@ -147,7 +147,7 @@ exports.createMedio = async (req, res) => {
 exports.updateMedio = async (req, res) => {
     const { cliente_email, cliente_telefono } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE SOLICITUD_MEDIO_COMUNICACION SET cliente_email=?, cliente_telefono=? WHERE id=? AND ID_Solicitud=?',
             [cliente_email, cliente_telefono, req.params.mid, req.params.id]
         );
@@ -158,7 +158,7 @@ exports.updateMedio = async (req, res) => {
 
 exports.deleteMedio = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM SOLICITUD_MEDIO_COMUNICACION WHERE id=? AND ID_Solicitud=?', [req.params.mid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -175,7 +175,7 @@ exports.getServicios = async (req, res) => {
 exports.createServicio = async (req, res) => {
     const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO SOLICITUD_SERVICIO (ID_Solicitud,ID_Servicio,fecha_inicio_servicio,fecha_fin_servicio,horario_servicio) VALUES (?,?,?,?,?)',
             [req.params.id, ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio]
         );
@@ -186,7 +186,7 @@ exports.createServicio = async (req, res) => {
 exports.updateServicio = async (req, res) => {
     const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE SOLICITUD_SERVICIO SET ID_Servicio=?, fecha_inicio_servicio=?, fecha_fin_servicio=?, horario_servicio=? WHERE id=? AND ID_Solicitud=?',
             [ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio, req.params.sid, req.params.id]
         );
@@ -197,7 +197,7 @@ exports.updateServicio = async (req, res) => {
 
 exports.deleteServicio = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM SOLICITUD_SERVICIO WHERE id=? AND ID_Solicitud=?', [req.params.sid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -214,7 +214,7 @@ exports.getInventario = async (req, res) => {
 exports.createInventario = async (req, res) => {
     const { ID_Inventario, cantidad, intencion, dias_alquilados } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO SOLICITUD_INVENTARIO (ID_Solicitud,ID_Inventario,cantidad,intencion,dias_alquilados) VALUES (?,?,?,?,?)',
             [req.params.id, ID_Inventario, cantidad, intencion, dias_alquilados]
         );
@@ -225,7 +225,7 @@ exports.createInventario = async (req, res) => {
 exports.updateInventario = async (req, res) => {
     const { ID_Inventario, cantidad, intencion, dias_alquilados } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE SOLICITUD_INVENTARIO SET ID_Inventario=?, cantidad=?, intencion=?, dias_alquilados=? WHERE id=? AND ID_Solicitud=?',
             [ID_Inventario, cantidad, intencion, dias_alquilados, req.params.iid, req.params.id]
         );
@@ -236,7 +236,7 @@ exports.updateInventario = async (req, res) => {
 
 exports.deleteInventario = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM SOLICITUD_INVENTARIO WHERE id=? AND ID_Solicitud=?', [req.params.iid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

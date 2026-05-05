@@ -177,7 +177,7 @@ exports.getDetalles = async (req, res) => {
 exports.create = async (req, res) => {
     const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO COTIZACION_COMERCIAL (version,nombre,id_solicitud,DNI_O_RUC,precio_total,estado,comentario_cliente) VALUES (?,?,?,?,?,?,?)',
             [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente]
         );
@@ -206,7 +206,7 @@ exports.update = async (req, res) => {
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para editar esta cotización' });
         }
 
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE COTIZACION_COMERCIAL SET version=?,nombre=?,id_solicitud=?,DNI_O_RUC=?,precio_total=?,estado=?,comentario_cliente=? WHERE ID=?',
             [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, req.params.id]
         );
@@ -221,7 +221,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM COTIZACION_COMERCIAL WHERE ID = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM COTIZACION_COMERCIAL WHERE ID = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
 
         await db.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
@@ -239,7 +239,7 @@ exports.getServicios = async (req, res) => {
 exports.createServicio = async (req, res) => {
     const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion,ID_Servicio,fecha_inicio,fecha_finalizacion,jornada,precio_comercial,ubicacion) VALUES (?,?,?,?,?,?,?)',
             [req.params.id, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion]
         );
@@ -250,7 +250,7 @@ exports.createServicio = async (req, res) => {
 exports.updateServicio = async (req, res) => {
     const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE COTIZACION_SERVICIO SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=?, ubicacion=? WHERE id=? AND ID_Cotizacion=?',
             [ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion, req.params.sid, req.params.id]
         );
@@ -261,7 +261,7 @@ exports.updateServicio = async (req, res) => {
 
 exports.deleteServicio = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM COTIZACION_SERVICIO WHERE id=? AND ID_Cotizacion=?', [req.params.sid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -278,7 +278,7 @@ exports.getCamiones = async (req, res) => {
 exports.createCamion = async (req, res) => {
     const { Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO COTIZACION_CAMION (ID_Cotizacion,Placa,uso,fecha_hora_entrada,fecha_hora_salida,ID_Piloto,preciounit) VALUES (?,?,?,?,?,?,?)',
             [req.params.id, Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit]
         );
@@ -289,7 +289,7 @@ exports.createCamion = async (req, res) => {
 exports.updateCamion = async (req, res) => {
     const { Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE COTIZACION_CAMION SET Placa=?, uso=?, fecha_hora_entrada=?, fecha_hora_salida=?, ID_Piloto=?, preciounit=? WHERE id=? AND ID_Cotizacion=?',
             [Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit, req.params.cid, req.params.id]
         );
@@ -300,7 +300,7 @@ exports.updateCamion = async (req, res) => {
 
 exports.deleteCamion = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM COTIZACION_CAMION WHERE id=? AND ID_Cotizacion=?', [req.params.cid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -317,7 +317,7 @@ exports.getInventario = async (req, res) => {
 exports.createInventario = async (req, res) => {
     const { ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, costo_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO COTIZACION_INVENTARIO (ID_Cotizacion,ID_Inventario,cantidad,intencion,dias_alquilados,precio_comercial,costo_comercial,fecha_salida_taller,fecha_ingreso_taller,observaciones) VALUES (?,?,?,?,?,?,?,?,?,?)',
             [req.params.id, ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, costo_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones]
         );
@@ -328,7 +328,7 @@ exports.createInventario = async (req, res) => {
 exports.updateInventario = async (req, res) => {
     const { ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, costo_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE COTIZACION_INVENTARIO SET ID_Inventario=?, cantidad=?, intencion=?, dias_alquilados=?, precio_comercial=?, costo_comercial=?, fecha_salida_taller=?, fecha_ingreso_taller=?, observaciones=? WHERE id=? AND ID_Cotizacion=?',
             [ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial, costo_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones, req.params.iid, req.params.id]
         );
@@ -339,7 +339,7 @@ exports.updateInventario = async (req, res) => {
 
 exports.deleteInventario = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM COTIZACION_INVENTARIO WHERE id=? AND ID_Cotizacion=?', [req.params.iid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -356,7 +356,7 @@ exports.getPersonal = async (req, res) => {
 exports.createPersonal = async (req, res) => {
     const { ID_Usuario, rol_en_trabajo, fecha_entrada, fecha_salida, dias_trabajados } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO COTIZACION_PERSONAL (ID_Cotizacion,ID_Usuario,rol_en_trabajo,fecha_entrada,fecha_salida,dias_trabajados) VALUES (?,?,?,?,?,?)',
             [req.params.id, ID_Usuario, rol_en_trabajo, fecha_entrada, fecha_salida, dias_trabajados]
         );
@@ -367,7 +367,7 @@ exports.createPersonal = async (req, res) => {
 exports.updatePersonal = async (req, res) => {
     const { ID_Usuario, rol_en_trabajo, fecha_entrada, fecha_salida, dias_trabajados } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE COTIZACION_PERSONAL SET ID_Usuario=?, rol_en_trabajo=?, fecha_entrada=?, fecha_salida=?, dias_trabajados=? WHERE id=? AND ID_Cotizacion=?',
             [ID_Usuario, rol_en_trabajo, fecha_entrada, fecha_salida, dias_trabajados, req.params.pid, req.params.id]
         );
@@ -378,7 +378,7 @@ exports.updatePersonal = async (req, res) => {
 
 exports.deletePersonal = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM COTIZACION_PERSONAL WHERE id=? AND ID_Cotizacion=?', [req.params.pid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

@@ -63,7 +63,7 @@ exports.update = async (req, res) => {
         aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
         profesion, nro_cta_bancaria, cv, foto_perfil } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             `UPDATE PERFIL SET Nombre=?,Apellido=?,Genero=?,RUC=?,fecha_nacimiento=?,
              correo_contacto=?,telefono_contacto=?,estado_civil=?,distrito_residencia=?,
              seguro_vida_ley=?,aficiones=?,experiencia=?,comentarios=?,estado=?,
@@ -81,7 +81,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM PERFIL WHERE DNI = ?', [req.params.dni]);
+        const result = await db.query('DELETE FROM PERFIL WHERE DNI = ?', [req.params.dni]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Perfil eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -98,7 +98,7 @@ exports.getEducacion = async (req, res) => {
 exports.createEducacion = async (req, res) => {
     const { nombre_educacion, nivel_educacion, institucion } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PERFIL_EDUCACION (DNI_perfil,nombre_educacion,nivel_educacion,institucion) VALUES (?,?,?,?)',
             [req.params.dni, nombre_educacion, nivel_educacion, institucion]
         );
@@ -109,7 +109,7 @@ exports.createEducacion = async (req, res) => {
 exports.updateEducacion = async (req, res) => {
     const { nombre_educacion, nivel_educacion, institucion } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE PERFIL_EDUCACION SET nombre_educacion=?,nivel_educacion=?,institucion=? WHERE id=? AND DNI_perfil=?',
             [nombre_educacion, nivel_educacion, institucion, req.params.id, req.params.dni]
         );
@@ -120,7 +120,7 @@ exports.updateEducacion = async (req, res) => {
 
 exports.deleteEducacion = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM PERFIL_EDUCACION WHERE id=? AND DNI_perfil=?', [req.params.id, req.params.dni]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -139,7 +139,7 @@ exports.getBrevete = async (req, res) => {
 exports.createBrevete = async (req, res) => {
     const { categoria, pdf_brevete, fecha_vencimiento } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PERFIL_BREVETE (DNI_perfil,categoria,pdf_brevete,fecha_vencimiento) VALUES (?,?,?,?)',
             [req.params.dni, categoria, pdf_brevete, fecha_vencimiento]
         );
@@ -150,7 +150,7 @@ exports.createBrevete = async (req, res) => {
 exports.updateBrevete = async (req, res) => {
     const { categoria, pdf_brevete, fecha_vencimiento } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE PERFIL_BREVETE SET categoria=?,pdf_brevete=?,fecha_vencimiento=? WHERE id=? AND DNI_perfil=?',
             [categoria, pdf_brevete, fecha_vencimiento, req.params.id, req.params.dni]
         );
@@ -161,7 +161,7 @@ exports.updateBrevete = async (req, res) => {
 
 exports.deleteBrevete = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM PERFIL_BREVETE WHERE id=? AND DNI_perfil=?', [req.params.id, req.params.dni]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -180,7 +180,7 @@ exports.getCertificacion = async (req, res) => {
 exports.createCertificacion = async (req, res) => {
     const { nombre, institucion, fecha_validez, foto } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO PERFIL_CERTIFICACION (DNI_perfil,nombre,institucion,fecha_validez,foto) VALUES (?,?,?,?,?)',
             [req.params.dni, nombre, institucion, fecha_validez, foto]
         );
@@ -191,7 +191,7 @@ exports.createCertificacion = async (req, res) => {
 exports.updateCertificacion = async (req, res) => {
     const { nombre, institucion, fecha_validez, foto } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE PERFIL_CERTIFICACION SET nombre=?,institucion=?,fecha_validez=?,foto=? WHERE id=? AND DNI_perfil=?',
             [nombre, institucion, fecha_validez, foto, req.params.id, req.params.dni]
         );
@@ -202,7 +202,7 @@ exports.updateCertificacion = async (req, res) => {
 
 exports.deleteCertificacion = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM PERFIL_CERTIFICACION WHERE id=? AND DNI_perfil=?', [req.params.id, req.params.dni]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

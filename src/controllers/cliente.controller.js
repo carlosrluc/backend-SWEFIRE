@@ -50,7 +50,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { nombre_comercial, razon_social, rubro, ubicacion_facturacion, observacion } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE CLIENTE SET nombre_comercial=?,razon_social=?,rubro=?,ubicacion_facturacion=?,observacion=? WHERE DNI_O_RUC=?',
             [nombre_comercial, razon_social, rubro, ubicacion_facturacion, observacion, req.params.id]
         );
@@ -61,7 +61,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM CLIENTE WHERE DNI_O_RUC = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM CLIENTE WHERE DNI_O_RUC = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Cliente eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -76,7 +76,7 @@ exports.getContactos = async (req, res) => {
 exports.createContacto = async (req, res) => {
     const { DNI_perfil, cargo_en_empresa, lugar_trabajo } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO CLIENTE_CONTACTO (DNI_O_RUC,DNI_perfil,cargo_en_empresa,lugar_trabajo) VALUES (?,?,?,?)',
             [req.params.id, DNI_perfil, cargo_en_empresa, lugar_trabajo]
         );
@@ -87,7 +87,7 @@ exports.createContacto = async (req, res) => {
 exports.updateContacto = async (req, res) => {
     const { DNI_perfil, cargo_en_empresa, lugar_trabajo } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE CLIENTE_CONTACTO SET DNI_perfil=?,cargo_en_empresa=?,lugar_trabajo=? WHERE id=? AND DNI_O_RUC=?',
             [DNI_perfil, cargo_en_empresa, lugar_trabajo, req.params.cid, req.params.id]
         );
@@ -98,7 +98,7 @@ exports.updateContacto = async (req, res) => {
 
 exports.deleteContacto = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM CLIENTE_CONTACTO WHERE id=? AND DNI_O_RUC=?', [req.params.cid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -115,7 +115,7 @@ exports.getTelefonosMovil = async (req, res) => {
 exports.createTelefonoMovil = async (req, res) => {
     const { telefono, persona } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO CLIENTE_TELEFONO_MOVIL (DNI_O_RUC,telefono,persona) VALUES (?,?,?)',
             [req.params.id, telefono, persona]
         );
@@ -125,7 +125,7 @@ exports.createTelefonoMovil = async (req, res) => {
 
 exports.deleteTelefonoMovil = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM CLIENTE_TELEFONO_MOVIL WHERE id=? AND DNI_O_RUC=?', [req.params.cid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -142,7 +142,7 @@ exports.getCorreos = async (req, res) => {
 exports.createCorreo = async (req, res) => {
     const { correo, rama } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO CLIENTE_CORREO (DNI_O_RUC,correo,rama) VALUES (?,?,?)',
             [req.params.id, correo, rama]
         );
@@ -152,7 +152,7 @@ exports.createCorreo = async (req, res) => {
 
 exports.deleteCorreo = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM CLIENTE_CORREO WHERE id=? AND DNI_O_RUC=?', [req.params.cid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -169,7 +169,7 @@ exports.getTelefonosFijo = async (req, res) => {
 exports.createTelefonoFijo = async (req, res) => {
     const { numero, anexo, descripcion_anexo } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO CLIENTE_TELEFONO_FIJO (DNI_O_RUC,numero,anexo,descripcion_anexo) VALUES (?,?,?,?)',
             [req.params.id, numero, anexo, descripcion_anexo]
         );
@@ -179,7 +179,7 @@ exports.createTelefonoFijo = async (req, res) => {
 
 exports.deleteTelefonoFijo = async (req, res) => {
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'DELETE FROM CLIENTE_TELEFONO_FIJO WHERE id=? AND DNI_O_RUC=?', [req.params.cid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });

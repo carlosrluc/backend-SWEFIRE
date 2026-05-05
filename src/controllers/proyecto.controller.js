@@ -162,7 +162,7 @@ exports.create = async (req, res) => {
     const { descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
         orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             `INSERT INTO PROYECTO (descripcion_servicio,ID_Trabajo,Id_Cliente,ubicacion,id_cotizacion,
              orden_servicio,informe_final,factura,fecha_inicio,fecha_fin,observaciones,estado)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
@@ -177,7 +177,7 @@ exports.update = async (req, res) => {
     const { descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
         orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             `UPDATE PROYECTO SET descripcion_servicio=?,ID_Trabajo=?,Id_Cliente=?,ubicacion=?,id_cotizacion=?,
              orden_servicio=?,informe_final=?,factura=?,fecha_inicio=?,fecha_fin=?,observaciones=?,estado=?
              WHERE id_Proyecto=?`,
@@ -191,7 +191,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM PROYECTO WHERE id_Proyecto = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM PROYECTO WHERE id_Proyecto = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Proyecto eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }

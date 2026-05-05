@@ -7,7 +7,7 @@ exports.getAll = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        const [rows] = await db.query(
+        const rows = await db.query(
             `SELECT INC.*, CC.nombre as Cotizacion_Nombre, C.nombre_comercial as Cliente_Nombre 
              FROM INCIDENCIA INC 
              LEFT JOIN COTIZACION_COMERCIAL CC ON INC.cotizacion_remuneracion = CC.ID 
@@ -15,8 +15,8 @@ exports.getAll = async (req, res) => {
              LIMIT ? OFFSET ?`, 
             [limit, offset]
         );
-        const [countResult] = await db.query('SELECT COUNT(*) as total FROM INCIDENCIA');
-        const total = countResult.total;
+        const countResult = await db.query('SELECT COUNT(*) as total FROM INCIDENCIA');
+        const total = countResult[0].total;
 
         res.json({
             data: rows,
@@ -57,7 +57,7 @@ exports.getByProyecto = async (req, res) => {
 exports.create = async (req, res) => {
     const { id_proyecto, empresa_involucrada, cotizacion_remuneracion, comentario, estado } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO INCIDENCIA (id_proyecto, empresa_involucrada, cotizacion_remuneracion, comentario, estado) VALUES (?,?,?,?,?)',
             [id_proyecto, empresa_involucrada, cotizacion_remuneracion, comentario, estado]
         );
@@ -68,7 +68,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { id_proyecto, empresa_involucrada, cotizacion_remuneracion, comentario, estado } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'UPDATE INCIDENCIA SET id_proyecto=?, empresa_involucrada=?, cotizacion_remuneracion=?, comentario=?, estado=? WHERE id_incidencia=?',
             [id_proyecto, empresa_involucrada, cotizacion_remuneracion, comentario, estado, req.params.id]
         );
@@ -79,7 +79,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM INCIDENCIA WHERE id_incidencia = ?', [req.params.id]);
+        const result = await db.query('DELETE FROM INCIDENCIA WHERE id_incidencia = ?', [req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Incidencia eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -96,7 +96,7 @@ exports.getObjetos = async (req, res) => {
 exports.createObjeto = async (req, res) => {
     const { id_proyecto_inventario, id_proyecto_camion, ocurrencia_inventario, ocurrencia_camion, fecha_perdida, cantidad, ultima_ubicacion, comentario, precio_remunerar } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO INCIDENCIA_OBJETOS (id_incidencia, id_proyecto_inventario, id_proyecto_camion, ocurrencia_inventario, ocurrencia_camion, fecha_perdida, cantidad, ultima_ubicacion, comentario, precio_remunerar) VALUES (?,?,?,?,?,?,?,?,?,?)',
             [req.params.id, id_proyecto_inventario, id_proyecto_camion, ocurrencia_inventario, ocurrencia_camion, fecha_perdida, cantidad, ultima_ubicacion, comentario, precio_remunerar]
         );
@@ -106,7 +106,7 @@ exports.createObjeto = async (req, res) => {
 
 exports.deleteObjeto = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM INCIDENCIA_OBJETOS WHERE id = ? AND id_incidencia = ?', [req.params.oid, req.params.id]);
+        const result = await db.query('DELETE FROM INCIDENCIA_OBJETOS WHERE id = ? AND id_incidencia = ?', [req.params.oid, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Objeto de incidencia eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -130,7 +130,7 @@ exports.getInvolucrados = async (req, res) => {
 exports.createInvolucrado = async (req, res) => {
     const { dni_involucrado, id_trabajo, version_de_hechos, comentario } = req.body;
     try {
-        const [result] = await db.query(
+        const result = await db.query(
             'INSERT INTO INVOLUCRADO (dni_involucrado, id_trabajo, id_incidencia, version_de_hechos, comentario) VALUES (?,?,?,?,?)',
             [dni_involucrado, id_trabajo, req.params.id, version_de_hechos, comentario]
         );
@@ -140,7 +140,7 @@ exports.createInvolucrado = async (req, res) => {
 
 exports.deleteInvolucrado = async (req, res) => {
     try {
-        const [result] = await db.query('DELETE FROM INVOLUCRADO WHERE id = ? AND id_incidencia = ?', [req.params.ivid, req.params.id]);
+        const result = await db.query('DELETE FROM INVOLUCRADO WHERE id = ? AND id_incidencia = ?', [req.params.ivid, req.params.id]);
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Involucrado eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
