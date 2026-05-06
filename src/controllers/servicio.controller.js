@@ -36,22 +36,22 @@ exports.getById = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
-    const { nombre, descripcion, precio_regular, condicional_precio, observaciones } = req.body;
+    const { nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado } = req.body;
     try {
         const result = await db.query(
-            'INSERT INTO SERVICIO (nombre,descripcion,precio_regular,condicional_precio,observaciones) VALUES (?,?,?,?,?)',
-            [nombre, descripcion, precio_regular, condicional_precio, observaciones]
+            'INSERT INTO SERVICIO (nombre,descripcion,precio_regular,condicional_precio,observaciones,Estado) VALUES (?,?,?,?,?,?)',
+            [nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado]
         );
         res.status(201).json({ message: 'Servicio creado', ID_Servicio: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.update = async (req, res) => {
-    const { nombre, descripcion, precio_regular, condicional_precio, observaciones } = req.body;
+    const { nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado } = req.body;
     try {
         const result = await db.query(
-            'UPDATE SERVICIO SET nombre=?,descripcion=?,precio_regular=?,condicional_precio=?,observaciones=? WHERE ID_Servicio=?',
-            [nombre, descripcion, precio_regular, condicional_precio, observaciones, req.params.id]
+            'UPDATE SERVICIO SET nombre=?,descripcion=?,precio_regular=?,condicional_precio=?,observaciones=?,Estado=? WHERE ID_Servicio=?',
+            [nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio actualizado' });

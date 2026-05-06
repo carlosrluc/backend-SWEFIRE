@@ -44,6 +44,7 @@ const c = require('../controllers/servicio.controller');
  *               precio_regular: { type: number }
  *               condicional_precio: { type: string }
  *               observaciones: { type: string }
+ *               Estado: { type: string, enum: [Activo, Desactivado] }
  *     responses:
  *       201:
  *         description: Servicio creado
@@ -87,6 +88,7 @@ router.post('/', c.create);
  *               precio_regular: { type: number }
  *               condicional_precio: { type: string }
  *               observaciones: { type: string }
+ *               Estado: { type: string, enum: [Activo, Desactivado] }
  *     responses:
  *       200:
  *         description: Actualizado
