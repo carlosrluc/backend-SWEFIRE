@@ -83,6 +83,18 @@ exports.createPersonal = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+exports.updatePersonal = async (req, res) => {
+    const { profesion, cantidad, disponibilidad, requerimiento_legal } = req.body;
+    try {
+        const result = await db.query(
+            'UPDATE SERVICIO_PERSONAL_REQUERIDO SET profesion=?, cantidad=?, disponibilidad=?, requerimiento_legal=? WHERE id=? AND ID_Servicio=?',
+            [profesion, cantidad, disponibilidad, requerimiento_legal, req.params.pid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Personal requerido actualizado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
 exports.deletePersonal = async (req, res) => {
     try {
         const result = await db.query(

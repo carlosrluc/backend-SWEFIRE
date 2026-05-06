@@ -151,6 +151,32 @@ router.post('/:id/personal', c.createPersonal);
 /**
  * @openapi
  * /api/servicios/{id}/personal/{pid}:
+ *   put:
+ *     tags: [Servicio - Personal Requerido]
+ *     summary: Actualizar personal requerido
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: pid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               profesion: { type: string }
+ *               cantidad: { type: integer }
+ *               disponibilidad: { type: string }
+ *               requerimiento_legal: { type: string }
+ *     responses:
+ *       200:
+ *         description: Personal actualizado
  *   delete:
  *     tags: [Servicio - Personal Requerido]
  *     summary: Eliminar personal requerido
@@ -167,6 +193,7 @@ router.post('/:id/personal', c.createPersonal);
  *       200:
  *         description: Eliminado
  */
+router.put('/:id/personal/:pid', c.updatePersonal);
 router.delete('/:id/personal/:pid', c.deletePersonal);
 
 module.exports = router;
