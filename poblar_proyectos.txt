@@ -1,0 +1,149 @@
+-- ============================================================
+-- SQL PARA POBLAR LA TABLA PROYECTO
+-- ============================================================
+
+-- Asegúrate de estar en la base de datos correcta
+USE swefire_db;
+
+-- Desactivar temporalmente las llaves foráneas para evitar errores si no hay datos relacionados
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- Limpiar la tabla si es necesario (Opcional, descomentar si se desea vaciar primero)
+-- TRUNCATE TABLE PROYECTO;
+
+INSERT INTO PROYECTO (
+    descripcion_servicio, 
+    Id_Cliente, 
+    ubicacion, 
+    id_cotizacion, 
+    orden_servicio, 
+    informe_final, 
+    factura, 
+    fecha_inicio, 
+    fecha_fin, 
+    observaciones, 
+    estado
+) VALUES
+(
+    'Instalación de sistema de rociadores automáticos - Sector A del Mall', 
+    '20501234567', 
+    'Av. Javier Prado Este 4200, San Borja, Lima', 
+    1, 
+    '/archivos/os/os_001_mall.pdf', 
+    NULL, 
+    NULL, 
+    '2025-05-15', 
+    '2025-06-15', 
+    'Requiere coordinación nocturna para no afectar el flujo de clientes.', 
+    'En Ejecución'
+),
+(
+    'Mantenimiento preventivo anual de extintores y gabinetes contra incendios', 
+    '20512345678', 
+    'Av. La Paz 463, Miraflores, Lima', 
+    2, 
+    '/archivos/os/os_002_hotel.pdf', 
+    '/archivos/informes/inf_002_final.pdf', 
+    '/archivos/facturas/fac_002_pagada.pdf', 
+    '2025-04-20', 
+    '2025-04-22', 
+    'Servicio completado satisfactoriamente en todas las sedes.', 
+    'Completado'
+),
+(
+    'Instalación de sistema de detección de humo y alarmas - Almacén Central', 
+    '20523456789', 
+    'Av. El Derby 254, Surco, Lima', 
+    3, 
+    '/archivos/os/os_003_mina.pdf', 
+    NULL, 
+    NULL, 
+    '2025-06-01', 
+    '2025-06-10', 
+    'Pendiente de llegada de sensores especializados de importación.', 
+    'Pendiente'
+),
+(
+    'Capacitación teórica y práctica de personal en uso de extintores y evacuación', 
+    '20534567890', 
+    'Jr. Washington 1471, Lima Centro', 
+    4, 
+    '/archivos/os/os_004_clinica.pdf', 
+    NULL, 
+    NULL, 
+    '2025-05-20', 
+    '2025-05-20', 
+    'Coordinado con el departamento de RRHH para dos turnos de 20 personas.', 
+    'Pendiente'
+),
+(
+    'Auditoría y certificación de seguridad contra incendios para licencia municipal', 
+    '20545678901', 
+    'Sedes Miraflores y San Borja, Lima', 
+    5, 
+    '/archivos/os/os_005_retail.pdf', 
+    '/archivos/informes/inf_005_audit.pdf', 
+    NULL, 
+    '2025-05-01', 
+    '2025-05-05', 
+    'El informe presenta observaciones que están en revisión por el área legal.', 
+    'En proceso legal'
+),
+(
+    'Mantenimiento correctivo de bombas contra incendio y reemplazo de válvulas', 
+    '20501234567', 
+    'Sede Industrial - Av. Argentina, Callao', 
+    1, 
+    '/archivos/os/os_006_bombas.pdf', 
+    NULL, 
+    NULL, 
+    '2025-07-01', 
+    '2025-07-05', 
+    'Se requiere parada de planta parcial programada para el día 03.', 
+    'Pendiente'
+),
+(
+    'Recarga y prueba hidrostática de 50 extintores de CO2 y PQS', 
+    '20545678901', 
+    'Almacén Central - Ate Vitarte', 
+    4, 
+    '/archivos/os/os_007_recarga.pdf', 
+    '/archivos/informes/inf_007_cert.pdf', 
+    NULL, 
+    '2025-03-10', 
+    '2025-03-12', 
+    'Certificados entregados físicamente en la oficina del cliente.', 
+    'Completado'
+),
+(
+    'Instalación de sistema de supresión de cocina mediante agente químico', 
+    '20512345678', 
+    'Restaurante Principal - Miraflores', 
+    2, 
+    '/archivos/os/os_008_cocina.pdf', 
+    NULL, 
+    NULL, 
+    '2025-08-15', 
+    '2025-08-16', 
+    'Instalación en horario de madrugada (00:00 - 05:00) por solicitud del restaurante.', 
+    'Pendiente'
+),
+(
+    'Inspección mensual del sistema de alarma y luces de emergencia', 
+    '20534567890', 
+    'Torre de Consultorios - Lima Centro', 
+    3, 
+    '/archivos/os/os_009_inspeccion.pdf', 
+    NULL, 
+    NULL, 
+    '2025-06-01', 
+    '2025-06-01', 
+    'Revisión rutinaria según contrato de mantenimiento anual.', 
+    'En Ejecución'
+);
+
+-- Volver a activar las llaves foráneas
+SET FOREIGN_KEY_CHECKS = 1;
+
+-- Verificación de los datos insertados
+SELECT * FROM PROYECTO;

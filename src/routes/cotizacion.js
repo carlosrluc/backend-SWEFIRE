@@ -53,8 +53,13 @@ const { permit } = require('../middlewares/role.middleware');
  *               precio_total: { type: number }
  *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada] }
  *               comentario_cliente: { type: string }
- *               tasa_cambio: { type: number }
+ *               fecha_emision: { type: string, format: date }
+ *               fecha_vigencia: { type: string, format: date }
+ *               observacion: { type: string }
+ *               Tasa_Cambio: { type: number }
  *               condiciones: { type: string }
+ *               tacaCompra: { type: number }
+ *               tasaVenta: { type: number }
  *     responses:
  *       201:
  *         description: Cotización creada
@@ -97,8 +102,13 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
  *               precio_total: { type: number }
  *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada] }
  *               comentario_cliente: { type: string }
- *               tasa_cambio: { type: number }
+ *               fecha_emision: { type: string, format: date }
+ *               fecha_vigencia: { type: string, format: date }
+ *               observacion: { type: string }
+ *               Tasa_Cambio: { type: number }
  *               condiciones: { type: string }
+ *               tacaCompra: { type: number }
+ *               tasaVenta: { type: number }
  *     responses:
  *       200:
  *         description: Actualizada

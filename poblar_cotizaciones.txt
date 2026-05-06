@@ -1,0 +1,108 @@
+-- ============================================================
+-- SQL PARA POBLAR LA TABLA COTIZACION_COMERCIAL
+-- ============================================================
+
+USE swefire_db;
+
+SET FOREIGN_KEY_CHECKS = 0;
+
+INSERT INTO COTIZACION_COMERCIAL (
+    version, 
+    nombre, 
+    id_solicitud, 
+    DNI_O_RUC, 
+    precio_total, 
+    estado, 
+    comentario_cliente, 
+    fecha_emision, 
+    fecha_vigencia, 
+    observacion, 
+    Tasa_Cambio, 
+    condiciones, 
+    tacaCompra, 
+    tasaVenta
+) VALUES
+(
+    1, 
+    'COT-2025-010 - Sistema de Rociadores - Planta Sur', 
+    1, 
+    '20501234567', 
+    15500.50, 
+    'aprobado', 
+    'El cliente aceptó los términos tras la última reunión.', 
+    '2025-05-01', 
+    '2025-05-31', 
+    'Urgente: iniciar lo antes posible.', 
+    3.75, 
+    'Pago 50% adelantado, 50% al finalizar.', 
+    3.72, 
+    3.78
+),
+(
+    2, 
+    'COT-2025-011v2 - Recarga de Extintores Corporativos', 
+    2, 
+    '20512345678', 
+    2400.00, 
+    'rechazado por cliente', 
+    'Presupuesto excedido para este trimestre.', 
+    '2025-04-15', 
+    '2025-05-15', 
+    'Cliente solicitó descuento adicional del 10%.', 
+    3.74, 
+    'Crédito a 30 días.', 
+    3.71, 
+    3.77
+),
+(
+    1, 
+    'COT-2025-012 - Mantenimiento de Tableros Eléctricos', 
+    NULL, 
+    '20523456789', 
+    8900.00, 
+    'aprobado', 
+    'Autorizado por jefe de mantenimiento.', 
+    '2025-06-05', 
+    '2025-07-05', 
+    'Incluye repuestos originales.', 
+    3.76, 
+    'Garantía de 1 año.', 
+    3.73, 
+    3.79
+),
+(
+    1, 
+    'COT-2025-013 - Auditoría de Seguridad NFPA', 
+    3, 
+    '20534567890', 
+    12000.00, 
+    'descartada', 
+    'El cliente optó por otro proveedor local.', 
+    '2025-05-20', 
+    '2025-06-20', 
+    'Seguimiento realizado, no hubo respuesta positiva.', 
+    3.75, 
+    'Neto 15 días.', 
+    3.72, 
+    3.78
+),
+(
+    3, 
+    'COT-2025-014 - Suministro de Gabinetes contra Incendio', 
+    4, 
+    '20545678901', 
+    45600.00, 
+    'aprobado', 
+    'Aprobado bajo orden de compra OC-9988.', 
+    '2025-05-10', 
+    '2025-06-10', 
+    'Entrega programada para la quincena.', 
+    3.77, 
+    'Entrega en obra incluida.', 
+    3.74, 
+    3.80
+);
+
+SET FOREIGN_KEY_CHECKS = 1;
+
+SELECT * FROM COTIZACION_COMERCIAL;

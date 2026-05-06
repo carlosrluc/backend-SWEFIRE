@@ -36,7 +36,7 @@ exports.getByPlaca = async (req, res) => {
             `SELECT C.*, F.nombre_comercial as Fabricante_Nombre 
              FROM CAMION C 
              LEFT JOIN FABRICANTE F ON C.ID_Fabricante = F.ID_Fabricante 
-             WHERE C.Placa = ?`, 
+             WHERE C.Placa = ?`,
             [req.params.placa]
         );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
@@ -54,8 +54,8 @@ exports.create = async (req, res) => {
              fecha_prox_revision,ID_Fabricante,tarjeta_propiedad,vencimiento_tarjeta,soat_n_poliza,
              soat_empresa,soat_precio,soat_dia_pago,Estado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [Placa, nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
-             fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
-             soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado]
+                fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
+                soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado]
         );
         res.status(201).json({ message: 'Camión creado', Placa });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -71,8 +71,8 @@ exports.update = async (req, res) => {
              fecha_prox_revision=?,ID_Fabricante=?,tarjeta_propiedad=?,vencimiento_tarjeta=?,soat_n_poliza=?,
              soat_empresa=?,soat_precio=?,soat_dia_pago=?,Estado=? WHERE Placa=?`,
             [nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
-             fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
-             soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado, req.params.placa]
+                fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
+                soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado, req.params.placa]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Camión actualizado' });

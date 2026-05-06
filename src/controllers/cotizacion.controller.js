@@ -18,8 +18,8 @@ exports.formatQuotation = (row, rol) => {
         },
         estado: estadoFormateado,
         tasaCambio: {
-            tasaCompra: row.Tasa_Cambio || 0,
-            tasaVenta: row.Tasa_Cambio || 0
+            tasaCompra: row.tacaCompra || 0,
+            tasaVenta: row.tasaVenta || 0
         },
         mensajes: {
             comentarioCliente: row.comentario_cliente || ""
@@ -175,11 +175,11 @@ exports.getDetalles = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
-    const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente } = req.body;
+    const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta } = req.body;
     try {
         const result = await db.query(
-            'INSERT INTO COTIZACION_COMERCIAL (version,nombre,id_solicitud,DNI_O_RUC,precio_total,estado,comentario_cliente) VALUES (?,?,?,?,?,?,?)',
-            [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente]
+            'INSERT INTO COTIZACION_COMERCIAL (version,nombre,id_solicitud,DNI_O_RUC,precio_total,estado,comentario_cliente,fecha_emision,fecha_vigencia,observacion,Tasa_Cambio,condiciones,tacaCompra,tasaVenta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta]
         );
 
         if (id_solicitud) {
@@ -191,7 +191,7 @@ exports.create = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
-    const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente } = req.body;
+    const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta } = req.body;
     try {
         if (req.user && req.user.rolNormalizado === 'cliente') {
             const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
@@ -207,8 +207,8 @@ exports.update = async (req, res) => {
         }
 
         const result = await db.query(
-            'UPDATE COTIZACION_COMERCIAL SET version=?,nombre=?,id_solicitud=?,DNI_O_RUC=?,precio_total=?,estado=?,comentario_cliente=? WHERE ID=?',
-            [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, req.params.id]
+            'UPDATE COTIZACION_COMERCIAL SET version=?,nombre=?,id_solicitud=?,DNI_O_RUC=?,precio_total=?,estado=?,comentario_cliente=?,fecha_emision=?,fecha_vigencia=?,observacion=?,Tasa_Cambio=?,condiciones=?,tacaCompra=?,tasaVenta=? WHERE ID=?',
+            [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
 

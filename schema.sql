@@ -74,6 +74,7 @@ CREATE TABLE "SERVICIO" (
 
 -- swefire_db.CAMION definition
 
+
 CREATE TABLE "CAMION" (
   "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   "nombre" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -95,7 +96,6 @@ CREATE TABLE "CAMION" (
   KEY "ID_Fabricante" ("ID_Fabricante"),
   CONSTRAINT "CAMION_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE SET NULL
 );
-
 
 -- swefire_db.CAMION_MANTENIMIENTO definition
 
@@ -417,6 +417,8 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
   "observacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "Tasa_Cambio" float DEFAULT NULL,
   "condiciones" text COLLATE utf8mb4_unicode_ci,
+  "tacaCompra" float DEFAULT NULL,
+  "tasaVenta" float DEFAULT NULL,
   PRIMARY KEY ("ID"),
   KEY "id_solicitud" ("id_solicitud"),
   KEY "DNI_O_RUC" ("DNI_O_RUC"),

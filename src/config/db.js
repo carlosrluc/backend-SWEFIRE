@@ -14,6 +14,48 @@ const pool = mysql.createPool({
 
 module.exports = {
     query: async (sql, params) => {
+        if (params && typeof sql === 'string' && sql.trim().toUpperCase().startsWith('UPDATE')) {
+            const match = sql.match(/UPDATE\s+(.+?)\s+SET\s+(.+?)\s+(WHERE\s+.+)/is);
+            if (match) {
+                const table = match[1];
+                const setClause = match[2];
+                const whereClause = match[3];
+
+                const setParts = setClause.split(',');
+                const newSetParts = [];
+                const newParams = [];
+                
+                let paramIndex = 0;
+                for (let i = 0; i < setParts.length; i++) {
+                    const qCount = (setParts[i].match(/\?/g) || []).length;
+                    if (qCount === 1) {
+                        const val = params[paramIndex];
+                        if (val !== undefined) {
+                            newSetParts.push(setParts[i].trim());
+                            newParams.push(val);
+                        }
+                        paramIndex++;
+                    } else {
+                        newSetParts.push(setParts[i].trim());
+                        for(let j=0; j<qCount; j++) {
+                            newParams.push(params[paramIndex++]);
+                        }
+                    }
+                }
+
+                for (let i = paramIndex; i < params.length; i++) {
+                    newParams.push(params[i]);
+                }
+
+                if (newSetParts.length === 0) {
+                    return { affectedRows: 1 };
+                }
+
+                sql = `UPDATE ${table} SET ${newSetParts.join(', ')} ${whereClause}`;
+                params = newParams;
+            }
+        }
+
         const [rows] = await pool.query(sql, params);
         return rows;
     },
