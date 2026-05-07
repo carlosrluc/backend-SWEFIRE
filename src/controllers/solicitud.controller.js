@@ -51,6 +51,57 @@ exports.getAll = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+exports.getByEstado = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+        const estado = req.params.estado;
+
+        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre, C.razon_social as Razon_Social FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC WHERE S.estado = ?';
+        let countQuery = 'SELECT COUNT(*) as total FROM SOLICITUD S WHERE S.estado = ?';
+        let args = [estado];
+        let countArgs = [estado];
+
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil); 
+
+            query += ` AND S.Id_Cliente IN (${clientIds.map(() => '?').join(',')})`;
+            countQuery += ` AND S.Id_Cliente IN (${clientIds.map(() => '?').join(',')})`;
+            args.push(...clientIds);
+            countArgs.push(...clientIds);
+        }
+
+        query += ' LIMIT ? OFFSET ?';
+        args.push(limit, offset);
+
+        const rows = await db.query(query, args);
+        const countResult = await db.query(countQuery, countArgs);
+        const total = countResult[0].total;
+
+        const detailedRows = await Promise.all(rows.map(async (solicitud) => {
+            const [medios, servicios, inventario] = await Promise.all([
+                db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
+                db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
+                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
+            ]);
+            return { ...solicitud, medios, servicios, inventario };
+        }));
+
+        res.json({
+            data: detailedRows,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit)
+            }
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
 exports.getById = async (req, res) => {
     try {
         let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre, C.razon_social as Razon_Social FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC WHERE S.ID = ?';

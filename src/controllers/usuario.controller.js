@@ -128,8 +128,29 @@ exports.login = async (req, res) => {
             { expiresIn: '24h' }
         );
 
+        const perfilRows = await db.query('SELECT Nombre, Apellido FROM PERFIL WHERE DNI = ?', [user.dni_perfil]);
+        const perfilNombre = perfilRows.length > 0 ? perfilRows[0].Nombre : null;
+        const perfilApellidos = perfilRows.length > 0 ? perfilRows[0].Apellido : null;
+
+        const checkRows = await db.query(`
+            SELECT 1 
+            FROM CLIENTE_CONTACTO cc
+            JOIN SOLICITUD s ON cc.DNI_O_RUC = s.Id_Cliente
+            WHERE cc.DNI_perfil = ?
+            LIMIT 1
+        `, [user.dni_perfil]);
+        const nuevo = checkRows.length > 0 ? 'si' : 'no';
+
         const { contrasena: unneeded, temp_pass_unhashed: tempUnneeded, ...userData } = user;
-        res.json({ message: 'Login exitoso', token, access_token: token, user: userData });
+        res.json({ 
+            message: 'Login exitoso', 
+            token, 
+            access_token: token, 
+            user: userData,
+            nombre: perfilNombre,
+            apellidos: perfilApellidos,
+            nuevo: nuevo
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

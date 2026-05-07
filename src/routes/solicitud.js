@@ -62,6 +62,32 @@ router.post('/', c.create);
 
 /**
  * @openapi
+ * /api/solicitudes/estado/{estado}:
+ *   get:
+ *     tags: [Solicitud]
+ *     summary: Listar solicitudes por estado
+ *     parameters:
+ *       - in: path
+ *         name: estado
+ *         required: true
+ *         schema: { type: string, enum: ['pendiente','aceptado','rechazado'] }
+ *         description: Estado de la solicitud
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
+ *     responses:
+ *       200:
+ *         description: Lista de solicitudes filtrada por estado
+ */
+router.get('/estado/:estado', c.getByEstado);
+
+/**
+ * @openapi
  * /api/solicitudes/{id}:
  *   get:
  *     tags: [Solicitud]
