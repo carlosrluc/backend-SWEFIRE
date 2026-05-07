@@ -34,7 +34,7 @@ exports.getAll = async (req, res) => {
             const [medios, servicios, inventario] = await Promise.all([
                 db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
                 db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as Nombre, I.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
+                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
             ]);
             return { ...solicitud, medios, servicios, inventario };
         }));
@@ -71,7 +71,7 @@ exports.getById = async (req, res) => {
         const [medios, servicios, inventario] = await Promise.all([
             db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id]),
             db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT SI.*, I.nombre_objeto as Nombre, I.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
+            db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
         ]);
         res.json({ ...solicitud, medios, servicios, inventario });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -127,7 +127,7 @@ exports.remove = async (req, res) => {
     try {
         let query = 'DELETE FROM SOLICITUD WHERE ID = ?';
         let args = [req.params.id];
-        
+
         if (req.user && req.user.rolNormalizado === 'cliente') {
             const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
             const clientIds = contactos.map(c => c.DNI_O_RUC);
@@ -223,7 +223,7 @@ exports.deleteServicio = async (req, res) => {
 
 // ── SOLICITUD_INVENTARIO ──────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as Nombre, I.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 

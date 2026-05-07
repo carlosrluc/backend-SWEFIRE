@@ -13,9 +13,9 @@ exports.getAll = async (req, res) => {
         let queryParams = [];
 
         if (buscar) {
-    whereClauses.push('CC.nombre LIKE ?');
-    queryParams.push(`%${buscar}%`);
-}
+            whereClauses.push('CC.nombre LIKE ?');
+            queryParams.push(`%${buscar}%`);
+        }
 
         if (fecha_inicio) {
             whereClauses.push('P.fecha_inicio >= ?');
@@ -102,7 +102,7 @@ exports.proyecto_todo = async (req, res) => {
         // 3. Obtener inventario del proyecto
         const inventario = await db.query(
             `SELECT 
-                I.nombre_objeto AS nombre_del_producto,
+                I.nombre_objeto as nombre_del_producto,
                 I.ID_Fabricante AS id_fabricante,
                 PI.estado_post AS estado,
                 PI.cantidad_objeto AS cantidad,

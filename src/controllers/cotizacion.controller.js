@@ -155,7 +155,7 @@ exports.getDetalles = async (req, res) => {
         const invQuery = `
             SELECT 
                 c.ID_Inventario AS id, 
-                i.nombre_objeto AS nombre_producto, 
+                I.nombre_objeto as nombre_producto, 
                 c.cantidad,
                 c.precio_comercial AS precio_unitario,
                 c.intencion,
@@ -245,20 +245,20 @@ exports.create = async (req, res) => {
                  Tasa_Cambio, condiciones, tacaCompra, tasaVenta)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
-                version  || 1,
-                nombre   || null,
+                version || 1,
+                nombre || null,
                 id_solicitud || null,
                 DNI_O_RUC || null,
                 precioTotal,
                 estado,
                 comentario_cliente || null,
-                cond?.fechaEmision  || null,
+                cond?.fechaEmision || null,
                 cond?.fechaVigencia || null,
                 cond?.observaciones || null,
                 Tasa_Cambio || null,
-                cond?.condiciones   || null,
+                cond?.condiciones || null,
                 tasaCambio?.tasaCompra || null,
-                tasaCambio?.tasaVenta  || null
+                tasaCambio?.tasaVenta || null
             ]
         );
 
