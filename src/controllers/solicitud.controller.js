@@ -28,14 +28,24 @@ exports.getAll = async (req, res) => {
 
         const rows = await db.query(query, args);
         const countResult = await db.query(countQuery, countArgs);
-        
+        const total = countResult[0].total;
+
+        const detailedRows = await Promise.all(rows.map(async (solicitud) => {
+            const [medios, servicios, inventario] = await Promise.all([
+                db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
+                db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
+                db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
+            ]);
+            return { ...solicitud, medios, servicios, inventario };
+        }));
+
         res.json({
-            data: rows,
+            data: detailedRows,
             pagination: {
-                total: countResult[0].total,
+                total,
                 page,
                 limit,
-                totalPages: Math.ceil(countResult[0].total / limit)
+                totalPages: Math.ceil(total / limit)
             }
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -57,7 +67,13 @@ exports.getById = async (req, res) => {
 
         const rows = await db.query(query, args);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-        res.json(rows[0]);
+        const solicitud = rows[0];
+        const [medios, servicios, inventario] = await Promise.all([
+            db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id]),
+            db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id]),
+            db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
+        ]);
+        res.json({ ...solicitud, medios, servicios, inventario });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

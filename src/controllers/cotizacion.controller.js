@@ -78,7 +78,7 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        let query = 'SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC WHERE C_C.ID = ?';
+        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC WHERE S.ID = ?';
         let args = [req.params.id];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -86,14 +86,43 @@ exports.getById = async (req, res) => {
             const clientIds = contactos.map(c => c.DNI_O_RUC);
             clientIds.push(req.user.dni_perfil);
 
-            const placeholders = clientIds.map(() => '?').join(',');
-            query += ` AND (C_C.DNI_O_RUC IN (${placeholders}) OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`;
-            args.push(...clientIds, ...clientIds);
+            query += ` AND S.Id_Cliente IN (${clientIds.map(() => '?').join(',')})`;
+            args.push(...clientIds);
         }
 
         const rows = await db.query(query, args);
-        if (!rows.length) return res.status(404).json({ error: 'No encontrado o sin permiso' });
-        res.json(exports.formatQuotation(rows[0], req.user ? req.user.rolNormalizado : null));
+        if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
+        const solicitud = rows[0];
+        // Obtener datos de subtablas relacionadas
+        const [medios, servicios, inventario] = await Promise.all([
+            db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id]),
+            db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id]),
+            db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
+        ]);
+        // Devolver la solicitud con sus sub‑arrays
+        res.json({
+            ...solicitud,
+            medios,
+            servicios,
+            inventario
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.create = async (req, res) => {
+    const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta } = req.body;
+    const estado = 'Pendiente'; // Siempre iniciar como Pendiente
+    try {
+        const result = await db.query(
+            'INSERT INTO COTIZACION_COMERCIAL (version,nombre,id_solicitud,DNI_O_RUC,precio_total,estado,comentario_cliente,fecha_emision,fecha_vigencia,observacion,Tasa_Cambio,condiciones,tacaCompra,tasaVenta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta]
+        );
+
+        if (id_solicitud) {
+            await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID = ?`, [id_solicitud]);
+        }
+
+        res.status(201).json({ message: 'Cotización creada', ID: result.insertId, estado });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -197,6 +226,7 @@ exports.create = async (req, res) => {
         }
 
         // ── Insertar cabecera de COTIZACION_COMERCIAL ───────────────────────────
+        const estado = 'Pendiente'; // Force default status
         const result = await db.query(
             `INSERT INTO COTIZACION_COMERCIAL
                 (version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado,
@@ -209,7 +239,7 @@ exports.create = async (req, res) => {
                 id_solicitud || null,
                 DNI_O_RUC || null,
                 precioTotal,
-                estado || null,
+                estado,
                 comentario_cliente || null,
                 cond?.fechaEmision  || null,
                 cond?.fechaVigencia || null,
