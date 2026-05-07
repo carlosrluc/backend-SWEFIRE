@@ -38,7 +38,7 @@ const { permit } = require('../middlewares/role.middleware');
  *         description: Lista de cotizaciones con metadatos de paginación
  *   post:
  *     tags: [Cotización]
- *     summary: Crear una cotización
+ *     summary: Crear una cotización (con productos, camión y servicio de recojo)
  *     requestBody:
  *       required: true
  *       content:
@@ -46,23 +46,47 @@ const { permit } = require('../middlewares/role.middleware');
  *           schema:
  *             type: object
  *             properties:
- *               version: { type: integer, example: 1 }
- *               nombre: { type: string }
- *               id_solicitud: { type: integer }
- *               DNI_O_RUC: { type: string }
- *               precio_total: { type: number }
- *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada] }
- *               comentario_cliente: { type: string }
- *               fecha_emision: { type: string, format: date }
- *               fecha_vigencia: { type: string, format: date }
- *               observacion: { type: string }
- *               Tasa_Cambio: { type: number }
- *               condiciones: { type: string }
- *               tacaCompra: { type: number }
- *               tasaVenta: { type: number }
+ *               id_solicitud: { type: integer, description: ID de la solicitud asociada }
+ *               productos:
+ *                 type: array
+ *                 description: Productos a incluir en la cotización
+ *                 items:
+ *                   type: object
+ *                   required: [id, intencion, cantidad, precio_unitario]
+ *                   properties:
+ *                     id: { type: string, description: ID_Inventario del producto }
+ *                     intencion: { type: string, enum: [alquilar, comprar] }
+ *                     cantidad: { type: integer }
+ *                     precio_unitario: { type: number }
+ *               id_camion: { type: string, description: Placa del camión asignado }
+ *               costoRecojo:
+ *                 type: object
+ *                 description: Costo de recojo - se guarda como servicio ID=7 en COTIZACION_SERVICIO
+ *                 properties:
+ *                   costo: { type: number }
+ *                   fechaRecojo: { type: string, format: date }
+ *                   direccionRecojo: { type: string }
+ *               tasaCambio:
+ *                 type: object
+ *                 properties:
+ *                   tasaCompra: { type: number }
+ *                   tasaVenta: { type: number }
+ *               condiciones:
+ *                 type: object
+ *                 properties:
+ *                   fechaEmision: { type: string, format: date }
+ *                   fechaVigencia: { type: string, format: date }
+ *                   condiciones: { type: string }
+ *                   observaciones: { type: string }
+ *               version: { type: integer, example: 1, description: Campo legacy (default 1) }
+ *               nombre: { type: string, description: Campo legacy }
+ *               DNI_O_RUC: { type: string, description: Campo legacy - DNI o RUC del cliente }
+ *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada], description: Campo legacy }
+ *               comentario_cliente: { type: string, description: Campo legacy }
+ *               Tasa_Cambio: { type: number, description: Campo legacy }
  *     responses:
  *       201:
- *         description: Cotización creada
+ *         description: Cotización creada. Devuelve el ID y el precio_total calculado.
  */
 router.get('/', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getAll);
 router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.create);
@@ -85,7 +109,7 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
  *         description: No encontrada
  *   put:
  *     tags: [Cotización]
- *     summary: Actualizar cotización
+ *     summary: Actualizar cotización (reemplaza productos, camión y servicio de recojo)
  *     parameters:
  *       - in: path
  *         name: id
@@ -98,20 +122,43 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
  *           schema:
  *             type: object
  *             properties:
- *               nombre: { type: string }
- *               precio_total: { type: number }
+ *               id_solicitud: { type: integer, description: ID de la solicitud asociada }
+ *               productos:
+ *                 type: array
+ *                 description: Reemplaza todo el inventario de la cotización
+ *                 items:
+ *                   type: object
+ *                   required: [id, intencion, cantidad, precio_unitario]
+ *                   properties:
+ *                     id: { type: string, description: ID_Inventario del producto }
+ *                     intencion: { type: string, enum: [alquilar, comprar] }
+ *                     cantidad: { type: integer }
+ *                     precio_unitario: { type: number }
+ *               id_camion: { type: string, description: Placa del camión (reemplaza el camión actual) }
+ *               costoRecojo:
+ *                 type: object
+ *                 description: Costo de recojo - guarda como servicio ID=7 en COTIZACION_SERVICIO
+ *                 properties:
+ *                   costo: { type: number }
+ *                   fechaRecojo: { type: string, format: date }
+ *                   direccionRecojo: { type: string }
+ *               tasaCambio:
+ *                 type: object
+ *                 properties:
+ *                   tasaCompra: { type: number }
+ *                   tasaVenta: { type: number }
+ *               condiciones:
+ *                 type: object
+ *                 properties:
+ *                   fechaEmision: { type: string, format: date }
+ *                   fechaVigencia: { type: string, format: date }
+ *                   condiciones: { type: string }
+ *                   observaciones: { type: string }
  *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada] }
  *               comentario_cliente: { type: string }
- *               fecha_emision: { type: string, format: date }
- *               fecha_vigencia: { type: string, format: date }
- *               observacion: { type: string }
- *               Tasa_Cambio: { type: number }
- *               condiciones: { type: string }
- *               tacaCompra: { type: number }
- *               tasaVenta: { type: number }
  *     responses:
  *       200:
- *         description: Actualizada
+ *         description: Cotización actualizada. Devuelve el precio_total calculado.
  *   delete:
  *     tags: [Cotización]
  *     summary: Eliminar cotización

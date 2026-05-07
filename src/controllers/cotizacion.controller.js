@@ -175,24 +175,104 @@ exports.getDetalles = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
-    const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta } = req.body;
+    const {
+        id_solicitud,
+        productos,
+        id_camion,
+        costoRecojo,
+        tasaCambio,
+        condiciones: cond,
+        // Campos legacy opcionales
+        version, nombre, DNI_O_RUC, estado, comentario_cliente, Tasa_Cambio
+    } = req.body;
+
     try {
+        // ── Calcular precio_total ────────────────────────────────────────────────
+        let precioTotal = 0;
+        if (Array.isArray(productos)) {
+            precioTotal += productos.reduce((sum, p) => sum + ((p.precio_unitario || 0) * (p.cantidad || 0)), 0);
+        }
+        if (costoRecojo && costoRecojo.costo) {
+            precioTotal += Number(costoRecojo.costo);
+        }
+
+        // ── Insertar cabecera de COTIZACION_COMERCIAL ───────────────────────────
         const result = await db.query(
-            'INSERT INTO COTIZACION_COMERCIAL (version,nombre,id_solicitud,DNI_O_RUC,precio_total,estado,comentario_cliente,fecha_emision,fecha_vigencia,observacion,Tasa_Cambio,condiciones,tacaCompra,tasaVenta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta]
+            `INSERT INTO COTIZACION_COMERCIAL
+                (version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado,
+                 comentario_cliente, fecha_emision, fecha_vigencia, observacion,
+                 Tasa_Cambio, condiciones, tacaCompra, tasaVenta)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [
+                version  || 1,
+                nombre   || null,
+                id_solicitud || null,
+                DNI_O_RUC || null,
+                precioTotal,
+                estado || null,
+                comentario_cliente || null,
+                cond?.fechaEmision  || null,
+                cond?.fechaVigencia || null,
+                cond?.observaciones || null,
+                Tasa_Cambio || null,
+                cond?.condiciones   || null,
+                tasaCambio?.tasaCompra || null,
+                tasaCambio?.tasaVenta  || null
+            ]
         );
 
+        const newId = result.insertId;
+
+        // ── Insertar COTIZACION_INVENTARIO ───────────────────────────────────────
+        if (Array.isArray(productos)) {
+            for (const p of productos) {
+                await db.query(
+                    'INSERT INTO COTIZACION_INVENTARIO (ID_Cotizacion, ID_Inventario, cantidad, intencion, precio_comercial) VALUES (?,?,?,?,?)',
+                    [newId, p.id, p.cantidad, p.intencion, p.precio_unitario]
+                );
+            }
+        }
+
+        // ── Insertar COTIZACION_CAMION ───────────────────────────────────────────
+        if (id_camion) {
+            await db.query(
+                'INSERT INTO COTIZACION_CAMION (ID_Cotizacion, Placa) VALUES (?,?)',
+                [newId, id_camion]
+            );
+        }
+
+        // ── Insertar servicio de recojo en COTIZACION_SERVICIO (ID_Servicio=7) ──
+        if (costoRecojo && costoRecojo.costo) {
+            await db.query(
+                'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion, ID_Servicio, precio_comercial, fecha_inicio, ubicacion) VALUES (?,7,?,?,?)',
+                [newId, costoRecojo.costo, costoRecojo.fechaRecojo || null, costoRecojo.direccionRecojo || null]
+            );
+        }
+
+        // ── Actualizar estado de SOLICITUD ───────────────────────────────────────
         if (id_solicitud) {
             await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID = ?`, [id_solicitud]);
         }
 
-        res.status(201).json({ message: 'Cotización creada', ID: result.insertId });
+        res.status(201).json({ message: 'Cotización creada', ID: newId, precio_total: precioTotal });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+
 exports.update = async (req, res) => {
-    const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta } = req.body;
+    const {
+        id_solicitud,
+        productos,
+        id_camion,
+        costoRecojo,
+        tasaCambio,
+        condiciones: cond,
+        // Campos opcionales legacy que se mantienen
+        version, nombre, DNI_O_RUC, estado, comentario_cliente, Tasa_Cambio
+    } = req.body;
+
     try {
+        // ── Verificar permiso si es cliente ─────────────────────────────────────
         if (req.user && req.user.rolNormalizado === 'cliente') {
             const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
             const clientIds = contactos.map(c => c.DNI_O_RUC);
@@ -206,16 +286,84 @@ exports.update = async (req, res) => {
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para editar esta cotización' });
         }
 
-        const result = await db.query(
-            'UPDATE COTIZACION_COMERCIAL SET version=?,nombre=?,id_solicitud=?,DNI_O_RUC=?,precio_total=?,estado=?,comentario_cliente=?,fecha_emision=?,fecha_vigencia=?,observacion=?,Tasa_Cambio=?,condiciones=?,tacaCompra=?,tasaVenta=? WHERE ID=?',
-            [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta, req.params.id]
-        );
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        // ── Calcular precio_total ────────────────────────────────────────────────
+        let precioTotal = 0;
+        if (Array.isArray(productos)) {
+            precioTotal += productos.reduce((sum, p) => sum + ((p.precio_unitario || 0) * (p.cantidad || 0)), 0);
+        }
+        if (costoRecojo && costoRecojo.costo) {
+            precioTotal += Number(costoRecojo.costo);
+        }
 
+        // ── Actualizar cabecera de COTIZACION_COMERCIAL ─────────────────────────
+        const updateFields = {
+            precio_total: precioTotal,
+        };
+        if (id_solicitud !== undefined) updateFields.id_solicitud = id_solicitud;
+        if (tasaCambio?.tasaCompra !== undefined) updateFields.tacaCompra = tasaCambio.tasaCompra;
+        if (tasaCambio?.tasaVenta !== undefined) updateFields.tasaVenta = tasaCambio.tasaVenta;
+        if (cond?.fechaEmision !== undefined) updateFields.fecha_emision = cond.fechaEmision;
+        if (cond?.fechaVigencia !== undefined) updateFields.fecha_vigencia = cond.fechaVigencia;
+        if (cond?.condiciones !== undefined) updateFields.condiciones = cond.condiciones;
+        if (cond?.observaciones !== undefined) updateFields.observacion = cond.observaciones;
+        // Campos legacy opcionales
+        if (version !== undefined) updateFields.version = version;
+        if (nombre !== undefined) updateFields.nombre = nombre;
+        if (DNI_O_RUC !== undefined) updateFields.DNI_O_RUC = DNI_O_RUC;
+        if (estado !== undefined) updateFields.estado = estado;
+        if (comentario_cliente !== undefined) updateFields.comentario_cliente = comentario_cliente;
+        if (Tasa_Cambio !== undefined) updateFields.Tasa_Cambio = Tasa_Cambio;
+
+        const setClauses = Object.keys(updateFields).map(k => `${k}=?`).join(',');
+        const setValues = Object.values(updateFields);
+
+        const result = await db.query(
+            `UPDATE COTIZACION_COMERCIAL SET ${setClauses} WHERE ID=?`,
+            [...setValues, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Cotización no encontrada' });
+
+        // ── Sincronizar COTIZACION_INVENTARIO (replace) ─────────────────────────
+        if (Array.isArray(productos)) {
+            await db.query('DELETE FROM COTIZACION_INVENTARIO WHERE ID_Cotizacion = ?', [req.params.id]);
+            for (const p of productos) {
+                await db.query(
+                    'INSERT INTO COTIZACION_INVENTARIO (ID_Cotizacion, ID_Inventario, cantidad, intencion, precio_comercial) VALUES (?,?,?,?,?)',
+                    [req.params.id, p.id, p.cantidad, p.intencion, p.precio_unitario]
+                );
+            }
+        }
+
+        // ── Sincronizar COTIZACION_CAMION (replace) ──────────────────────────────
+        if (id_camion !== undefined) {
+            await db.query('DELETE FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [req.params.id]);
+            if (id_camion) {
+                await db.query(
+                    'INSERT INTO COTIZACION_CAMION (ID_Cotizacion, Placa) VALUES (?,?)',
+                    [req.params.id, id_camion]
+                );
+            }
+        }
+
+        // ── Sincronizar servicio de recojo en COTIZACION_SERVICIO (ID_Servicio=7) ─
+        if (costoRecojo !== undefined) {
+            await db.query(
+                'DELETE FROM COTIZACION_SERVICIO WHERE ID_Cotizacion = ? AND ID_Servicio = 7',
+                [req.params.id]
+            );
+            if (costoRecojo && costoRecojo.costo) {
+                await db.query(
+                    'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion, ID_Servicio, precio_comercial, fecha_inicio, ubicacion) VALUES (?,7,?,?,?)',
+                    [req.params.id, costoRecojo.costo, costoRecojo.fechaRecojo || null, costoRecojo.direccionRecojo || null]
+                );
+            }
+        }
+
+        // ── Sincronizar estados de SOLICITUD ─────────────────────────────────────
         await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
         await db.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
 
-        res.json({ message: 'Cotización actualizada' });
+        res.json({ message: 'Cotización actualizada', precio_total: precioTotal });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
