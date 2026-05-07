@@ -156,9 +156,10 @@ exports.getDetalles = async (req, res) => {
             SELECT 
                 c.ID_Inventario AS id, 
                 i.nombre_objeto AS nombre_producto, 
-                c.cantidad, 
-                c.precio_comercial AS precio_unitario, 
-                c.intencion 
+                c.cantidad,
+                c.precio_comercial AS precio_unitario,
+                c.intencion,
+                c.dias_alquilados
             FROM COTIZACION_INVENTARIO c 
             LEFT JOIN INVENTARIO i ON c.ID_Inventario = i.Id_Objeto 
             WHERE c.ID_Cotizacion = ?`;
@@ -189,14 +190,24 @@ exports.getDetalles = async (req, res) => {
             WHERE c.ID_Cotizacion = ?`;
         const serviciosResult = await db.query(servQuery, [cotizacionId]);
 
+        const mapByKey = (arr, key) => arr.reduce((obj, item) => {
+            obj[item[key]] = item;
+            return obj;
+        }, {});
+        const inventarioObj = mapByKey(inventarioResult, 'id');
+        const camionesObj = mapByKey(camionesResult, 'placa');
+        const serviciosObj = serviciosResult.reduce((obj, item, idx) => {
+            obj[idx] = item;
+            return obj;
+        }, {});
         res.json({
             comentario_cliente: cotizacionBase.comentario_cliente,
             fecha_emision: cotizacionBase.fecha_emision,
             fecha_vigencia: cotizacionBase.fecha_vigencia,
             observacion: cotizacionBase.observacion,
-            inventario: inventarioResult,
-            camiones: camionesResult,
-            servicios: serviciosResult
+            inventario: inventarioObj,
+            camiones: camionesObj,
+            servicios: serviciosObj
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
