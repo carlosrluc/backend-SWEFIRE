@@ -13,7 +13,7 @@ exports.getAll = async (req, res) => {
         let queryParams = [];
 
         if (buscar) {
-            whereClauses.push('(P.descripcion_servicio LIKE ? OR C.nombre_comercial LIKE ? OR P.ubicacion LIKE ?)');
+            whereClauses.push('(CC.nombre LIKE ? OR C.nombre_comercial LIKE ? OR P.ubicacion LIKE ?)');
             const searchPattern = `%${buscar}%`;
             queryParams.push(searchPattern, searchPattern, searchPattern);
         }

@@ -7,7 +7,7 @@ exports.getAll = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC';
+        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre, C.razon_social as Razon_Social FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC';
         let countQuery = 'SELECT COUNT(*) as total FROM SOLICITUD S';
         let args = [];
         let countArgs = [];
@@ -34,7 +34,7 @@ exports.getAll = async (req, res) => {
             const [medios, servicios, inventario] = await Promise.all([
                 db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
                 db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
+                db.query('SELECT SI.*, I.nombre_objeto as Nombre, SI.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
             ]);
             return { ...solicitud, medios, servicios, inventario };
         }));
@@ -53,7 +53,7 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC WHERE S.ID = ?';
+        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre, C.razon_social as Razon_Social FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC WHERE S.ID = ?';
         let args = [req.params.id];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -71,7 +71,7 @@ exports.getById = async (req, res) => {
         const [medios, servicios, inventario] = await Promise.all([
             db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id]),
             db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
+            db.query('SELECT SI.*, I.nombre_objeto as Nombre, SI.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
         ]);
         res.json({ ...solicitud, medios, servicios, inventario });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -223,7 +223,7 @@ exports.deleteServicio = async (req, res) => {
 
 // ── SOLICITUD_INVENTARIO ──────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as Nombre, SI.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
