@@ -279,14 +279,31 @@ exports.getSolicitudesPorPerfil = async (req, res) => {
 
 exports.getCotizacionesPorPerfil = async (req, res) => {
     try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+
+        const countSql = `
+            SELECT COUNT(*) as total 
+            FROM COTIZACION_COMERCIAL C
+            JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
+            WHERE CC.DNI_perfil = ?`;
+        const countResult = await db.query(countSql, [req.params.dni]);
+        const total = countResult[0].total;
+
         const sql = `
             SELECT C.*, CL.nombre_comercial as Cliente_Nombre 
             FROM COTIZACION_COMERCIAL C
             JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
             LEFT JOIN CLIENTE CL ON C.DNI_O_RUC = CL.DNI_O_RUC
-            WHERE CC.DNI_perfil = ?`;
-        const rows = await db.query(sql, [req.params.dni]);
-        res.json(rows.map(r => formatQuotation(r, req.user ? req.user.rolNormalizado : null)));
+            WHERE CC.DNI_perfil = ?
+            LIMIT ? OFFSET ?`;
+        const rows = await db.query(sql, [req.params.dni, limit, offset]);
+        
+        res.json({
+            data: rows.map(r => formatQuotation(r, req.user ? req.user.rolNormalizado : null)),
+            pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

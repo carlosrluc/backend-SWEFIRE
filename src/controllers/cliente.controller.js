@@ -195,8 +195,21 @@ exports.getSolicitudes = async (req, res) => {
 
 exports.getCotizaciones = async (req, res) => {
     try {
-        const rows = await db.query('SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC WHERE C_C.DNI_O_RUC = ?', [req.params.id]);
-        res.json(rows.map(r => formatQuotation(r, req.user ? req.user.rolNormalizado : null)));
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+
+        const countQuery = 'SELECT COUNT(*) as total FROM COTIZACION_COMERCIAL C_C WHERE C_C.DNI_O_RUC = ?';
+        const countResult = await db.query(countQuery, [req.params.id]);
+        const total = countResult[0].total;
+
+        const query = 'SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC WHERE C_C.DNI_O_RUC = ? LIMIT ? OFFSET ?';
+        const rows = await db.query(query, [req.params.id, limit, offset]);
+
+        res.json({
+            data: rows.map(r => formatQuotation(r, req.user ? req.user.rolNormalizado : null)),
+            pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }
+        });
     }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
