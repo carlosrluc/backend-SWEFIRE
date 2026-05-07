@@ -13,10 +13,9 @@ exports.getAll = async (req, res) => {
         let queryParams = [];
 
         if (buscar) {
-            whereClauses.push('(CC.nombre LIKE ? OR C.nombre_comercial LIKE ? OR P.ubicacion LIKE ?)');
-            const searchPattern = `%${buscar}%`;
-            queryParams.push(searchPattern, searchPattern, searchPattern);
-        }
+    whereClauses.push('CC.nombre LIKE ?');
+    queryParams.push(`%${buscar}%`);
+}
 
         if (fecha_inicio) {
             whereClauses.push('P.fecha_inicio >= ?');
@@ -50,8 +49,9 @@ exports.getAll = async (req, res) => {
             SELECT COUNT(*) as total 
             FROM PROYECTO P 
             LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
+            LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
             ${whereString}`;
-        
+
         const countResult = await db.query(countQueryStr, queryParams);
         const total = countResult[0].total;
 
@@ -79,7 +79,7 @@ exports.proyecto_todo = async (req, res) => {
              LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
              LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
              LEFT JOIN TRABAJO T ON P.ID_Trabajo = T.Id_trabajo 
-             WHERE P.id_Proyecto = ?`, 
+             WHERE P.id_Proyecto = ?`,
             [id_proyecto]
         );
         if (!pRows.length) return res.status(404).json({ error: 'Proyecto no encontrado' });
@@ -91,7 +91,7 @@ exports.proyecto_todo = async (req, res) => {
             `SELECT PC.*, C.nombre as Camion_Nombre, 0 as precio 
              FROM PROYECTO_CAMION PC 
              LEFT JOIN CAMION C ON PC.Placa = C.Placa 
-             WHERE PC.id_Proyecto = ?`, 
+             WHERE PC.id_Proyecto = ?`,
             [id_proyecto]
         );
         let subtotal_camiones = 0;
@@ -150,7 +150,7 @@ exports.getById = async (req, res) => {
              LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
              LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
              LEFT JOIN TRABAJO T ON P.ID_Trabajo = T.Id_trabajo 
-             WHERE P.id_Proyecto = ?`, 
+             WHERE P.id_Proyecto = ?`,
             [req.params.id]
         );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
@@ -167,7 +167,7 @@ exports.create = async (req, res) => {
              orden_servicio,informe_final,factura,fecha_inicio,fecha_fin,observaciones,estado)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
             [descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-             orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado]
+                orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado]
         );
         res.status(201).json({ message: 'Proyecto creado', id_Proyecto: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -182,7 +182,7 @@ exports.update = async (req, res) => {
              orden_servicio=?,informe_final=?,factura=?,fecha_inicio=?,fecha_fin=?,observaciones=?,estado=?
              WHERE id_Proyecto=?`,
             [descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-             orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado, req.params.id]
+                orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Proyecto actualizado' });
