@@ -34,7 +34,7 @@ exports.getAll = async (req, res) => {
             const [medios, servicios, inventario] = await Promise.all([
                 db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
                 db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as Nombre, SI.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
+                db.query('SELECT SI.*, I.nombre_objeto as Nombre, I.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
             ]);
             return { ...solicitud, medios, servicios, inventario };
         }));
@@ -71,7 +71,7 @@ exports.getById = async (req, res) => {
         const [medios, servicios, inventario] = await Promise.all([
             db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id]),
             db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT SI.*, I.nombre_objeto as Nombre, SI.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
+            db.query('SELECT SI.*, I.nombre_objeto as Nombre, I.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
         ]);
         res.json({ ...solicitud, medios, servicios, inventario });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -223,7 +223,7 @@ exports.deleteServicio = async (req, res) => {
 
 // ── SOLICITUD_INVENTARIO ──────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as Nombre, SI.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as Nombre, I.precio_comercial as Precio_comercial FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
