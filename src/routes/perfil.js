@@ -44,7 +44,9 @@ const c = require('../controllers/perfil.controller');
  *       - in: query
  *         name: fecha
  *         required: true
- *         schema: { type: string, format: date }
+ *         schema:
+ *           type: string
+ *           format: date
  *         description: Fecha para la cual verificar disponibilidad (YYYY-MM-DD)
  *     responses:
  *       200:
