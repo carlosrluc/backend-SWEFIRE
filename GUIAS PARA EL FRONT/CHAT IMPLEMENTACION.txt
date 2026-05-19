@@ -1,0 +1,92 @@
+=== GUÍA SIMPLE DE IMPLEMENTACIÓN FRONTEND (REACT/VUE/VANILLA) ===
+
+1. Instalar la librería del cliente de WebSockets:
+   npm install socket.io-client
+
+2. En tu componente o página donde ves la cotización (por ejemplo, DetallesCotizacion.js), debes hacer dos cosas:
+   - Llamar a la API REST para cargar el historial de mensajes anterior.
+   - Conectarte por WebSockets para enviar/recibir en tiempo real.
+
+=====================================================================
+EJEMPLO CON JAVASCRIPT / REACT:
+
+import { useEffect, useState } from 'react';
+import { io } from 'socket.io-client';
+
+export default function ChatCotizacion({ cotizacionId, token, user }) {
+  const [mensajes, setMensajes] = useState([]);
+  const [nuevoMensaje, setNuevoMensaje] = useState("");
+  const [socket, setSocket] = useState(null);
+
+  useEffect(() => {
+    // 1. CARGAR HISTORIAL AL ABRIR EL COMPONENTE
+    fetch(`https://swefire.onrender.com/api/cotizaciones/${cotizacionId}/chat`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(res => res.json())
+    .then(data => setMensajes(data))
+    .catch(err => console.error("Error cargando historial", err));
+
+    // 2. CONECTAR AL SOCKET
+    const newSocket = io("https://swefire.onrender.com", {
+      auth: { token: token } // El backend validará este JWT
+    });
+
+    // 3. UNIRSE A LA SALA (ROOM)
+    newSocket.on("connect", () => {
+      newSocket.emit("join_room", cotizacionId);
+    });
+
+    // 4. ESCUCHAR NUEVOS MENSAJES DE OTROS (O TUYOS REBOTADOS)
+    newSocket.on("receive_message", (mensaje) => {
+      setMensajes((prev) => [...prev, mensaje]);
+    });
+
+    // Manejo de errores de conexión/permisos
+    newSocket.on("error", (err) => {
+      alert("Error de chat: " + err);
+    });
+
+    setSocket(newSocket);
+
+    // Desconectar al salir de la pantalla
+    return () => newSocket.disconnect();
+  }, [cotizacionId, token]);
+
+  // 5. FUNCIÓN PARA ENVIAR TU MENSAJE
+  const enviarMensaje = () => {
+    if (nuevoMensaje.trim() !== "" && socket) {
+      socket.emit("send_message", {
+        id_cotizacion: cotizacionId,
+        mensaje: nuevoMensaje,
+        nombre_remitente: user.nombre // Nombre del cliente o empleado para mostrar
+      });
+      setNuevoMensaje(""); // Limpiar input
+    }
+  };
+
+  return (
+    <div>
+      <div className="chat-historial">
+        {mensajes.map((m) => (
+          <div key={m.id_mensaje}>
+            <strong>{m.nombre_remitente}: </strong>
+            <span>{m.mensaje}</span>
+          </div>
+        ))}
+      </div>
+      
+      <div className="chat-input">
+        <input 
+          value={nuevoMensaje} 
+          onChange={(e) => setNuevoMensaje(e.target.value)} 
+          placeholder="Escribe un mensaje..."
+        />
+        <button onClick={enviarMensaje}>Enviar</button>
+      </div>
+    </div>
+  );
+}
+=====================================================================
+
+¡Y listo! Con esto tendrás el historial guardado en la Base de Datos al entrar y la conversación en tiempo real.

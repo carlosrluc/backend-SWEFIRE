@@ -788,6 +788,16 @@ CREATE TABLE "TRABAJO_RRHH_PDF" (
   CONSTRAINT "TRABAJO_RRHH_PDF_ibfk_1" FOREIGN KEY ("ID_RRHH") REFERENCES "TRABAJO_RRHH" ("id") ON DELETE CASCADE
 );
 
+CREATE TABLE COTIZACION_CHAT_MENSAJE (
+    id_mensaje INT AUTO_INCREMENT PRIMARY KEY,
+    id_cotizacion INT NOT NULL,
+    id_remitente VARCHAR(20) NOT NULL, -- DNI del perfil o RUC del cliente
+    tipo_remitente ENUM('empleado', 'cliente') NOT NULL,
+    nombre_remitente VARCHAR(150) NOT NULL, -- Para fácil renderizado en frontend
+    mensaje TEXT NOT NULL,
+    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_cotizacion) REFERENCES COTIZACION_COMERCIAL(ID) ON DELETE CASCADE
+);
 -- ============================================================
 -- REFERENCIAS CRUZADAS (FKs que se agregaron al final)
 -- ============================================================

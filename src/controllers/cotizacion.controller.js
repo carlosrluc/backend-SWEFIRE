@@ -574,3 +574,86 @@ exports.deletePersonal = async (req, res) => {
         res.json({ message: 'Personal en cotización eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+// ── COTIZACION_CHAT ───────────────────────────────────────────────────────────
+exports.getChatHistory = async (req, res) => {
+    try {
+        const cotizacionId = req.params.id;
+
+        // Validar permisos si es cliente
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+
+            const placeholders = clientIds.map(() => '?').join(',');
+            const check = await db.query(
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                [cotizacionId, ...clientIds, ...clientIds]
+            );
+            if (!check.length) return res.status(403).json({ error: 'No tienes permiso para ver este chat' });
+        }
+
+        const messages = await db.query(
+            'SELECT * FROM COTIZACION_CHAT_MENSAJE WHERE id_cotizacion = ? ORDER BY fecha_hora ASC', 
+            [cotizacionId]
+        );
+
+        res.json(messages);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+exports.sendChatMessage = async (req, res) => {
+    try {
+        const cotizacionId = req.params.id;
+        const { mensaje, nombre_remitente } = req.body;
+
+        if (!mensaje) {
+            return res.status(400).json({ error: 'El mensaje es requerido' });
+        }
+
+        // Validar permisos si es cliente
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+
+            const placeholders = clientIds.map(() => '?').join(',');
+            const check = await db.query(
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                [cotizacionId, ...clientIds, ...clientIds]
+            );
+            if (!check.length) return res.status(403).json({ error: 'No tienes permiso para enviar mensajes en este chat' });
+        }
+
+        const tipo_remitente = req.user.rolNormalizado === 'cliente' ? 'cliente' : 'empleado';
+        const remitenteId = req.user.dni_perfil || 'sistema';
+
+        const result = await db.query(
+            'INSERT INTO COTIZACION_CHAT_MENSAJE (id_cotizacion, id_remitente, tipo_remitente, nombre_remitente, mensaje) VALUES (?, ?, ?, ?, ?)',
+            [cotizacionId, remitenteId, tipo_remitente, nombre_remitente || req.user.correo || 'Usuario', mensaje]
+        );
+
+        const newMsg = {
+            id_mensaje: result.insertId,
+            id_cotizacion: Number(cotizacionId),
+            id_remitente: remitenteId,
+            tipo_remitente,
+            nombre_remitente: nombre_remitente || req.user.correo || 'Usuario',
+            mensaje,
+            fecha_hora: new Date()
+        };
+
+        // Emitir por Socket.io si está conectado
+        const io = req.app.get('socketio');
+        if (io) {
+            io.to(cotizacionId).emit('receive_message', newMsg);
+        }
+
+        res.status(201).json(newMsg);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};

@@ -590,4 +590,43 @@ router.put('/:id/personal/:pid', auth, permit(['trabajtaller', 'gerente', 'admin
  */
 router.delete('/:id/personal/:pid', auth, permit(['gerente', 'adminproy']), c.deletePersonal);
 
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/chat:
+ *   get:
+ *     tags: [Cotización - Chat]
+ *     summary: Obtener el historial del chat
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Historial de mensajes
+ *   post:
+ *     tags: [Cotización - Chat]
+ *     summary: Enviar un mensaje de chat
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [mensaje]
+ *             properties:
+ *               mensaje: { type: string, example: "Hola, podemos negociar el precio de los rociadores?" }
+ *               nombre_remitente: { type: string, example: "Juan Perez" }
+ *     responses:
+ *       201:
+ *         description: Mensaje enviado exitosamente
+ */
+router.get('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.getChatHistory);
+router.post('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.sendChatMessage);
+
 module.exports = router;
