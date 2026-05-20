@@ -1,8 +1,26 @@
 const db = require('../config/db');
 
+const autoUpdateProjectStatus = async () => {
+    try {
+        await db.query(`
+            UPDATE PROYECTO 
+            SET estado = CASE 
+                WHEN CURDATE() > fecha_fin THEN 'Completado'
+                WHEN CURDATE() >= fecha_inicio AND CURDATE() <= fecha_fin THEN 'En Ejecución'
+                ELSE estado 
+            END
+            WHERE estado NOT IN ('Cancelado', 'Rechazado')
+        `);
+    } catch (e) {
+        console.error('Error auto-actualizando estados de proyectos:', e);
+    }
+};
+
 // ── PROYECTO ──────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
     try {
+        await autoUpdateProjectStatus();
+
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
@@ -65,6 +83,33 @@ exports.getAll = async (req, res) => {
             }
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getActiveAndCompleted = async (req, res) => {
+    try {
+        await autoUpdateProjectStatus();
+
+        const queryStr = `
+            SELECT P.*, C.nombre_comercial as Cliente_Nombre, CC.nombre as Cotizacion_Nombre, T.comentario as Trabajo_Comentario 
+            FROM PROYECTO P 
+            LEFT JOIN CLIENTE C ON P.Id_Cliente = C.DNI_O_RUC 
+            LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
+            LEFT JOIN TRABAJO T ON P.ID_Trabajo = T.Id_trabajo 
+            WHERE P.estado IN ('En Ejecución', 'Completado')
+            ORDER BY 
+                CASE P.estado 
+                    WHEN 'En Ejecución' THEN 1 
+                    WHEN 'Completado' THEN 2 
+                    ELSE 3 
+                END ASC,
+                P.fecha_fin DESC
+        `;
+
+        const rows = await db.query(queryStr);
+        res.json(rows);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 };
 
 // ── PROYECTO_TODO ─────────────────────────────────────────────────────────────

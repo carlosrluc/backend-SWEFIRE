@@ -61,6 +61,19 @@ router.post('/', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'ger
 
 /**
  * @openapi
+ * /api/proyectos/activos-completados:
+ *   get:
+ *     tags: [Proyecto]
+ *     summary: Obtener proyectos en ejecución y completados (ordenados)
+ *     description: Retorna proyectos en estado "En Ejecución" y "Completado". Primero lista los en ejecución, luego los completados, ordenados por fecha_fin de más lejano a más reciente. Además auto-actualiza los estados según la fecha actual.
+ *     responses:
+ *       200:
+ *         description: Lista de proyectos
+ */
+router.get('/activos-completados', auth, c.getActiveAndCompleted);
+
+/**
+ * @openapi
  * /api/proyectos/{id}:
  *   get:
  *     tags: [Proyecto]
