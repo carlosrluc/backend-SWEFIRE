@@ -1,0 +1,66 @@
+=== GUÍA SIMPLE PARA EL FRONTEND (CONSUMO DE PDF) ===
+
+ENDPOINT: GET /api/cotizaciones/{id}/orden-compra
+
+Dado que el endpoint devuelve un archivo binario (un PDF) y no un JSON tradicional, hay dos formas principales de consumirlo en el frontend (React, Vue, HTML puro, etc.):
+
+--------------------------------------------------
+OPCIÓN 1: Abrir en una nueva pestaña (Lo más fácil)
+--------------------------------------------------
+Si NO tienes protección JWT (token) obligatoria para descargar, o si puedes mandar el token por URL, basta con poner un enlace (etiqueta <a>) directo al endpoint.
+Ejemplo:
+<a href="http://localhost:3000/api/cotizaciones/5/orden-compra" target="_blank">
+  Ver Orden de Compra
+</a>
+
+--------------------------------------------------
+OPCIÓN 2: Descargar/Visualizar usando `fetch` (Requerido si usas JWT)
+--------------------------------------------------
+Si tu ruta está protegida con el middleware `auth` (necesitas pasar el token en el Header), no puedes usar un <a> simple. Debes usar `fetch` para descargar el archivo (Blob) y luego crear una URL temporal en el navegador para mostrarlo o descargarlo.
+
+Ejemplo en JavaScript / React:
+
+async function verPDF(cotizacionId, token) {
+  try {
+    // 1. Hacemos la petición enviando el token
+    const response = await fetch(`http://localhost:3000/api/cotizaciones/${cotizacionId}/orden-compra`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) throw new Error("No se pudo obtener el PDF");
+
+    // 2. Convertimos la respuesta a un Blob (archivo binario)
+    const blob = await response.blob();
+
+    // 3. Creamos una URL temporal (Object URL) para este Blob en el navegador
+    const fileUrl = window.URL.createObjectURL(blob);
+
+    // 4. Lo abrimos en una nueva pestaña
+    window.open(fileUrl, '_blank');
+
+    // OPCIONAL: Si prefieres forzar la descarga en lugar de abrirlo:
+    /*
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = `orden_compra_${cotizacionId}.pdf`;
+    link.click();
+    */
+
+  } catch (error) {
+    console.error("Error al visualizar el PDF:", error);
+    alert("No hay PDF o no tienes permiso");
+  }
+}
+
+// Así lo usarías en un botón de React:
+// <button onClick={() => verPDF(5, "tu_token_jwt")}>Ver PDF</button>
+
+--------------------------------------------------
+OPCIÓN 3: Incrustarlo en la página (<object> o <iframe>)
+--------------------------------------------------
+Si deseas mostrar el PDF dentro de un recuadro de tu página, haces el mismo `fetch` que en la Opción 2 para obtener el `fileUrl` (el Object URL del Blob) y se lo pasas a una etiqueta:
+
+<iframe src={fileUrl} width="100%" height="600px"></iframe>

@@ -48,10 +48,11 @@ const { permit } = require('../middlewares/role.middleware');
  *               Id_Cliente: { type: string }
  *               ubicacion: { type: string }
  *               id_cotizacion: { type: integer }
+ *               orden_compra: { type: string, description: "URL de redirección al PDF de la cotización" }
  *               fecha_inicio: { type: string, format: date }
  *               fecha_fin: { type: string, format: date }
  *               observaciones: { type: string }
- *               estado: { type: string, enum: [Pendiente, "En Ejecución", Completado, "En proceso legal"] }
+ *               estado: { type: string, enum: ["No iniciado", "En Ejecución", Completado, "En proceso legal"] }
  *     responses:
  *       201:
  *         description: Proyecto creado
@@ -103,9 +104,10 @@ router.get('/activos-completados', auth, c.getActiveAndCompleted);
  *           schema:
  *             type: object
  *             properties:
- *               estado: { type: string, enum: [Pendiente, "En Ejecución", Completado, "En proceso legal"] }
+ *               estado: { type: string, enum: ["No iniciado", "En Ejecución", Completado, "En proceso legal"] }
  *               observaciones: { type: string }
  *               fecha_fin: { type: string, format: date }
+ *               orden_compra: { type: string, description: "URL de redirección al PDF de la cotización" }
  *     responses:
  *       200:
  *         description: Actualizado

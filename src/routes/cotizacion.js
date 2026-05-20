@@ -2,6 +2,7 @@ const router = require('express').Router();
 const c = require('../controllers/cotizacion.controller');
 const auth = require('../middlewares/auth.middleware');
 const { permit } = require('../middlewares/role.middleware');
+const upload = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
@@ -628,5 +629,50 @@ router.delete('/:id/personal/:pid', auth, permit(['gerente', 'adminproy']), c.de
  */
 router.get('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.getChatHistory);
 router.post('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.sendChatMessage);
+
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/orden-compra:
+ *   get:
+ *     tags: [Cotización - Documentos]
+ *     summary: Descargar o visualizar la orden de compra
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Archivo PDF
+ *         content:
+ *           application/pdf:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *   post:
+ *     tags: [Cotización - Documentos]
+ *     summary: Subir la orden de compra (PDF)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               orden_compra:
+ *                 type: string
+ *                 format: binary
+ *                 description: Archivo PDF de la orden de compra
+ *     responses:
+ *       200:
+ *         description: Orden de compra subida correctamente
+ */
+router.get('/:id/orden-compra', auth, c.getOrdenCompra);
+router.post('/:id/orden-compra', auth, permit(['cliente', 'gerente', 'adminproy']), upload.single('orden_compra'), c.uploadOrdenCompra);
 
 module.exports = router;

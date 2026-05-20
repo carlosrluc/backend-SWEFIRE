@@ -657,3 +657,141 @@ exports.sendChatMessage = async (req, res) => {
         res.status(500).json({ error: e.message });
     }
 };
+
+// ── ORDEN DE COMPRA (PDF) ───────────────────────────────────────────────────────
+const path = require('path');
+const fs = require('fs');
+
+exports.uploadOrdenCompra = async (req, res) => {
+    try {
+        const cotizacionId = req.params.id;
+        if (!req.file) {
+            return res.status(400).json({ error: 'No se subió ningún archivo' });
+        }
+
+        // Obtener la cotización actual para ver si ya tenía un PDF y borrarlo
+        const rows = await db.query('SELECT Orden_compra FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
+        if (!rows.length) {
+            // Si la cotización no existe, borrar el archivo recién subido
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Cotización no encontrada' });
+        }
+
+        const oldFile = rows[0].Orden_compra;
+        if (oldFile && fs.existsSync(oldFile)) {
+            // Borrar el archivo viejo
+            try {
+                fs.unlinkSync(oldFile);
+            } catch (err) {
+                console.error("No se pudo borrar el PDF antiguo:", err);
+            }
+        }
+
+        // Guardar la nueva ruta en la base de datos
+        await db.query('UPDATE COTIZACION_COMERCIAL SET Orden_compra = ? WHERE ID = ?', [req.file.path, cotizacionId]);
+
+        // === AUTO-CREACIÓN DEL PROYECTO ===
+        try {
+            // Verificar si ya existe un proyecto para esta cotización
+            const projCheck = await db.query('SELECT id_Proyecto FROM PROYECTO WHERE id_cotizacion = ?', [cotizacionId]);
+            
+            if (projCheck.length === 0) {
+                // Obtener datos de la cotización
+                const cotData = await db.query('SELECT DNI_O_RUC, id_solicitud, nombre FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
+                if (cotData.length > 0) {
+                    const clienteId = cotData[0].DNI_O_RUC;
+                    const idSolicitud = cotData[0].id_solicitud;
+                    const nombreCot = cotData[0].nombre;
+                    let ubicacion = null;
+                    let descripcionServicio = `Proyecto autogenerado a partir de la cotización: ${nombreCot}`;
+
+                    if (idSolicitud) {
+                        const solData = await db.query('SELECT ubicacion, descripcion FROM SOLICITUD WHERE ID = ?', [idSolicitud]);
+                        if (solData.length) {
+                            ubicacion = solData[0].ubicacion;
+                            if (solData[0].descripcion) {
+                                descripcionServicio = solData[0].descripcion;
+                            }
+                        }
+                    }
+
+                    // 1. Crear el Trabajo base
+                    const trabajoResult = await db.query(
+                        'INSERT INTO TRABAJO (comentario) VALUES (?)',
+                        [`Trabajo autogenerado para ${nombreCot}`]
+                    );
+                    const idTrabajo = trabajoResult.insertId;
+
+                    // URL de redireccionamiento para descargar el PDF desde el front
+                    const urlDescargaPdf = `/api/cotizaciones/${cotizacionId}/orden-compra`;
+
+                    // 2. Crear el Proyecto
+                    const projResult = await db.query(
+                        `INSERT INTO PROYECTO (descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion, orden_compra, estado, fecha_inicio, fecha_fin) 
+                         VALUES (?, ?, ?, ?, ?, ?, 'No iniciado', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY))`,
+                        [descripcionServicio, idTrabajo, clienteId, ubicacion, cotizacionId, urlDescargaPdf]
+                    );
+                    const idProyecto = projResult.insertId;
+
+                    // Actualizar Id_Proyecto en Trabajo
+                    await db.query('UPDATE TRABAJO SET Id_Proyecto = ? WHERE Id_trabajo = ?', [idProyecto, idTrabajo]);
+
+                    // 3. Migrar Inventario (COTIZACION_INVENTARIO -> PROYECTO_INVENTARIO)
+                    const inventarios = await db.query('SELECT ID_Inventario, cantidad, Razon FROM COTIZACION_INVENTARIO WHERE ID_Cotizacion = ?', [cotizacionId]);
+                    for (const inv of inventarios) {
+                        await db.query(
+                            'INSERT INTO PROYECTO_INVENTARIO (id_Proyecto, Id_Objeto, cantidad_objeto, razon, estado) VALUES (?, ?, ?, ?, ?)',
+                            [idProyecto, inv.ID_Inventario, inv.cantidad, inv.Razon, 'aceptable']
+                        );
+                    }
+
+                    // 4. Migrar Camiones (COTIZACION_CAMION -> PROYECTO_CAMION)
+                    const camiones = await db.query('SELECT Placa, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, Razon FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
+                    for (const cam of camiones) {
+                        await db.query(
+                            'INSERT INTO PROYECTO_CAMION (id_Proyecto, Placa, fecha_hora_entrada, fecha_hora_salida, personal_manejando, razon, estado) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                            [idProyecto, cam.Placa, cam.fecha_hora_entrada, cam.fecha_hora_salida, cam.ID_Piloto, cam.Razon, 'aceptable']
+                        );
+                    }
+
+                    // 5. Migrar Personal (COTIZACION_PERSONAL -> TRABAJO_JORNADA)
+                    const personal = await db.query('SELECT ID_Usuario, fecha_entrada, fecha_salida FROM COTIZACION_PERSONAL WHERE ID_Cotizacion = ?', [cotizacionId]);
+                    for (const pers of personal) {
+                        const user = await db.query('SELECT dni_perfil FROM USUARIO WHERE idusuario = ?', [pers.ID_Usuario]);
+                        if (user.length > 0) {
+                            const dni = user[0].dni_perfil;
+                            await db.query(
+                                'INSERT INTO TRABAJO_JORNADA (Id_trabajo, DNI_Trabajador, dia) VALUES (?, ?, ?)',
+                                [idTrabajo, dni, pers.fecha_entrada || new Date()]
+                            );
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Error al autogenerar el proyecto:", err);
+        }
+        // ==================================
+
+        res.json({ message: 'Orden de compra subida correctamente. Proyecto sincronizado.', ruta: req.file.path });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+exports.getOrdenCompra = async (req, res) => {
+    try {
+        const rows = await db.query('SELECT Orden_compra FROM COTIZACION_COMERCIAL WHERE ID = ?', [req.params.id]);
+        if (!rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
+
+        const pdfPath = rows[0].Orden_compra;
+        if (!pdfPath || !fs.existsSync(pdfPath)) {
+            return res.status(404).json({ error: 'No hay ninguna orden de compra guardada para esta cotización' });
+        }
+
+        // Enviar el archivo
+        res.sendFile(path.resolve(pdfPath));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};

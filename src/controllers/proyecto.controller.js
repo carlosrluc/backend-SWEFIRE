@@ -205,14 +205,14 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
     const { descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-        orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
+        orden_compra, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
     try {
         const result = await db.query(
             `INSERT INTO PROYECTO (descripcion_servicio,ID_Trabajo,Id_Cliente,ubicacion,id_cotizacion,
-             orden_servicio,informe_final,factura,fecha_inicio,fecha_fin,observaciones,estado)
+             orden_compra,informe_final,factura,fecha_inicio,fecha_fin,observaciones,estado)
              VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
             [descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-                orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado]
+                orden_compra, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado]
         );
         res.status(201).json({ message: 'Proyecto creado', id_Proyecto: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -220,14 +220,14 @@ exports.create = async (req, res) => {
 
 exports.update = async (req, res) => {
     const { descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-        orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
+        orden_compra, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
     try {
         const result = await db.query(
             `UPDATE PROYECTO SET descripcion_servicio=?,ID_Trabajo=?,Id_Cliente=?,ubicacion=?,id_cotizacion=?,
-             orden_servicio=?,informe_final=?,factura=?,fecha_inicio=?,fecha_fin=?,observaciones=?,estado=?
+             orden_compra=?,informe_final=?,factura=?,fecha_inicio=?,fecha_fin=?,observaciones=?,estado=?
              WHERE id_Proyecto=?`,
             [descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-                orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado, req.params.id]
+                orden_compra, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Proyecto actualizado' });
