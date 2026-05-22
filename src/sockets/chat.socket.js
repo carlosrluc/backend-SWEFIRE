@@ -5,27 +5,20 @@ module.exports = (io) => {
     io.use(async (socket, next) => {
         try {
             console.log("INICIO DE LOGS DEBUG");
-            
+
             console.log(socket.handshake.auth);
 
             const token = socket.handshake.auth.token;
+            if (!token) return next(new Error('Authentication error: Token missing'));
 
-            console.log("TOKEN:", token);
-
-            const decoded = jwt.verify(
-                token,
-                process.env.JWT_SECRET
-            );
-
-            console.log("DECODED:", decoded);
-
+            const JWT_SECRET = process.env.JWT_SECRET || 'secret_key_swefire';
+            const decoded = jwt.verify(token, JWT_SECRET);
             socket.user = decoded;
-
+            console.log(`[Socket] Token verificado correctamente. Usuario: ${decoded.dni_perfil}`);
             next();
         } catch (err) {
-            console.log("JWT ERROR:", err);
-
-            next(err);
+            console.error("\n[ERROR DE SOCKET] Fallo al verificar el token:", err.message);
+            next(new Error('Authentication error: Invalid token'));
         }
     });
 
