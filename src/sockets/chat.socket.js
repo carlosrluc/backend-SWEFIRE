@@ -4,10 +4,6 @@ const db = require('../config/db');
 module.exports = (io) => {
     io.use(async (socket, next) => {
         try {
-            console.log("INICIO DE LOGS DEBUG");
-
-            console.log(socket.handshake.auth);
-
             const token = socket.handshake.auth.token;
             if (!token) return next(new Error('Authentication error: Token missing'));
 

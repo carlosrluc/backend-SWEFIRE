@@ -6,6 +6,37 @@ exports.getByCotizacion = async (req, res) => {
         const idCotizacion = req.params.id;
         const tipo = req.query.tipo;
         
+        let query = 'SELECT ID, ID_Cotizacion, tipo, nombre_gasto, costo_unitario, cantidad, costo_total, moneda, costo_x_hora, hora_total, dias_trabajados, estancia FROM PRESUPUESTO WHERE ID_Cotizacion = ?';
+        const params = [idCotizacion];
+        
+        if (tipo) {
+            query += ' AND tipo = ?';
+            params.push(tipo);
+        }
+        
+        const rows = await db.query(query, params);
+        
+        // Filtrar campos nulos para no enviarlos
+        const cleanedRows = rows.map(row => {
+            const cleanRow = {};
+            for (const key in row) {
+                if (row[key] !== null) {
+                    cleanRow[key] = row[key];
+                }
+            }
+            return cleanRow;
+        });
+        
+        res.json(cleanedRows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// Obtener todos los items del presupuesto de una cotización (incluyendo gastos reales y diferencias)
+exports.getByCotizacionReal = async (req, res) => {
+    try {
+        const idCotizacion = req.params.id;
+        const tipo = req.query.tipo;
+        
         let query = 'SELECT * FROM PRESUPUESTO WHERE ID_Cotizacion = ?';
         const params = [idCotizacion];
         

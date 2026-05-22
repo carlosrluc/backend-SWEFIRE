@@ -56,6 +56,28 @@ const uploadPrueba = require('../middlewares/uploadPrueba.middleware');
  *         description: Item creado
  */
 router.get('/cotizacion/:id', c.getByCotizacion);
+
+/**
+ * @openapi
+ * /api/presupuestos/cotizacion/{id}/real:
+ *   get:
+ *     tags: [Presupuesto]
+ *     summary: Listar presupuesto de una cotización incluyendo gastos reales
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: tipo
+ *         required: false
+ *         schema: { type: string, enum: ['Material Directo','Mano de Obra','Servicios','Gastos Administrativos','Costos Indirectos'] }
+ *     responses:
+ *       200:
+ *         description: Lista de items de presupuesto con costo real
+ */
+router.get('/cotizacion/:id/real', c.getByCotizacionReal);
+
 router.post('/cotizacion/:id', c.createItem);
 
 /**
