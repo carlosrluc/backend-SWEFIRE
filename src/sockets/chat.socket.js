@@ -4,14 +4,26 @@ const db = require('../config/db');
 module.exports = (io) => {
     io.use(async (socket, next) => {
         try {
-            const token = socket.handshake.auth.token;
-            if (!token) return next(new Error('Authentication error: Token missing'));
+            console.log(socket.handshake.auth);
 
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const token = socket.handshake.auth.token;
+
+            console.log("TOKEN:", token);
+
+            const decoded = jwt.verify(
+                token,
+                process.env.JWT_SECRET
+            );
+
+            console.log("DECODED:", decoded);
+
             socket.user = decoded;
+
             next();
         } catch (err) {
-            next(new Error('Authentication error: Invalid token'));
+            console.log("JWT ERROR:", err);
+
+            next(err);
         }
     });
 
@@ -44,11 +56,11 @@ module.exports = (io) => {
 
         socket.on('send_message', async (data) => {
             const { id_cotizacion, mensaje, nombre_remitente } = data;
-            
+
             if (!id_cotizacion || !mensaje) return;
 
             const tipo_remitente = socket.user.rolNormalizado === 'cliente' ? 'cliente' : 'empleado';
-            
+
             try {
                 const result = await db.query(
                     'INSERT INTO COTIZACION_CHAT_MENSAJE (id_cotizacion, id_remitente, tipo_remitente, nombre_remitente, mensaje) VALUES (?, ?, ?, ?, ?)',
