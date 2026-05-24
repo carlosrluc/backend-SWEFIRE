@@ -6,7 +6,7 @@ exports.getByCotizacion = async (req, res) => {
         const idCotizacion = req.params.id;
         const tipo = req.query.tipo;
         
-        let query = 'SELECT ID, ID_Cotizacion, tipo, nombre_gasto, costo_unitario, cantidad, costo_total, moneda, costo_x_hora, hora_total, dias_trabajados, estancia FROM PRESUPUESTO WHERE ID_Cotizacion = ?';
+        let query = 'SELECT ID, ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto, costo_unitario, cantidad, costo_total, moneda, costo_x_hora, hora_total, dias_trabajados, estancia FROM PRESUPUESTO WHERE ID_Cotizacion = ?';
         const params = [idCotizacion];
         
         if (tipo) {
@@ -126,11 +126,11 @@ exports.createItem = async (req, res) => {
         
         const result = await db.query(
             `INSERT INTO PRESUPUESTO (
-                ID_Cotizacion, tipo, nombre_gasto, costo_unitario, cantidad, 
+                ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto, costo_unitario, cantidad, 
                 costo_total, moneda, costo_x_hora, hora_total, dias_trabajados, estancia
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-                idCotizacion, data.tipo, data.nombre_gasto || null, data.costo_unitario || null, data.cantidad || null,
+                idCotizacion, data.tipo, data.realizacion_gastos || 'en preparacion', data.nombre_gasto || null, data.costo_unitario || null, data.cantidad || null,
                 costo_total, data.moneda || 'soles', data.costo_x_hora || null, data.hora_total || null, data.dias_trabajados || null, 
                 data.estancia || null
             ]
