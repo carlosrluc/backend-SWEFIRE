@@ -197,6 +197,26 @@ router.get('/:id/detalles', auth, permit(['cliente', 'abogado', 'trabajtaller', 
 
 /**
  * @openapi
+ * /api/cotizaciones/{id}/detalles-franco:
+ *   get:
+ *     tags: [Cotización]
+ *     summary: Obtener detalles completos de una cotización (formato Franco)
+ *     description: Devuelve la cotización con cliente, productos, array de camiones (con todos sus datos), costo de recojo y condiciones.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Detalles completos de la cotización
+ *       404:
+ *         description: No encontrada
+ */
+router.get('/:id/detalles-franco', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getDetallesFranco);
+
+/**
+ * @openapi
  * /api/cotizaciones/{id}/servicios:
  *   get:
  *     tags: [Cotización - Servicios]

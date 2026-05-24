@@ -214,6 +214,149 @@ exports.getDetalles = async (req, res) => {
     }
 };
 
+// ── COTIZACION DETALLES FRANCO ────────────────────────────────────────────────
+exports.getDetallesFranco = async (req, res) => {
+    try {
+        const cotizacionId = req.params.id;
+
+        // Validar permisos si es cliente
+        if (req.user && req.user.rolNormalizado === 'cliente') {
+            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const clientIds = contactos.map(c => c.DNI_O_RUC);
+            clientIds.push(req.user.dni_perfil);
+            const placeholders = clientIds.map(() => '?').join(',');
+            const check = await db.query(
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                [cotizacionId, ...clientIds, ...clientIds]
+            );
+            if (!check.length) return res.status(403).json({ error: 'No tienes permiso para ver esta cotización' });
+        }
+
+        // Obtener datos base de la cotización
+        const baseResult = await db.query('SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
+        if (!baseResult.length) return res.status(404).json({ error: 'Cotización no encontrada' });
+        const base = baseResult[0];
+
+        // Calcular estado formateado
+        let estado = 'pendiente';
+        if (base.estado === 'aprobado') estado = 'aprobado';
+        else if (base.estado === 'rechazado por cliente' || base.estado === 'descartada') estado = 'rechazado';
+
+        // Obtener información del cliente
+        const clienteResult = await db.query(
+            'SELECT DNI_O_RUC as documentoIdentidad, nombre_comercial as nombreComercial, razon_social as razonSocial FROM CLIENTE WHERE DNI_O_RUC = ?',
+            [base.DNI_O_RUC]
+        );
+        const cliente = clienteResult[0] || {};
+
+        // Obtener inventario (productos cotizados)
+        const invQuery = `
+            SELECT 
+                c.ID_Inventario AS id, 
+                i.nombre_objeto AS nombre, 
+                c.cantidad,
+                c.precio_comercial AS precioUnitario,
+                c.intencion,
+                c.dias_alquilados AS diasAlquilados
+            FROM COTIZACION_INVENTARIO c 
+            LEFT JOIN INVENTARIO i ON c.ID_Inventario = i.Id_Objeto 
+            WHERE c.ID_Cotizacion = ?`;
+        const inventarioResult = await db.query(invQuery, [cotizacionId]);
+        const productos = inventarioResult.map(row => ({
+            id: row.id,
+            nombre: row.nombre,
+            cantidad: row.cantidad,
+            precioUnitario: row.precioUnitario,
+            intencion: row.intencion,
+            diasAlquilados: row.diasAlquilados
+        }));
+
+        // Obtener camiones con todos sus detalles (se retorna como array)
+        const camionesQuery = `
+            SELECT 
+                cam.Placa AS placa,
+                cam.nombre AS nombre,
+                cam.ano_fabricacion AS anoFabricacion,
+                cam.modelo AS modelo,
+                cam.color AS color,
+                cam.caracteristicas AS caracteristicas,
+                cam.revision_tecnica AS revisionTecnica,
+                cam.fecha_prox_revision AS fechaProximaRevision,
+                cam.tarjeta_propiedad AS tarjetaPropiedad,
+                cam.vencimiento_tarjeta AS vencimientoTarjeta,
+                cam.soat_n_poliza AS soatPoliza,
+                cam.soat_empresa AS soatEmpresa,
+                cam.soat_precio AS soatPrecio,
+                cam.soat_dia_pago AS soatDiaPago,
+                cc.uso AS uso,
+                cc.fecha_hora_entrada AS fechaEntrada,
+                cc.fecha_hora_salida AS fechaSalida,
+                cc.ID_Piloto AS idPiloto
+            FROM COTIZACION_CAMION cc
+            LEFT JOIN CAMION cam ON cc.Placa = cam.Placa
+            WHERE cc.ID_Cotizacion = ?`;
+        const camionesResult = await db.query(camionesQuery, [cotizacionId]);
+        const camiones = camionesResult.map(cam => ({
+            placa: cam.placa,
+            nombre: cam.nombre,
+            anoFabricacion: cam.anoFabricacion,
+            modelo: cam.modelo,
+            color: cam.color,
+            caracteristicas: cam.caracteristicas,
+            revisionTecnica: cam.revisionTecnica,
+            fechaProximaRevision: cam.fechaProximaRevision,
+            tarjetaPropiedad: cam.tarjetaPropiedad,
+            vencimientoTarjeta: cam.vencimientoTarjeta,
+            soatPoliza: cam.soatPoliza,
+            soatEmpresa: cam.soatEmpresa,
+            soatPrecio: cam.soatPrecio,
+            soatDiaPago: cam.soatDiaPago,
+            uso: cam.uso,
+            fechaEntrada: cam.fechaEntrada,
+            fechaSalida: cam.fechaSalida,
+            idPiloto: cam.idPiloto
+        }));
+
+        // Obtener costo de recojo (COTIZACION_SERVICIO con ID_Servicio = 7)
+        const recojoResult = await db.query(
+            `SELECT precio_comercial AS costo, fecha_inicio AS fechaRecojo, ubicacion AS direccionRecojo
+             FROM COTIZACION_SERVICIO
+             WHERE ID_Cotizacion = ? AND ID_Servicio = 7
+             LIMIT 1`,
+            [cotizacionId]
+        );
+        const costoRecojo = recojoResult.length > 0 ? {
+            costo: recojoResult[0].costo,
+            fechaRecojo: recojoResult[0].fechaRecojo,
+            direccionRecojo: recojoResult[0].direccionRecojo
+        } : null;
+
+        // Construir respuesta
+        res.json({
+            id: base.ID,
+            nombre: base.nombre || '',
+            estado,
+            version: base.version || 1,
+            cliente,
+            productos,
+            camiones,
+            costoRecojo,
+            condiciones: {
+                fechaEmision: base.fecha_emision ? new Date(base.fecha_emision).toISOString().split('T')[0] : null,
+                fechaVigencia: base.fecha_vigencia ? new Date(base.fecha_vigencia).toISOString().split('T')[0] : null,
+                condiciones: base.condiciones || '',
+                observaciones: base.observacion || ''
+            },
+            tipoCambio: {
+                tasaCompra: base.tacaCompra || 0,
+                tasaVenta: base.tasaVenta || 0
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
 exports.create = async (req, res) => {
     const {
         id_solicitud,
