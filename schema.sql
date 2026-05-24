@@ -1,18 +1,12 @@
--- ============================================================
--- SWEFIRE DB - SCHEMA COMPLETO
--- ============================================================
-
-CREATE DATABASE IF NOT EXISTS swefire_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE swefire_db;
 -- swefire_db.CLIENTE definition
 
 CREATE TABLE "CLIENTE" (
   "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "nombre_comercial" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "razon_social" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "rubro" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "ubicacion_facturacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "observacion" text COLLATE utf8mb4_unicode_ci,
+  "nombre_comercial" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "razon_social" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "rubro" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ubicacion_facturacion" varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "observacion" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY ("DNI_O_RUC")
 );
 
@@ -40,8 +34,8 @@ CREATE TABLE "PERFIL" (
   "Genero" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "RUC" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_nacimiento" date DEFAULT NULL,
-  "correo_contacto" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "telefono_contacto" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "correo_contacto" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "telefono_contacto" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "estado_civil" varchar(30) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "distrito_residencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "seguro_vida_ley" enum('si','no') COLLATE utf8mb4_unicode_ci DEFAULT 'no',
@@ -68,44 +62,45 @@ CREATE TABLE "SERVICIO" (
   "precio_regular" decimal(12,2) DEFAULT NULL,
   "condicional_precio" text COLLATE utf8mb4_unicode_ci,
   "observaciones" text COLLATE utf8mb4_unicode_ci,
+  "Estado" enum('Activo','Desactivado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("ID_Servicio")
 );
 
 
 -- swefire_db.CAMION definition
 
-
 CREATE TABLE "CAMION" (
   "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "nombre" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "ano_fabricacion" year DEFAULT NULL,
-  "modelo" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "modelo" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "color" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "caracteristicas" text COLLATE utf8mb4_unicode_ci,
-  "revision_tecnica" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "revision_tecnica" varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_prox_revision" date DEFAULT NULL,
-  "ID_Fabricante" int DEFAULT NULL,
-  "tarjeta_propiedad" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ID_Fabricante" int NOT NULL,
+  "tarjeta_propiedad" varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "vencimiento_tarjeta" date DEFAULT NULL,
-  "soat_n_poliza" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "soat_empresa" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "soat_n_poliza" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "soat_empresa" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "soat_precio" decimal(10,2) DEFAULT NULL,
   "soat_dia_pago" date DEFAULT NULL,
-  "Estado" enum('Operacional','Ocupado','En mantenimiento','inoperativo','descalificado') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "Estado" enum('Operacional','Ocupado','En mantenimiento','Inoperativo','Descalificado','Tarjeta Vencida') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'Operacional',
   PRIMARY KEY ("Placa"),
-  KEY "ID_Fabricante" ("ID_Fabricante"),
-  CONSTRAINT "CAMION_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE SET NULL
+  KEY "CAMION_ibfk_1" ("ID_Fabricante"),
+  CONSTRAINT "CAMION_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
+
 
 -- swefire_db.CAMION_MANTENIMIENTO definition
 
 CREATE TABLE "CAMION_MANTENIMIENTO" (
   "id" int NOT NULL AUTO_INCREMENT,
-  "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "fecha_ultimo_mant" date DEFAULT NULL,
-  "responsable" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "razon" text COLLATE utf8mb4_unicode_ci,
-  "contacto_responsable" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "Placa" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "fecha_ultimo_mant" date NOT NULL,
+  "responsable" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "razon" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  "contacto_responsable" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   "pdf_mantenimiento" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "Placa" ("Placa"),
@@ -118,9 +113,9 @@ CREATE TABLE "CAMION_MANTENIMIENTO" (
 CREATE TABLE "CLIENTE_CONTACTO" (
   "id" int NOT NULL AUTO_INCREMENT,
   "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "DNI_perfil" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "cargo_en_empresa" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "lugar_trabajo" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "DNI_perfil" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "cargo_en_empresa" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "lugar_trabajo" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "DNI_O_RUC" ("DNI_O_RUC"),
   KEY "DNI_perfil" ("DNI_perfil"),
@@ -134,8 +129,8 @@ CREATE TABLE "CLIENTE_CONTACTO" (
 CREATE TABLE "CLIENTE_CORREO" (
   "id" int NOT NULL AUTO_INCREMENT,
   "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "correo" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "rama" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "correo" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "rama" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "DNI_O_RUC" ("DNI_O_RUC"),
   CONSTRAINT "CLIENTE_CORREO_ibfk_1" FOREIGN KEY ("DNI_O_RUC") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE
@@ -147,7 +142,7 @@ CREATE TABLE "CLIENTE_CORREO" (
 CREATE TABLE "CLIENTE_TELEFONO_FIJO" (
   "id" int NOT NULL AUTO_INCREMENT,
   "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "numero" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "numero" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   "anexo" varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "descripcion_anexo" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
@@ -161,7 +156,7 @@ CREATE TABLE "CLIENTE_TELEFONO_FIJO" (
 CREATE TABLE "CLIENTE_TELEFONO_MOVIL" (
   "id" int NOT NULL AUTO_INCREMENT,
   "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "telefono" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "telefono" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   "persona" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "DNI_O_RUC" ("DNI_O_RUC"),
@@ -193,7 +188,7 @@ CREATE TABLE "INVENTARIO" (
   "lugar_almacenaje" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "cantidad" int DEFAULT '0',
   "nombre_objeto" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "ID_Fabricante" int DEFAULT NULL,
+  "ID_Fabricante" int NOT NULL,
   "orden_compra" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_compra" date DEFAULT NULL,
   "factura" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -212,8 +207,8 @@ CREATE TABLE "INVENTARIO" (
   "mant_responsable" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "mant_contacto" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("Id_Objeto"),
-  KEY "ID_Fabricante" ("ID_Fabricante"),
-  CONSTRAINT "INVENTARIO_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE SET NULL
+  KEY "INVENTARIO_ibfk_1" ("ID_Fabricante"),
+  CONSTRAINT "INVENTARIO_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
 
@@ -389,10 +384,10 @@ CREATE TABLE "CAMION_INVENTARIO" (
   "id" int NOT NULL AUTO_INCREMENT,
   "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   "Id_Objeto" int NOT NULL,
-  "cantidad_requerida" int DEFAULT '0',
-  "cantidad_actual" int DEFAULT '0',
+  "cantidad_requerida" int NOT NULL DEFAULT '0',
+  "cantidad_actual" int NOT NULL DEFAULT '0',
   "ubicacion_en_camion" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "requerido_legal" enum('si','no') COLLATE utf8mb4_unicode_ci DEFAULT 'no',
+  "requerido_legal" enum('si','no') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no',
   PRIMARY KEY ("id"),
   KEY "Placa" ("Placa"),
   KEY "Id_Objeto" ("Id_Objeto"),
@@ -407,23 +402,24 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
   "ID" int NOT NULL AUTO_INCREMENT,
   "version" int DEFAULT '1',
   "nombre" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "id_solicitud" int DEFAULT NULL,
-  "DNI_O_RUC" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "id_solicitud" int NOT NULL,
+  "DNI_O_RUC" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   "precio_total" decimal(14,2) DEFAULT NULL,
-  "estado" enum('aprobado','rechazado por cliente','descartada') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "estado" enum('aprobado','rechazado por cliente','descartada','Pendiente') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "comentario_cliente" text COLLATE utf8mb4_unicode_ci,
   "fecha_emision" date DEFAULT NULL,
   "fecha_vigencia" date DEFAULT NULL,
-  "observacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "observacion" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   "Tasa_Cambio" float DEFAULT NULL,
   "condiciones" text COLLATE utf8mb4_unicode_ci,
   "tacaCompra" float DEFAULT NULL,
   "tasaVenta" float DEFAULT NULL,
+  "Orden_compra" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("ID"),
-  KEY "id_solicitud" ("id_solicitud"),
-  KEY "DNI_O_RUC" ("DNI_O_RUC"),
-  CONSTRAINT "COTIZACION_COMERCIAL_ibfk_1" FOREIGN KEY ("id_solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE SET NULL,
-  CONSTRAINT "COTIZACION_COMERCIAL_ibfk_2" FOREIGN KEY ("DNI_O_RUC") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE SET NULL
+  KEY "COTIZACION_COMERCIAL_ibfk_2" ("DNI_O_RUC"),
+  KEY "COTIZACION_COMERCIAL_ibfk_1" ("id_solicitud"),
+  CONSTRAINT "COTIZACION_COMERCIAL_ibfk_1" FOREIGN KEY ("id_solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT "COTIZACION_COMERCIAL_ibfk_2" FOREIGN KEY ("DNI_O_RUC") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
 
@@ -435,13 +431,12 @@ CREATE TABLE "COTIZACION_INVENTARIO" (
   "ID_Inventario" int NOT NULL,
   "cantidad" int DEFAULT NULL,
   "intencion" enum('comprar','alquilar') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "dias_alquilados" int DEFAULT NULL,
+  "dias_alquilados" int DEFAULT '0',
   "precio_comercial" decimal(12,2) DEFAULT NULL,
   "fecha_salida_taller" datetime DEFAULT NULL,
   "fecha_ingreso_taller" datetime DEFAULT NULL,
   "observaciones" text COLLATE utf8mb4_unicode_ci,
   "Costo_Comercial" float DEFAULT NULL,
-  "Razon" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "ID_Cotizacion" ("ID_Cotizacion"),
   KEY "ID_Inventario" ("ID_Inventario"),
@@ -487,56 +482,29 @@ CREATE TABLE "COTIZACION_SERVICIO" (
 );
 
 
--- swefire_db.PRESUPUESTO_INTERNO definition
+-- swefire_db.PRESUPUESTO definition
 
-CREATE TABLE "PRESUPUESTO_INTERNO" (
+CREATE TABLE "PRESUPUESTO" (
   "ID" int NOT NULL AUTO_INCREMENT,
   "ID_Cotizacion" int NOT NULL,
-  "costos_indirectos" decimal(12,2) DEFAULT NULL,
-  "coste_total_estimado" decimal(14,2) DEFAULT NULL,
+  "tipo" enum('Material Directo','Mano de Obra','Servicios','Gastos Administrativos','Costos Indirectos') COLLATE utf8mb4_unicode_ci NOT NULL,
+  "realizacion_gastos" enum('anulada','en preparacion','durante servicio') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'en preparacion',
+  "nombre_gasto" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "costo_unitario" decimal(12,2) DEFAULT NULL,
+  "cantidad" decimal(10,2) DEFAULT NULL,
+  "costo_total" decimal(14,2) NOT NULL,
+  "moneda" enum('soles','dolares') COLLATE utf8mb4_unicode_ci DEFAULT 'soles',
+  "costo_x_hora" decimal(10,2) DEFAULT NULL,
+  "hora_total" decimal(10,2) DEFAULT NULL,
+  "dias_trabajados" int DEFAULT NULL,
+  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "costo_real" decimal(14,2) DEFAULT NULL,
+  "prueba" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "razon" text COLLATE utf8mb4_unicode_ci,
+  "diferencia" decimal(14,2) DEFAULT NULL,
   PRIMARY KEY ("ID"),
   KEY "ID_Cotizacion" ("ID_Cotizacion"),
-  CONSTRAINT "PRESUPUESTO_INTERNO_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
-);
-
-
--- swefire_db.PRESUPUESTO_MANO_OBRA definition
-
-CREATE TABLE "PRESUPUESTO_MANO_OBRA" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "ID_Presupuesto" int NOT NULL,
-  "profesion_ejercida" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "costo_x_hora" decimal(10,2) DEFAULT NULL,
-  "costo_general" decimal(12,2) DEFAULT NULL,
-  PRIMARY KEY ("id"),
-  KEY "ID_Presupuesto" ("ID_Presupuesto"),
-  CONSTRAINT "PRESUPUESTO_MANO_OBRA_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
-);
-
-
--- swefire_db.PRESUPUESTO_MATERIAL_DIRECTO definition
-
-CREATE TABLE "PRESUPUESTO_MATERIAL_DIRECTO" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "ID_Presupuesto" int NOT NULL,
-  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "costo" decimal(12,2) DEFAULT NULL,
-  PRIMARY KEY ("id"),
-  KEY "ID_Presupuesto" ("ID_Presupuesto"),
-  CONSTRAINT "PRESUPUESTO_MATERIAL_DIRECTO_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
-);
-
-
--- swefire_db.PRESUPUESTO_SERVICIO definition
-
-CREATE TABLE "PRESUPUESTO_SERVICIO" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "ID_Presupuesto" int NOT NULL,
-  "nombre_servicio" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "costo" decimal(12,2) DEFAULT NULL,
-  PRIMARY KEY ("id"),
-  KEY "ID_Presupuesto" ("ID_Presupuesto"),
-  CONSTRAINT "PRESUPUESTO_SERVICIO_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
+  CONSTRAINT "PRESUPUESTO_ibfk_COT" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
 );
 
 
@@ -549,42 +517,32 @@ CREATE TABLE "COTIZACION_CAMION" (
   "uso" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_hora_entrada" datetime DEFAULT NULL,
   "fecha_hora_salida" datetime DEFAULT NULL,
-  "ID_Piloto" int DEFAULT NULL,
+  "ID_Piloto" int NOT NULL,
   "PrecioUnit" float DEFAULT NULL,
-  "Razon" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "ID_Cotizacion" ("ID_Cotizacion"),
   KEY "Placa" ("Placa"),
-  KEY "ID_Piloto" ("ID_Piloto"),
+  KEY "COTIZACION_CAMION_ibfk_3" ("ID_Piloto"),
   CONSTRAINT "COTIZACION_CAMION_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE,
   CONSTRAINT "COTIZACION_CAMION_ibfk_2" FOREIGN KEY ("Placa") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE,
-  CONSTRAINT "COTIZACION_CAMION_ibfk_3" FOREIGN KEY ("ID_Piloto") REFERENCES "USUARIO" ("idusuario") ON DELETE SET NULL
+  CONSTRAINT "COTIZACION_CAMION_ibfk_3" FOREIGN KEY ("ID_Piloto") REFERENCES "USUARIO" ("idusuario") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
 
--- swefire_db.PRESUPUESTO_COSTO_INDIRECTO definition
+-- swefire_db.COTIZACION_CHAT_MENSAJE definition
 
-CREATE TABLE "PRESUPUESTO_COSTO_INDIRECTO" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "ID_Presupuesto" int NOT NULL,
-  "nombre_costo" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "costo" decimal(12,2) DEFAULT NULL,
-  PRIMARY KEY ("id"),
-  KEY "ID_Presupuesto" ("ID_Presupuesto"),
-  CONSTRAINT "PRESUPUESTO_COSTO_INDIRECTO_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
-);
-
-
--- swefire_db.PRESUPUESTO_GASTO_ADMIN definition
-
-CREATE TABLE "PRESUPUESTO_GASTO_ADMIN" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "ID_Presupuesto" int NOT NULL,
-  "nombre_gasto" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "costo" decimal(12,2) DEFAULT NULL,
-  PRIMARY KEY ("id"),
-  KEY "ID_Presupuesto" ("ID_Presupuesto"),
-  CONSTRAINT "PRESUPUESTO_GASTO_ADMIN_ibfk_1" FOREIGN KEY ("ID_Presupuesto") REFERENCES "PRESUPUESTO_INTERNO" ("ID") ON DELETE CASCADE
+CREATE TABLE "COTIZACION_CHAT_MENSAJE" (
+  "id_mensaje" int NOT NULL AUTO_INCREMENT,
+  "id_cotizacion" int NOT NULL,
+  "id_remitente" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "id_cliente" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "tipo_remitente" varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "nombre_remitente" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "mensaje" text COLLATE utf8mb4_unicode_ci NOT NULL,
+  "fecha_hora" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id_mensaje"),
+  KEY "id_cotizacion" ("id_cotizacion"),
+  CONSTRAINT "COTIZACION_CHAT_MENSAJE_ibfk_1" FOREIGN KEY ("id_cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
 );
 
 
@@ -655,24 +613,24 @@ CREATE TABLE "INVOLUCRADO" (
 CREATE TABLE "PROYECTO" (
   "id_Proyecto" int NOT NULL AUTO_INCREMENT,
   "descripcion_servicio" text COLLATE utf8mb4_unicode_ci,
-  "ID_Trabajo" int DEFAULT NULL,
-  "Id_Cliente" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ID_Trabajo" int NOT NULL,
+  "Id_Cliente" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   "ubicacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "id_cotizacion" int DEFAULT NULL,
-  "orden_servicio" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "id_cotizacion" int NOT NULL,
+  "orden_servicio" varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "informe_final" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "factura" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_inicio" date DEFAULT NULL,
   "fecha_fin" date DEFAULT NULL,
   "observaciones" text COLLATE utf8mb4_unicode_ci,
-  "estado" enum('Pendiente','En Ejecución','Completado','En proceso legal') COLLATE utf8mb4_unicode_ci DEFAULT 'Pendiente',
+  "estado" enum('No iniciado','Pendiente','En Ejecución','Completado','En proceso legal','Cancelado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'Pendiente',
   PRIMARY KEY ("id_Proyecto"),
-  KEY "Id_Cliente" ("Id_Cliente"),
-  KEY "id_cotizacion" ("id_cotizacion"),
   KEY "fk_proyecto_trabajo" ("ID_Trabajo"),
-  CONSTRAINT "fk_proyecto_trabajo" FOREIGN KEY ("ID_Trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE SET NULL,
-  CONSTRAINT "PROYECTO_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE SET NULL,
-  CONSTRAINT "PROYECTO_ibfk_2" FOREIGN KEY ("id_cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE SET NULL
+  KEY "PROYECTO_ibfk_2" ("id_cotizacion"),
+  KEY "PROYECTO_ibfk_1" ("Id_Cliente"),
+  CONSTRAINT "fk_proyecto_trabajo" FOREIGN KEY ("ID_Trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT "PROYECTO_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT "PROYECTO_ibfk_2" FOREIGN KEY ("id_cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
 
@@ -733,15 +691,15 @@ CREATE TABLE "PROYECTO_INVENTARIO" (
 
 CREATE TABLE "TRABAJO" (
   "Id_trabajo" int NOT NULL AUTO_INCREMENT,
-  "Id_Proyecto" int DEFAULT NULL,
+  "Id_Proyecto" int NOT NULL,
   "fecha" date DEFAULT NULL,
   "horario" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "comentario" text COLLATE utf8mb4_unicode_ci,
   "asistencia" enum('Programada','Cancelada','Realizada') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("Id_trabajo"),
-  KEY "fk_trabajo_proyecto" ("Id_Proyecto"),
-  CONSTRAINT "fk_trabajo_proyecto" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE SET NULL,
-  CONSTRAINT "TRABAJO_ibfk_1" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE SET NULL
+  KEY "TRABAJO_ibfk_1" ("Id_Proyecto"),
+  CONSTRAINT "fk_trabajo_proyecto" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT "TRABAJO_ibfk_1" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
 
 
@@ -787,24 +745,3 @@ CREATE TABLE "TRABAJO_RRHH_PDF" (
   KEY "ID_RRHH" ("ID_RRHH"),
   CONSTRAINT "TRABAJO_RRHH_PDF_ibfk_1" FOREIGN KEY ("ID_RRHH") REFERENCES "TRABAJO_RRHH" ("id") ON DELETE CASCADE
 );
-
-CREATE TABLE COTIZACION_CHAT_MENSAJE (
-    id_mensaje INT AUTO_INCREMENT PRIMARY KEY,
-    id_cotizacion INT NOT NULL,
-    id_remitente VARCHAR(20) NOT NULL, -- DNI del perfil o RUC del cliente
-    tipo_remitente ENUM('empleado', 'cliente') NOT NULL,
-    nombre_remitente VARCHAR(150) NOT NULL, -- Para fácil renderizado en frontend
-    mensaje TEXT NOT NULL,
-    fecha_hora DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_cotizacion) REFERENCES COTIZACION_COMERCIAL(ID) ON DELETE CASCADE
-);
--- ============================================================
--- REFERENCIAS CRUZADAS (FKs que se agregaron al final)
--- ============================================================
-ALTER TABLE PROYECTO
-    ADD CONSTRAINT fk_proyecto_trabajo
-    FOREIGN KEY (ID_Trabajo) REFERENCES TRABAJO(Id_trabajo) ON DELETE SET NULL;
-
-ALTER TABLE TRABAJO
-    ADD CONSTRAINT fk_trabajo_proyecto
-    FOREIGN KEY (Id_Proyecto) REFERENCES PROYECTO(id_Proyecto) ON DELETE SET NULL;

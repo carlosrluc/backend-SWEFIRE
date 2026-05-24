@@ -155,7 +155,7 @@ exports.getDetalles = async (req, res) => {
         const invQuery = `
             SELECT 
                 c.ID_Inventario AS id, 
-                I.nombre_objeto as nombre_producto, 
+                i.nombre_objeto as nombre_producto, 
                 c.cantidad,
                 c.precio_comercial AS precio_unitario,
                 c.intencion,
@@ -727,7 +727,7 @@ exports.uploadOrdenCompra = async (req, res) => {
 
                     // 2. Crear el Proyecto
                     const projResult = await db.query(
-                        `INSERT INTO PROYECTO (descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion, orden_compra, estado, fecha_inicio, fecha_fin) 
+                        `INSERT INTO PROYECTO (descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion, orden_servicio, estado, fecha_inicio, fecha_fin) 
                          VALUES (?, ?, ?, ?, ?, ?, 'No iniciado', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY))`,
                         [descripcionServicio, idTrabajo, clienteId, ubicacion, cotizacionId, urlDescargaPdf]
                     );
@@ -737,20 +737,20 @@ exports.uploadOrdenCompra = async (req, res) => {
                     await db.query('UPDATE TRABAJO SET Id_Proyecto = ? WHERE Id_trabajo = ?', [idProyecto, idTrabajo]);
 
                     // 3. Migrar Inventario (COTIZACION_INVENTARIO -> PROYECTO_INVENTARIO)
-                    const inventarios = await db.query('SELECT ID_Inventario, cantidad, Razon FROM COTIZACION_INVENTARIO WHERE ID_Cotizacion = ?', [cotizacionId]);
+                    const inventarios = await db.query('SELECT ID_Inventario, cantidad, observaciones AS razon FROM COTIZACION_INVENTARIO WHERE ID_Cotizacion = ?', [cotizacionId]);
                     for (const inv of inventarios) {
                         await db.query(
                             'INSERT INTO PROYECTO_INVENTARIO (id_Proyecto, Id_Objeto, cantidad_objeto, razon, estado) VALUES (?, ?, ?, ?, ?)',
-                            [idProyecto, inv.ID_Inventario, inv.cantidad, inv.Razon, 'aceptable']
+                            [idProyecto, inv.ID_Inventario, inv.cantidad, inv.razon, 'aceptable']
                         );
                     }
 
                     // 4. Migrar Camiones (COTIZACION_CAMION -> PROYECTO_CAMION)
-                    const camiones = await db.query('SELECT Placa, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, Razon FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
+                    const camiones = await db.query('SELECT Placa, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, uso AS razon FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
                     for (const cam of camiones) {
                         await db.query(
                             'INSERT INTO PROYECTO_CAMION (id_Proyecto, Placa, fecha_hora_entrada, fecha_hora_salida, personal_manejando, razon, estado) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                            [idProyecto, cam.Placa, cam.fecha_hora_entrada, cam.fecha_hora_salida, cam.ID_Piloto, cam.Razon, 'aceptable']
+                            [idProyecto, cam.Placa, cam.fecha_hora_entrada, cam.fecha_hora_salida, cam.ID_Piloto, cam.razon, 'aceptable']
                         );
                     }
 

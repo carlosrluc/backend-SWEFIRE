@@ -46,24 +46,40 @@ module.exports = (io) => {
         });
 
         socket.on('send_message', async (data) => {
-            const { id_cotizacion, mensaje, nombre_remitente } = data;
+            const { id_cotizacion, mensaje } = data;
 
             if (!id_cotizacion || !mensaje) return;
 
-            const tipo_remitente = socket.user.rolNormalizado === 'cliente' ? 'cliente' : 'empleado';
-
             try {
+                // 1. Obtener id_cliente (DNI_O_RUC de COTIZACION_COMERCIAL)
+                const cotizaciones = await db.query('SELECT DNI_O_RUC FROM COTIZACION_COMERCIAL WHERE ID = ?', [id_cotizacion]);
+                if (!cotizaciones || cotizaciones.length === 0) {
+                    return socket.emit('error', 'Cotización no encontrada');
+                }
+                const id_cliente = cotizaciones[0].DNI_O_RUC;
+
+                // 2. Obtener Nombre y Apellido del remitente
+                const perfiles = await db.query('SELECT Nombre, Apellido FROM PERFIL WHERE DNI = ?', [socket.user.dni_perfil]);
+                let nombre_remitente = 'Desconocido';
+                if (perfiles && perfiles.length > 0) {
+                    nombre_remitente = `${perfiles[0].Nombre} ${perfiles[0].Apellido}`;
+                }
+
+                // 3. Obtener el rol exacto de la sesión
+                const tipo_remitente = socket.user.rol || 'Desconocido';
+
                 const result = await db.query(
-                    'INSERT INTO COTIZACION_CHAT_MENSAJE (id_cotizacion, id_remitente, tipo_remitente, nombre_remitente, mensaje) VALUES (?, ?, ?, ?, ?)',
-                    [id_cotizacion, socket.user.dni_perfil, tipo_remitente, nombre_remitente || 'Desconocido', mensaje]
+                    'INSERT INTO COTIZACION_CHAT_MENSAJE (id_cotizacion, id_remitente, id_cliente, tipo_remitente, nombre_remitente, mensaje) VALUES (?, ?, ?, ?, ?, ?)',
+                    [id_cotizacion, socket.user.dni_perfil, id_cliente, tipo_remitente, nombre_remitente, mensaje]
                 );
 
                 const newMsg = {
                     id_mensaje: result.insertId,
                     id_cotizacion,
                     id_remitente: socket.user.dni_perfil,
+                    id_cliente,
                     tipo_remitente,
-                    nombre_remitente: nombre_remitente || 'Desconocido',
+                    nombre_remitente,
                     mensaje,
                     fecha_hora: new Date()
                 };
