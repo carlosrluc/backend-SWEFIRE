@@ -25,14 +25,14 @@ exports.getAll = async (req, res) => {
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
 
-        const { buscar, fecha_inicio, fecha_fin, estado } = req.query;
+        const { nombre, fecha_inicio, fecha_fin, estado } = req.query;
 
         let whereClauses = [];
         let queryParams = [];
 
-        if (buscar) {
+        if (nombre) {
             whereClauses.push('CC.nombre LIKE ?');
-            queryParams.push(`%${buscar}%`);
+            queryParams.push(`%${nombre}%`);
         }
 
         if (fecha_inicio) {

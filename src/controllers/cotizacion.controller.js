@@ -49,17 +49,36 @@ exports.getAll = async (req, res) => {
         let args = [];
         let countArgs = [];
 
+        const { estado, nombre } = req.query;
+        let whereClauses = [];
+
         if (req.user && req.user.rolNormalizado === 'cliente') {
             const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
             const clientIds = contactos.map(c => c.DNI_O_RUC);
             clientIds.push(req.user.dni_perfil);
 
             const placeholders = clientIds.map(() => '?').join(',');
-            const condition = ` WHERE C_C.DNI_O_RUC IN (${placeholders}) OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders}))`;
-            query += condition;
-            countQuery += condition;
+            whereClauses.push(`(C_C.DNI_O_RUC IN (${placeholders}) OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`);
             args.push(...clientIds, ...clientIds);
             countArgs.push(...clientIds, ...clientIds);
+        }
+
+        if (estado) {
+            whereClauses.push('C_C.estado = ?');
+            args.push(estado);
+            countArgs.push(estado);
+        }
+
+        if (nombre) {
+            whereClauses.push('C_C.nombre LIKE ?');
+            args.push(`%${nombre}%`);
+            countArgs.push(`%${nombre}%`);
+        }
+
+        if (whereClauses.length > 0) {
+            const condition = ' WHERE ' + whereClauses.join(' AND ');
+            query += condition;
+            countQuery += condition;
         }
 
         query += ' LIMIT ? OFFSET ?';
