@@ -112,25 +112,54 @@ exports.deleteRRHH = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
-// ── TRABAJO_RRHH_PDF ──────────────────────────────────────────────────────────
-exports.getRRHHPdfs = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM TRABAJO_RRHH_PDF WHERE ID_RRHH = ?', [req.params.rid])); }
-    catch (e) { res.status(500).json({ error: e.message }); }
-};
-exports.createRRHHPdf = async (req, res) => {
-    const { pdf_url } = req.body;
+// ── ARCHIVOS DE TRABAJO_RRHH (PDFs) ──────────────────────────────────────────
+const fs = require('fs');
+const path = require('path');
+
+const handleFileUpload = async (req, res, table, idColumn, idValue, fileColumn, successMsg, subdir) => {
     try {
-        const [r] = await db.query(
-            'INSERT INTO TRABAJO_RRHH_PDF (ID_RRHH,pdf_url) VALUES (?,?)',
-            [req.params.rid, pdf_url]
-        );
-        res.status(201).json({ message: 'PDF RRHH creado', id: r.insertId });
+        if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+
+        const rows = await db.query(`SELECT ${fileColumn} FROM ${table} WHERE ${idColumn} = ?`, [idValue]);
+        if (!rows.length) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Registro no encontrado' });
+        }
+
+        // Borrar archivo anterior si existe (la BD guarda URL relativa, lo convertimos a ruta absoluta para borrarlo)
+        const oldUrl = rows[0][fileColumn];
+        if (oldUrl) {
+            const oldAbsPath = path.join(__dirname, '../../', oldUrl);
+            if (fs.existsSync(oldAbsPath)) {
+                try { fs.unlinkSync(oldAbsPath); } catch (err) { console.error("No se pudo borrar el archivo antiguo:", err); }
+            }
+        }
+
+        // Guardar URL relativa (ej: /uploads/pdfs/doc_123.pdf) en lugar del path absoluto del disco
+        const relativeUrl = `/uploads/${subdir}/${req.file.filename}`;
+        await db.query(`UPDATE ${table} SET ${fileColumn} = ? WHERE ${idColumn} = ?`, [relativeUrl, idValue]);
+        res.status(200).json({ message: successMsg, url: relativeUrl });
+    } catch (e) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ error: e.message });
+    }
+};
+
+const handleFileGet = async (req, res, table, idColumn, idValue, fileColumn) => {
+    try {
+        const rows = await db.query(`SELECT ${fileColumn} FROM ${table} WHERE ${idColumn} = ?`, [idValue]);
+        if (!rows.length) return res.status(404).json({ error: 'Registro no encontrado' });
+
+        const fileUrl = rows[0][fileColumn];
+        if (!fileUrl) {
+            return res.status(404).json({ error: 'Archivo no encontrado' });
+        }
+
+        // Redirigir al cliente a la URL pública (servida por express.static)
+        res.redirect(fileUrl);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
-exports.deleteRRHHPdf = async (req, res) => {
-    try {
-        const [r] = await db.query('DELETE FROM TRABAJO_RRHH_PDF WHERE id=? AND ID_RRHH=?', [req.params.pid, req.params.rid]);
-        if (r.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
-        res.json({ message: 'PDF RRHH eliminado' });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-};
+
+exports.uploadRRHHPDF = (req, res) => handleFileUpload(req, res, 'TRABAJO_RRHH', 'id', req.params.rid, 'pdf_RRHH', 'PDF de RRHH subido', 'pdfs');
+exports.getRRHHPDF = (req, res) => handleFileGet(req, res, 'TRABAJO_RRHH', 'id', req.params.rid, 'pdf_RRHH');
+

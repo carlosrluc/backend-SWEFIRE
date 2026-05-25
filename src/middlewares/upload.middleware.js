@@ -2,24 +2,30 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-// Crear la carpeta si no existe
-const uploadDir = path.join(__dirname, '../../uploads/cotizaciones');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+// Helpers for directories
+const createDir = (dir) => {
+    const fullPath = path.join(__dirname, '../../uploads', dir);
+    if (!fs.existsSync(fullPath)) {
+        fs.mkdirSync(fullPath, { recursive: true });
+    }
+    return fullPath;
+};
 
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        cb(null, uploadDir);
-    },
+const cotizacionesDir = createDir('cotizaciones');
+const pdfsDir = createDir('pdfs');
+const imagesDir = createDir('images');
+
+// Generic storage creator
+const createStorage = (destination, prefix) => multer.diskStorage({
+    destination: (req, file, cb) => cb(null, destination),
     filename: (req, file, cb) => {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        cb(null, `orden_compra_${uniqueSuffix}${path.extname(file.originalname)}`);
+        cb(null, `${prefix}_${uniqueSuffix}${path.extname(file.originalname)}`);
     }
 });
 
-const fileFilter = (req, file, cb) => {
-    // Aceptar solo PDFs
+// Filters
+const pdfFilter = (req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
         cb(null, true);
     } else {
@@ -27,12 +33,37 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-const upload = multer({ 
-    storage: storage,
-    fileFilter: fileFilter,
-    limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB límite
+const imageFilter = (req, file, cb) => {
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/gif'];
+    if (allowedMimeTypes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Solo se permiten archivos de imagen (JPEG, PNG, WEBP, GIF)'), false);
     }
+};
+
+// Multer instances
+const uploadCotizacion = multer({ 
+    storage: createStorage(cotizacionesDir, 'orden_compra'),
+    fileFilter: pdfFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-module.exports = upload;
+const uploadPDF = multer({ 
+    storage: createStorage(pdfsDir, 'doc'),
+    fileFilter: pdfFilter,
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+const uploadImage = multer({ 
+    storage: createStorage(imagesDir, 'img'),
+    fileFilter: imageFilter,
+    limits: { fileSize: 5 * 1024 * 1024 } // 5MB
+});
+
+module.exports = {
+    uploadCotizacion: uploadCotizacion,
+    uploadPDF: uploadPDF,
+    uploadImage: uploadImage
+};
+

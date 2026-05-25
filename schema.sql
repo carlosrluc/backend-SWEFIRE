@@ -246,7 +246,7 @@ CREATE TABLE "PERFIL_CERTIFICACION" (
   "nombre" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "institucion" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_validez" date DEFAULT NULL,
-  "foto" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "pdf_certificacion" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "DNI_perfil" ("DNI_perfil"),
   CONSTRAINT "PERFIL_CERTIFICACION_ibfk_1" FOREIGN KEY ("DNI_perfil") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
@@ -727,21 +727,10 @@ CREATE TABLE "TRABAJO_RRHH" (
   "Id_trabajo" int NOT NULL,
   "DNI_Trabajador" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   "estado_pago" enum('completado','por realizar','no pagar aun','devolucion pendiente') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "pdf_RRHH" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "Id_trabajo" ("Id_trabajo"),
   KEY "DNI_Trabajador" ("DNI_Trabajador"),
   CONSTRAINT "TRABAJO_RRHH_ibfk_1" FOREIGN KEY ("Id_trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE CASCADE,
   CONSTRAINT "TRABAJO_RRHH_ibfk_2" FOREIGN KEY ("DNI_Trabajador") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
-);
-
-
--- swefire_db.TRABAJO_RRHH_PDF definition
-
-CREATE TABLE "TRABAJO_RRHH_PDF" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "ID_RRHH" int NOT NULL,
-  "pdf_url" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  PRIMARY KEY ("id"),
-  KEY "ID_RRHH" ("ID_RRHH"),
-  CONSTRAINT "TRABAJO_RRHH_PDF_ibfk_1" FOREIGN KEY ("ID_RRHH") REFERENCES "TRABAJO_RRHH" ("id") ON DELETE CASCADE
 );

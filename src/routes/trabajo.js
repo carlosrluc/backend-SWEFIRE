@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const c = require('../controllers/trabajo.controller');
+const { uploadPDF } = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
@@ -223,10 +224,10 @@ router.delete('/:id/rrhh/:rid', c.deleteRRHH);
 
 /**
  * @openapi
- * /api/trabajos/{id}/rrhh/{rid}/pdfs:
+ * /api/trabajos/{id}/rrhh/{rid}/pdf:
  *   get:
- *     tags: [Trabajo - RRHH PDFs]
- *     summary: Listar PDFs del registro RRHH
+ *     tags: [Trabajo - RRHH]
+ *     summary: Descargar o visualizar PDF del registro RRHH
  *     parameters:
  *       - in: path
  *         name: id
@@ -238,10 +239,10 @@ router.delete('/:id/rrhh/:rid', c.deleteRRHH);
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Lista de PDFs
+ *         description: Archivo PDF
  *   post:
- *     tags: [Trabajo - RRHH PDFs]
- *     summary: Agregar PDF al registro RRHH
+ *     tags: [Trabajo - RRHH]
+ *     summary: Subir PDF al registro RRHH
  *     parameters:
  *       - in: path
  *         name: id
@@ -254,41 +255,18 @@ router.delete('/:id/rrhh/:rid', c.deleteRRHH);
  *     requestBody:
  *       required: true
  *       content:
- *         application/json:
+ *         multipart/form-data:
  *           schema:
  *             type: object
  *             properties:
- *               pdf_url: { type: string }
- *     responses:
- *       201:
- *         description: PDF creado
- */
-router.get('/:id/rrhh/:rid/pdfs', c.getRRHHPdfs);
-router.post('/:id/rrhh/:rid/pdfs', c.createRRHHPdf);
-
-/**
- * @openapi
- * /api/trabajos/{id}/rrhh/{rid}/pdfs/{pid}:
- *   delete:
- *     tags: [Trabajo - RRHH PDFs]
- *     summary: Eliminar PDF del registro RRHH
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *       - in: path
- *         name: rid
- *         required: true
- *         schema: { type: integer }
- *       - in: path
- *         name: pid
- *         required: true
- *         schema: { type: integer }
+ *               pdf_RRHH:
+ *                 type: string
+ *                 format: binary
  *     responses:
  *       200:
- *         description: PDF eliminado
+ *         description: Archivo PDF subido
  */
-router.delete('/:id/rrhh/:rid/pdfs/:pid', c.deleteRRHHPdf);
+router.get('/:id/rrhh/:rid/pdf', c.getRRHHPDF);
+router.post('/:id/rrhh/:rid/pdf', uploadPDF.single('pdf_RRHH'), c.uploadRRHHPDF);
 
 module.exports = router;

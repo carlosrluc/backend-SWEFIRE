@@ -331,6 +331,7 @@ router.post('/:id/inventario', auth, permit(['supervisorcampo', 'trabajcampo', '
  *       200:
  *         description: Eliminado
  */
-router.delete('/:id/inventario/:iid', auth, permit(['gerente', 'adminproy']), c.deleteInventario);
+router.get('/:id/inventario/:iid', auth, c.getInventarioById);
+router.put('/:id/inventario/:iid', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.updateInventario);
 
 module.exports = router;

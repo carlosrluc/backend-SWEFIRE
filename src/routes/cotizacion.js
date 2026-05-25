@@ -2,7 +2,7 @@ const router = require('express').Router();
 const c = require('../controllers/cotizacion.controller');
 const auth = require('../middlewares/auth.middleware');
 const { permit } = require('../middlewares/role.middleware');
-const upload = require('../middlewares/upload.middleware');
+const { uploadCotizacion } = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
@@ -693,6 +693,6 @@ router.post('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.se
  *         description: Orden de compra subida correctamente
  */
 router.get('/:id/orden-compra', auth, c.getOrdenCompra);
-router.post('/:id/orden-compra', auth, permit(['cliente', 'gerente', 'adminproy']), upload.single('orden_compra'), c.uploadOrdenCompra);
+router.post('/:id/orden-compra', auth, permit(['cliente', 'gerente', 'adminproy']), uploadCotizacion.single('orden_compra'), c.uploadOrdenCompra);
 
 module.exports = router;

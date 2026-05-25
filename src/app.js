@@ -28,6 +28,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ── Archivos estáticos (uploads) ──────────────────────────────────────────────
+// Sirve todos los archivos subidos (PDFs, imágenes) como rutas públicas.
+// Lo que se guarda en la BD es una URL relativa tipo /uploads/pdfs/archivo.pdf
+// y cualquier cliente puede descargarla desde el mismo host del servidor.
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+
 // ── Swagger ───────────────────────────────────────────────────────────────────
 const swaggerOptions = {
     definition: {

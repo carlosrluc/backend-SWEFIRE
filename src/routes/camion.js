@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const c = require('../controllers/camion.controller');
+const { uploadPDF } = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
@@ -131,6 +132,84 @@ router.delete('/:placa', c.remove);
 
 /**
  * @openapi
+ * /api/camiones/{placa}/revision-tecnica:
+ *   get:
+ *     tags: [Camión - Documentos]
+ *     summary: Descargar o visualizar revisión técnica
+ *     parameters:
+ *       - in: path
+ *         name: placa
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Archivo PDF
+ *   post:
+ *     tags: [Camión - Documentos]
+ *     summary: Subir revisión técnica (PDF)
+ *     parameters:
+ *       - in: path
+ *         name: placa
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               revision_tecnica:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Archivo subido
+ */
+router.get('/:placa/revision-tecnica', c.getRevisionTecnica);
+router.post('/:placa/revision-tecnica', uploadPDF.single('revision_tecnica'), c.uploadRevisionTecnica);
+
+/**
+ * @openapi
+ * /api/camiones/{placa}/tarjeta-propiedad:
+ *   get:
+ *     tags: [Camión - Documentos]
+ *     summary: Descargar o visualizar tarjeta de propiedad
+ *     parameters:
+ *       - in: path
+ *         name: placa
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Archivo PDF
+ *   post:
+ *     tags: [Camión - Documentos]
+ *     summary: Subir tarjeta de propiedad (PDF)
+ *     parameters:
+ *       - in: path
+ *         name: placa
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               tarjeta_propiedad:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Archivo subido
+ */
+router.get('/:placa/tarjeta-propiedad', c.getTarjetaPropiedad);
+router.post('/:placa/tarjeta-propiedad', uploadPDF.single('tarjeta_propiedad'), c.uploadTarjetaPropiedad);
+
+/**
+ * @openapi
  * /api/camiones/{placa}/mantenimientos:
  *   get:
  *     tags: [Camión - Mantenimiento]
@@ -169,6 +248,53 @@ router.delete('/:placa', c.remove);
  */
 router.get('/:placa/mantenimientos', c.getMantenimientos);
 router.post('/:placa/mantenimientos', c.createMantenimiento);
+
+/**
+ * @openapi
+ * /api/camiones/{placa}/mantenimientos/{mid}/pdf:
+ *   get:
+ *     tags: [Camión - Mantenimiento]
+ *     summary: Descargar o visualizar PDF de mantenimiento
+ *     parameters:
+ *       - in: path
+ *         name: placa
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: mid
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Archivo PDF
+ *   post:
+ *     tags: [Camión - Mantenimiento]
+ *     summary: Subir PDF de mantenimiento
+ *     parameters:
+ *       - in: path
+ *         name: placa
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: mid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               pdf_mantenimiento:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Archivo subido
+ */
+router.get('/:placa/mantenimientos/:mid/pdf', c.getMantenimientoPDF);
+router.post('/:placa/mantenimientos/:mid/pdf', uploadPDF.single('pdf_mantenimiento'), c.uploadMantenimientoPDF);
 
 /**
  * @openapi

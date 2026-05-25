@@ -40,18 +40,18 @@ exports.create = async (req, res) => {
     const { DNI, Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
         telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
         aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
-        profesion, nro_cta_bancaria, cv, foto_perfil } = req.body;
+        profesion, nro_cta_bancaria } = req.body;
     try {
         await db.query(
             `INSERT INTO PERFIL (DNI,Nombre,Apellido,Genero,RUC,fecha_nacimiento,
              correo_contacto,telefono_contacto,estado_civil,distrito_residencia,
              seguro_vida_ley,aficiones,experiencia,comentarios,estado,alergias,
-             condicion_medica,profesion,nro_cta_bancaria,cv,foto_perfil)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             condicion_medica,profesion,nro_cta_bancaria)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [DNI, Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
              telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
              aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
-             profesion, nro_cta_bancaria, cv, foto_perfil]
+             profesion, nro_cta_bancaria]
         );
         res.status(201).json({ message: 'Perfil creado', DNI });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -61,18 +61,18 @@ exports.update = async (req, res) => {
     const { Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
         telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
         aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
-        profesion, nro_cta_bancaria, cv, foto_perfil } = req.body;
+        profesion, nro_cta_bancaria } = req.body;
     try {
         const result = await db.query(
             `UPDATE PERFIL SET Nombre=?,Apellido=?,Genero=?,RUC=?,fecha_nacimiento=?,
              correo_contacto=?,telefono_contacto=?,estado_civil=?,distrito_residencia=?,
              seguro_vida_ley=?,aficiones=?,experiencia=?,comentarios=?,estado=?,
-             alergias=?,condicion_medica=?,profesion=?,nro_cta_bancaria=?,cv=?,foto_perfil=?
+             alergias=?,condicion_medica=?,profesion=?,nro_cta_bancaria=?
              WHERE DNI=?`,
             [Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
              telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
              aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
-             profesion, nro_cta_bancaria, cv, foto_perfil, req.params.dni]
+             profesion, nro_cta_bancaria, req.params.dni]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Perfil actualizado' });
@@ -86,6 +86,66 @@ exports.remove = async (req, res) => {
         res.json({ message: 'Perfil eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+// ── ARCHIVOS DE PERFIL (PDFs e Imágenes) ──────────────────────────────────
+const fs = require('fs');
+const path = require('path');
+
+const handleFileUpload = async (req, res, table, idColumn, idValue, fileColumn, successMsg, subdir) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+
+        const rows = await db.query(`SELECT ${fileColumn} FROM ${table} WHERE ${idColumn} = ?`, [idValue]);
+        if (!rows.length) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Registro no encontrado' });
+        }
+
+        // Borrar archivo anterior si existe (la BD guarda URL relativa, lo convertimos a ruta absoluta para borrarlo)
+        const oldUrl = rows[0][fileColumn];
+        if (oldUrl) {
+            const oldAbsPath = path.join(__dirname, '../../', oldUrl);
+            if (fs.existsSync(oldAbsPath)) {
+                try { fs.unlinkSync(oldAbsPath); } catch (err) { console.error("No se pudo borrar el archivo antiguo:", err); }
+            }
+        }
+
+        // Guardar URL relativa (ej: /uploads/pdfs/doc_123.pdf) en lugar del path absoluto del disco
+        const relativeUrl = `/uploads/${subdir}/${req.file.filename}`;
+        await db.query(`UPDATE ${table} SET ${fileColumn} = ? WHERE ${idColumn} = ?`, [relativeUrl, idValue]);
+        res.status(200).json({ message: successMsg, url: relativeUrl });
+    } catch (e) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ error: e.message });
+    }
+};
+
+const handleFileGet = async (req, res, table, idColumn, idValue, fileColumn) => {
+    try {
+        const rows = await db.query(`SELECT ${fileColumn} FROM ${table} WHERE ${idColumn} = ?`, [idValue]);
+        if (!rows.length) return res.status(404).json({ error: 'Registro no encontrado' });
+
+        const fileUrl = rows[0][fileColumn];
+        if (!fileUrl) {
+            return res.status(404).json({ error: 'Archivo no encontrado' });
+        }
+
+        // Redirigir al cliente a la URL pública (servida por express.static)
+        res.redirect(fileUrl);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.uploadCV = (req, res) => handleFileUpload(req, res, 'PERFIL', 'DNI', req.params.dni, 'cv', 'CV subido', 'pdfs');
+exports.getCV = (req, res) => handleFileGet(req, res, 'PERFIL', 'DNI', req.params.dni, 'cv');
+
+exports.uploadFotoPerfil = (req, res) => handleFileUpload(req, res, 'PERFIL', 'DNI', req.params.dni, 'foto_perfil', 'Foto de perfil subida', 'images');
+exports.getFotoPerfil = (req, res) => handleFileGet(req, res, 'PERFIL', 'DNI', req.params.dni, 'foto_perfil');
+
+exports.uploadBrevetePDF = (req, res) => handleFileUpload(req, res, 'PERFIL_BREVETE', 'id', req.params.id, 'pdf_brevete', 'Brevete subido', 'pdfs');
+exports.getBrevetePDF = (req, res) => handleFileGet(req, res, 'PERFIL_BREVETE', 'id', req.params.id, 'pdf_brevete');
+
+exports.uploadCertificacionPDF = (req, res) => handleFileUpload(req, res, 'PERFIL_CERTIFICACION', 'id', req.params.id, 'pdf_certificacion', 'Certificación subida', 'pdfs');
+exports.getCertificacionPDF = (req, res) => handleFileGet(req, res, 'PERFIL_CERTIFICACION', 'id', req.params.id, 'pdf_certificacion');
 
 // ── PERFIL_EDUCACION ──────────────────────────────────────────────────────────
 exports.getEducacion = async (req, res) => {
@@ -137,22 +197,22 @@ exports.getBrevete = async (req, res) => {
 };
 
 exports.createBrevete = async (req, res) => {
-    const { categoria, pdf_brevete, fecha_vencimiento } = req.body;
+    const { categoria, fecha_vencimiento } = req.body;
     try {
         const result = await db.query(
-            'INSERT INTO PERFIL_BREVETE (DNI_perfil,categoria,pdf_brevete,fecha_vencimiento) VALUES (?,?,?,?)',
-            [req.params.dni, categoria, pdf_brevete, fecha_vencimiento]
+            'INSERT INTO PERFIL_BREVETE (DNI_perfil,categoria,fecha_vencimiento) VALUES (?,?,?)',
+            [req.params.dni, categoria, fecha_vencimiento]
         );
         res.status(201).json({ message: 'Brevete creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.updateBrevete = async (req, res) => {
-    const { categoria, pdf_brevete, fecha_vencimiento } = req.body;
+    const { categoria, fecha_vencimiento } = req.body;
     try {
         const result = await db.query(
-            'UPDATE PERFIL_BREVETE SET categoria=?,pdf_brevete=?,fecha_vencimiento=? WHERE id=? AND DNI_perfil=?',
-            [categoria, pdf_brevete, fecha_vencimiento, req.params.id, req.params.dni]
+            'UPDATE PERFIL_BREVETE SET categoria=?,fecha_vencimiento=? WHERE id=? AND DNI_perfil=?',
+            [categoria, fecha_vencimiento, req.params.id, req.params.dni]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Brevete actualizado' });
@@ -178,22 +238,22 @@ exports.getCertificacion = async (req, res) => {
 };
 
 exports.createCertificacion = async (req, res) => {
-    const { nombre, institucion, fecha_validez, foto } = req.body;
+    const { nombre, institucion, fecha_validez } = req.body;
     try {
         const result = await db.query(
-            'INSERT INTO PERFIL_CERTIFICACION (DNI_perfil,nombre,institucion,fecha_validez,foto) VALUES (?,?,?,?,?)',
-            [req.params.dni, nombre, institucion, fecha_validez, foto]
+            'INSERT INTO PERFIL_CERTIFICACION (DNI_perfil,nombre,institucion,fecha_validez) VALUES (?,?,?,?)',
+            [req.params.dni, nombre, institucion, fecha_validez]
         );
         res.status(201).json({ message: 'Certificación creada', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.updateCertificacion = async (req, res) => {
-    const { nombre, institucion, fecha_validez, foto } = req.body;
+    const { nombre, institucion, fecha_validez } = req.body;
     try {
         const result = await db.query(
-            'UPDATE PERFIL_CERTIFICACION SET nombre=?,institucion=?,fecha_validez=?,foto=? WHERE id=? AND DNI_perfil=?',
-            [nombre, institucion, fecha_validez, foto, req.params.id, req.params.dni]
+            'UPDATE PERFIL_CERTIFICACION SET nombre=?,institucion=?,fecha_validez=? WHERE id=? AND DNI_perfil=?',
+            [nombre, institucion, fecha_validez, req.params.id, req.params.dni]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Certificación actualizada' });

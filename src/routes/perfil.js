@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const c = require('../controllers/perfil.controller');
+const { uploadPDF, uploadImage } = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
@@ -168,6 +169,84 @@ router.delete('/:dni', c.remove);
 
 /**
  * @openapi
+ * /api/perfiles/{dni}/cv:
+ *   get:
+ *     tags: [Perfil - Documentos]
+ *     summary: Descargar o visualizar CV
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Archivo PDF
+ *   post:
+ *     tags: [Perfil - Documentos]
+ *     summary: Subir CV (PDF)
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cv:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Archivo subido
+ */
+router.get('/:dni/cv', c.getCV);
+router.post('/:dni/cv', uploadPDF.single('cv'), c.uploadCV);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/foto:
+ *   get:
+ *     tags: [Perfil - Documentos]
+ *     summary: Descargar o visualizar foto de perfil
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: Archivo de imagen
+ *   post:
+ *     tags: [Perfil - Documentos]
+ *     summary: Subir foto de perfil (Imagen)
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               foto_perfil:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Archivo subido
+ */
+router.get('/:dni/foto', c.getFotoPerfil);
+router.post('/:dni/foto', uploadImage.single('foto_perfil'), c.uploadFotoPerfil);
+
+/**
+ * @openapi
  * /api/perfiles/{dni}/educacion:
  *   get:
  *     tags: [Perfil - Educación]
@@ -293,6 +372,53 @@ router.post('/:dni/brevetes', c.createBrevete);
 
 /**
  * @openapi
+ * /api/perfiles/{dni}/brevetes/{id}/pdf:
+ *   get:
+ *     tags: [Perfil - Brevete]
+ *     summary: Descargar o visualizar PDF del brevete
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Archivo PDF
+ *   post:
+ *     tags: [Perfil - Brevete]
+ *     summary: Subir PDF del brevete
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               pdf_brevete:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Archivo subido
+ */
+router.get('/:dni/brevetes/:id/pdf', c.getBrevetePDF);
+router.post('/:dni/brevetes/:id/pdf', uploadPDF.single('pdf_brevete'), c.uploadBrevetePDF);
+
+/**
+ * @openapi
  * /api/perfiles/{dni}/brevetes/{id}:
  *   put:
  *     tags: [Perfil - Brevete]
@@ -377,6 +503,53 @@ router.delete('/:dni/brevetes/:id', c.deleteBrevete);
  */
 router.get('/:dni/certificaciones', c.getCertificacion);
 router.post('/:dni/certificaciones', c.createCertificacion);
+
+/**
+ * @openapi
+ * /api/perfiles/{dni}/certificaciones/{id}/pdf:
+ *   get:
+ *     tags: [Perfil - Certificaciones]
+ *     summary: Descargar o visualizar PDF de la certificación
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Archivo PDF
+ *   post:
+ *     tags: [Perfil - Certificaciones]
+ *     summary: Subir PDF de la certificación
+ *     parameters:
+ *       - in: path
+ *         name: dni
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               pdf_certificacion:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Archivo subido
+ */
+router.get('/:dni/certificaciones/:id/pdf', c.getCertificacionPDF);
+router.post('/:dni/certificaciones/:id/pdf', uploadPDF.single('pdf_certificacion'), c.uploadCertificacionPDF);
 
 /**
  * @openapi

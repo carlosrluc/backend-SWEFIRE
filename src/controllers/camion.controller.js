@@ -151,15 +151,15 @@ exports.getByPlaca = async (req, res) => {
 
 exports.create = async (req, res) => {
     const { Placa, nombre, ano_fabricacion, modelo, color, caracteristicas,
-        revision_tecnica, fecha_prox_revision, ID_Fabricante, tarjeta_propiedad,
+        fecha_prox_revision, ID_Fabricante,
         vencimiento_tarjeta, soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado } = req.body;
     try {
         await db.query(
-            `INSERT INTO CAMION (Placa,nombre,ano_fabricacion,modelo,color,caracteristicas,revision_tecnica,
-             fecha_prox_revision,ID_Fabricante,tarjeta_propiedad,vencimiento_tarjeta,soat_n_poliza,
-             soat_empresa,soat_precio,soat_dia_pago,Estado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-            [Placa, nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
-                fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
+            `INSERT INTO CAMION (Placa,nombre,ano_fabricacion,modelo,color,caracteristicas,
+             fecha_prox_revision,ID_Fabricante,vencimiento_tarjeta,soat_n_poliza,
+             soat_empresa,soat_precio,soat_dia_pago,Estado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [Placa, nombre, ano_fabricacion, modelo, color, caracteristicas,
+                fecha_prox_revision, ID_Fabricante, vencimiento_tarjeta,
                 soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado]
         );
         res.status(201).json({ message: 'Camión creado', Placa });
@@ -167,16 +167,16 @@ exports.create = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
-    const { nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
-        fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
+    const { nombre, ano_fabricacion, modelo, color, caracteristicas,
+        fecha_prox_revision, ID_Fabricante, vencimiento_tarjeta,
         soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado } = req.body;
     try {
         const result = await db.query(
-            `UPDATE CAMION SET nombre=?,ano_fabricacion=?,modelo=?,color=?,caracteristicas=?,revision_tecnica=?,
-             fecha_prox_revision=?,ID_Fabricante=?,tarjeta_propiedad=?,vencimiento_tarjeta=?,soat_n_poliza=?,
+            `UPDATE CAMION SET nombre=?,ano_fabricacion=?,modelo=?,color=?,caracteristicas=?,
+             fecha_prox_revision=?,ID_Fabricante=?,vencimiento_tarjeta=?,soat_n_poliza=?,
              soat_empresa=?,soat_precio=?,soat_dia_pago=?,Estado=? WHERE Placa=?`,
-            [nombre, ano_fabricacion, modelo, color, caracteristicas, revision_tecnica,
-                fecha_prox_revision, ID_Fabricante, tarjeta_propiedad, vencimiento_tarjeta,
+            [nombre, ano_fabricacion, modelo, color, caracteristicas,
+                fecha_prox_revision, ID_Fabricante, vencimiento_tarjeta,
                 soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado, req.params.placa]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
@@ -192,6 +192,61 @@ exports.remove = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+// ── ARCHIVOS DE CAMION (PDFs) ────────────────────────────────────────────────
+const fs = require('fs');
+const path = require('path');
+
+const handleFileUpload = async (req, res, table, idColumn, idValue, fileColumn, successMsg, subdir) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+
+        const rows = await db.query(`SELECT ${fileColumn} FROM ${table} WHERE ${idColumn} = ?`, [idValue]);
+        if (!rows.length) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Registro no encontrado' });
+        }
+
+        // Borrar archivo anterior si existe (la BD guarda URL relativa, lo convertimos a ruta absoluta para borrarlo)
+        const oldUrl = rows[0][fileColumn];
+        if (oldUrl) {
+            const oldAbsPath = path.join(__dirname, '../../', oldUrl);
+            if (fs.existsSync(oldAbsPath)) {
+                try { fs.unlinkSync(oldAbsPath); } catch (err) { console.error("No se pudo borrar el archivo antiguo:", err); }
+            }
+        }
+
+        // Guardar URL relativa (ej: /uploads/pdfs/doc_123.pdf) en lugar del path absoluto del disco
+        const relativeUrl = `/uploads/${subdir}/${req.file.filename}`;
+        await db.query(`UPDATE ${table} SET ${fileColumn} = ? WHERE ${idColumn} = ?`, [relativeUrl, idValue]);
+        res.status(200).json({ message: successMsg, url: relativeUrl });
+    } catch (e) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ error: e.message });
+    }
+};
+
+const handleFileGet = async (req, res, table, idColumn, idValue, fileColumn) => {
+    try {
+        const rows = await db.query(`SELECT ${fileColumn} FROM ${table} WHERE ${idColumn} = ?`, [idValue]);
+        if (!rows.length) return res.status(404).json({ error: 'Registro no encontrado' });
+
+        const fileUrl = rows[0][fileColumn];
+        if (!fileUrl) {
+            return res.status(404).json({ error: 'Archivo no encontrado' });
+        }
+
+        // Redirigir al cliente a la URL pública (servida por express.static)
+        res.redirect(fileUrl);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.uploadRevisionTecnica = (req, res) => handleFileUpload(req, res, 'CAMION', 'Placa', req.params.placa, 'revision_tecnica', 'Revisión técnica subida', 'pdfs');
+exports.getRevisionTecnica = (req, res) => handleFileGet(req, res, 'CAMION', 'Placa', req.params.placa, 'revision_tecnica');
+
+exports.uploadTarjetaPropiedad = (req, res) => handleFileUpload(req, res, 'CAMION', 'Placa', req.params.placa, 'tarjeta_propiedad', 'Tarjeta de propiedad subida', 'pdfs');
+exports.getTarjetaPropiedad = (req, res) => handleFileGet(req, res, 'CAMION', 'Placa', req.params.placa, 'tarjeta_propiedad');
+
+
 // ── CAMION_MANTENIMIENTO ──────────────────────────────────────────────────────
 exports.getMantenimientos = async (req, res) => {
     try { res.json(await db.query('SELECT * FROM CAMION_MANTENIMIENTO WHERE Placa = ?', [req.params.placa])); }
@@ -199,15 +254,18 @@ exports.getMantenimientos = async (req, res) => {
 };
 
 exports.createMantenimiento = async (req, res) => {
-    const { fecha_ultimo_mant, responsable, razon, contacto_responsable, pdf_mantenimiento } = req.body;
+    const { fecha_ultimo_mant, responsable, razon, contacto_responsable } = req.body;
     try {
         const result = await db.query(
-            'INSERT INTO CAMION_MANTENIMIENTO (Placa,fecha_ultimo_mant,responsable,razon,contacto_responsable,pdf_mantenimiento) VALUES (?,?,?,?,?,?)',
-            [req.params.placa, fecha_ultimo_mant, responsable, razon, contacto_responsable, pdf_mantenimiento]
+            'INSERT INTO CAMION_MANTENIMIENTO (Placa,fecha_ultimo_mant,responsable,razon,contacto_responsable) VALUES (?,?,?,?,?)',
+            [req.params.placa, fecha_ultimo_mant, responsable, razon, contacto_responsable]
         );
         res.status(201).json({ message: 'Mantenimiento creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+exports.uploadMantenimientoPDF = (req, res) => handleFileUpload(req, res, 'CAMION_MANTENIMIENTO', 'id', req.params.mid, 'pdf_mantenimiento', 'PDF de mantenimiento subido', 'pdfs');
+exports.getMantenimientoPDF = (req, res) => handleFileGet(req, res, 'CAMION_MANTENIMIENTO', 'id', req.params.mid, 'pdf_mantenimiento');
 
 exports.deleteMantenimiento = async (req, res) => {
     try {

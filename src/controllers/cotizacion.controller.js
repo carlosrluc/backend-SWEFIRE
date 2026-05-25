@@ -839,18 +839,20 @@ exports.uploadOrdenCompra = async (req, res) => {
             return res.status(404).json({ error: 'Cotización no encontrada' });
         }
 
-        const oldFile = rows[0].Orden_compra;
-        if (oldFile && fs.existsSync(oldFile)) {
-            // Borrar el archivo viejo
+        const oldUrl = rows[0].Orden_compra;
+        if (oldUrl) {
+            // Borrar el archivo viejo (la BD guarda URL relativa, lo convertimos a ruta absoluta)
+            const oldAbsPath = path.join(__dirname, '../../', oldUrl);
             try {
-                fs.unlinkSync(oldFile);
+                if (fs.existsSync(oldAbsPath)) fs.unlinkSync(oldAbsPath);
             } catch (err) {
                 console.error("No se pudo borrar el PDF antiguo:", err);
             }
         }
 
-        // Guardar la nueva ruta en la base de datos
-        await db.query('UPDATE COTIZACION_COMERCIAL SET Orden_compra = ? WHERE ID = ?', [req.file.path, cotizacionId]);
+        // Guardar URL relativa en la base de datos (ej: /uploads/cotizaciones/orden_compra_xxx.pdf)
+        const relativeUrl = `/uploads/cotizaciones/${req.file.filename}`;
+        await db.query('UPDATE COTIZACION_COMERCIAL SET Orden_compra = ? WHERE ID = ?', [relativeUrl, cotizacionId]);
 
         // === AUTO-CREACIÓN DEL PROYECTO ===
         try {
@@ -935,7 +937,7 @@ exports.uploadOrdenCompra = async (req, res) => {
         }
         // ==================================
 
-        res.json({ message: 'Orden de compra subida correctamente. Proyecto sincronizado.', ruta: req.file.path });
+        res.json({ message: 'Orden de compra subida correctamente. Proyecto sincronizado.', url: relativeUrl });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -946,14 +948,15 @@ exports.getOrdenCompra = async (req, res) => {
         const rows = await db.query('SELECT Orden_compra FROM COTIZACION_COMERCIAL WHERE ID = ?', [req.params.id]);
         if (!rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
 
-        const pdfPath = rows[0].Orden_compra;
-        if (!pdfPath || !fs.existsSync(pdfPath)) {
+        const fileUrl = rows[0].Orden_compra;
+        if (!fileUrl) {
             return res.status(404).json({ error: 'No hay ninguna orden de compra guardada para esta cotización' });
         }
 
-        // Enviar el archivo
-        res.sendFile(path.resolve(pdfPath));
+        // Redirigir a la URL pública (servida por express.static)
+        res.redirect(fileUrl);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
 };
+

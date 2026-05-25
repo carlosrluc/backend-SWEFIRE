@@ -307,3 +307,22 @@ exports.deleteInventario = async (req, res) => {
         res.json({ message: 'Inventario en proyecto eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+// ── GET ONE INVENTARIO ───────────────────────────────────────────────────────
+exports.getInventarioById = async (req, res) => {
+    try {
+        const rows = await db.query('SELECT PI.*, I.nombre_objeto as Objeto_Nombre FROM PROYECTO_INVENTARIO PI LEFT JOIN INVENTARIO I ON PI.Id_Objeto = I.Id_Objeto WHERE PI.id = ? AND PI.id_Proyecto = ?', [req.params.iid, req.params.id]);
+        if (!rows.length) return res.status(404).json({ error: 'Inventario no encontrado' });
+        res.json(rows[0]);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// ── UPDATE INVENTARIO ───────────────────────────────────────────────────────
+exports.updateInventario = async (req, res) => {
+    const { Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon } = req.body;
+    try {
+        const result = await db.query('UPDATE PROYECTO_INVENTARIO SET Id_Objeto=?, cantidad_objeto=?, estado=?, fecha_salida=?, fecha_retorno=?, metodo_traslado=?, razon=? WHERE id=? AND id_Proyecto=?', [Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, req.params.iid, req.params.id]);
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'Inventario no encontrado' });
+        res.json({ message: 'Inventario actualizado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
