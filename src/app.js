@@ -28,11 +28,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── Archivos estáticos (uploads) ──────────────────────────────────────────────
+// ── Archivos estáticos (uploads y public) ──────────────────────────────────────
 // Sirve todos los archivos subidos (PDFs, imágenes) como rutas públicas.
 // Lo que se guarda en la BD es una URL relativa tipo /uploads/pdfs/archivo.pdf
 // y cualquier cliente puede descargarla desde el mismo host del servidor.
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
 // ── Swagger ───────────────────────────────────────────────────────────────────
 const swaggerOptions = {
@@ -74,7 +75,9 @@ const swaggerOptions = {
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+    customJs: '/public/swagger-custom.js'
+}));
 
 const authMiddleware = require('./middlewares/auth.middleware');
 app.use('/api', (req, res, next) => {

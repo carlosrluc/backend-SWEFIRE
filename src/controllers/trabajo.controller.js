@@ -38,7 +38,7 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
     const { Id_Proyecto, fecha, horario, asistencia, comentario } = req.body;
     try {
-        const [r] = await db.query(
+        const r = await db.query(
             'INSERT INTO TRABAJO (Id_Proyecto,fecha,horario,asistencia,comentario) VALUES (?,?,?,?,?)',
             [Id_Proyecto, fecha, horario, asistencia, comentario]
         );
@@ -49,7 +49,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const { Id_Proyecto, fecha, horario, asistencia, comentario } = req.body;
     try {
-        const [r] = await db.query(
+        const r = await db.query(
             'UPDATE TRABAJO SET Id_Proyecto=?,fecha=?,horario=?,asistencia=?,comentario=? WHERE Id_trabajo=?',
             [Id_Proyecto, fecha, horario, asistencia, comentario, req.params.id]
         );
@@ -60,7 +60,7 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const [r] = await db.query('DELETE FROM TRABAJO WHERE Id_trabajo = ?', [req.params.id]);
+        const r = await db.query('DELETE FROM TRABAJO WHERE Id_trabajo = ?', [req.params.id]);
         if (r.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Trabajo eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -74,7 +74,7 @@ exports.getJornadas = async (req, res) => {
 exports.createJornada = async (req, res) => {
     const { DNI_Trabajador, dia, horario_entrada, horario_salida } = req.body;
     try {
-        const [r] = await db.query(
+        const r = await db.query(
             'INSERT INTO TRABAJO_JORNADA (Id_trabajo,DNI_Trabajador,dia,horario_entrada,horario_salida) VALUES (?,?,?,?,?)',
             [req.params.id, DNI_Trabajador, dia, horario_entrada, horario_salida]
         );
@@ -83,7 +83,7 @@ exports.createJornada = async (req, res) => {
 };
 exports.deleteJornada = async (req, res) => {
     try {
-        const [r] = await db.query('DELETE FROM TRABAJO_JORNADA WHERE id=? AND Id_trabajo=?', [req.params.jid, req.params.id]);
+        const r = await db.query('DELETE FROM TRABAJO_JORNADA WHERE id=? AND Id_trabajo=?', [req.params.jid, req.params.id]);
         if (r.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Jornada eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -97,7 +97,7 @@ exports.getRRHH = async (req, res) => {
 exports.createRRHH = async (req, res) => {
     const { DNI_Trabajador, estado_pago } = req.body;
     try {
-        const [r] = await db.query(
+        const r = await db.query(
             'INSERT INTO TRABAJO_RRHH (Id_trabajo,DNI_Trabajador,estado_pago) VALUES (?,?,?)',
             [req.params.id, DNI_Trabajador, estado_pago]
         );
@@ -106,7 +106,7 @@ exports.createRRHH = async (req, res) => {
 };
 exports.deleteRRHH = async (req, res) => {
     try {
-        const [r] = await db.query('DELETE FROM TRABAJO_RRHH WHERE id=? AND Id_trabajo=?', [req.params.rid, req.params.id]);
+        const r = await db.query('DELETE FROM TRABAJO_RRHH WHERE id=? AND Id_trabajo=?', [req.params.rid, req.params.id]);
         if (r.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'RRHH eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }

@@ -8,7 +8,7 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre, C.razon_social as Razon_Social FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC';
-        let countQuery = 'SELECT COUNT(*) as total FROM SOLICITUD S';
+        let countQuery = 'SELECT COUNT(*) as total FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC';
         let args = [];
         let countArgs = [];
 

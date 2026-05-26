@@ -31,7 +31,7 @@ exports.getAll = async (req, res) => {
         let queryParams = [];
 
         if (nombre) {
-            whereClauses.push('CC.nombre LIKE ?');
+            whereClauses.push('P.Proyecto_Nombre LIKE ?');
             queryParams.push(`%${nombre}%`);
         }
 
@@ -207,11 +207,19 @@ exports.create = async (req, res) => {
     const { descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
         orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
     try {
+        let Proyecto_Nombre = null;
+        if (id_cotizacion) {
+            const cotizacionRows = await db.query('SELECT nombre FROM COTIZACION_COMERCIAL WHERE ID = ?', [id_cotizacion]);
+            if (cotizacionRows.length > 0) {
+                Proyecto_Nombre = cotizacionRows[0].nombre;
+            }
+        }
+
         const result = await db.query(
-            `INSERT INTO PROYECTO (descripcion_servicio,ID_Trabajo,Id_Cliente,ubicacion,id_cotizacion,
+            `INSERT INTO PROYECTO (Proyecto_Nombre,descripcion_servicio,ID_Trabajo,Id_Cliente,ubicacion,id_cotizacion,
              orden_servicio,informe_final,factura,fecha_inicio,fecha_fin,observaciones,estado)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
-            [descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [Proyecto_Nombre, descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
                 orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado]
         );
         res.status(201).json({ message: 'Proyecto creado', id_Proyecto: result.insertId });
@@ -250,7 +258,7 @@ exports.getCamiones = async (req, res) => {
 exports.createCamion = async (req, res) => {
     const { Placa, personal_manejando, fecha_hora_entrada, fecha_hora_salida, estado, razon } = req.body;
     try {
-        const [r] = await db.query(
+        const r = await db.query(
             'INSERT INTO PROYECTO_CAMION (id_Proyecto,Placa,personal_manejando,fecha_hora_entrada,fecha_hora_salida) VALUES (?,?,?,?,?)',
             [req.params.id, Placa, personal_manejando, fecha_hora_entrada, fecha_hora_salida, estado, razon]
         );
@@ -259,7 +267,7 @@ exports.createCamion = async (req, res) => {
 };
 exports.deleteCamion = async (req, res) => {
     try {
-        const [r] = await db.query('DELETE FROM PROYECTO_CAMION WHERE id=? AND id_Proyecto=?', [req.params.cid, req.params.id]);
+        const r = await db.query('DELETE FROM PROYECTO_CAMION WHERE id=? AND id_Proyecto=?', [req.params.cid, req.params.id]);
         if (r.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Camión en proyecto eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -273,13 +281,13 @@ exports.getDocumentacion = async (req, res) => {
 exports.createDocumentacion = async (req, res) => {
     const { pdf_url } = req.body;
     try {
-        const [r] = await db.query('INSERT INTO PROYECTO_DOCUMENTACION (id_Proyecto,pdf_url) VALUES (?,?)', [req.params.id, pdf_url]);
+        const r = await db.query('INSERT INTO PROYECTO_DOCUMENTACION (id_Proyecto,pdf_url) VALUES (?,?)', [req.params.id, pdf_url]);
         res.status(201).json({ message: 'Documentación creada', id: r.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.deleteDocumentacion = async (req, res) => {
     try {
-        const [r] = await db.query('DELETE FROM PROYECTO_DOCUMENTACION WHERE id=? AND id_Proyecto=?', [req.params.did, req.params.id]);
+        const r = await db.query('DELETE FROM PROYECTO_DOCUMENTACION WHERE id=? AND id_Proyecto=?', [req.params.did, req.params.id]);
         if (r.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Documentación eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -293,7 +301,7 @@ exports.getInventario = async (req, res) => {
 exports.createInventario = async (req, res) => {
     const { Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon } = req.body;
     try {
-        const [r] = await db.query(
+        const r = await db.query(
             'INSERT INTO PROYECTO_INVENTARIO (id_Proyecto,Id_Objeto,cantidad_objeto,estado,fecha_salida,fecha_retorno,metodo_traslado,razon) VALUES (?,?,?,?,?,?,?,?)',
             [req.params.id, Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon]
         );
@@ -302,7 +310,7 @@ exports.createInventario = async (req, res) => {
 };
 exports.deleteInventario = async (req, res) => {
     try {
-        const [r] = await db.query('DELETE FROM PROYECTO_INVENTARIO WHERE id=? AND id_Proyecto=?', [req.params.iid, req.params.id]);
+        const r = await db.query('DELETE FROM PROYECTO_INVENTARIO WHERE id=? AND id_Proyecto=?', [req.params.iid, req.params.id]);
         if (r.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Inventario en proyecto eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }

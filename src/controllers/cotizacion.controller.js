@@ -350,6 +350,13 @@ exports.getDetallesFranco = async (req, res) => {
             direccionRecojo: recojoResult[0].direccionRecojo
         } : null;
 
+        // Verificar si existen mensajes en el chat de la cotización
+        const chatCheck = await db.query(
+            'SELECT 1 FROM COTIZACION_CHAT_MENSAJE WHERE id_cotizacion = ? LIMIT 1',
+            [cotizacionId]
+        );
+        const chat = chatCheck.length > 0 ? "si" : "no";
+
         // Construir respuesta
         res.json({
             id: base.ID,
@@ -360,6 +367,7 @@ exports.getDetallesFranco = async (req, res) => {
             productos,
             camiones,
             costoRecojo,
+            chat,
             condiciones: {
                 fechaEmision: base.fecha_emision ? new Date(base.fecha_emision).toISOString().split('T')[0] : null,
                 fechaVigencia: base.fecha_vigencia ? new Date(base.fecha_vigencia).toISOString().split('T')[0] : null,
