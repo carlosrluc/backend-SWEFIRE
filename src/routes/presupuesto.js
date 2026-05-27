@@ -161,6 +161,7 @@ router.delete('/item/:idItem', c.deleteItem);
  *             properties:
  *               costo_real: { type: number }
  *               razon: { type: string }
+ *               ID_Incidencia: { type: integer }
  *               prueba: { type: string, format: binary }
  *     responses:
  *       200:

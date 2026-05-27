@@ -273,6 +273,19 @@ exports.deleteCamion = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+// ── UPDATE PROYECTO_CAMION ─────────────────────────────────────────────────────
+exports.updateCamion = async (req, res) => {
+    const { Placa, personal_manejando, fecha_hora_entrada, fecha_hora_salida, estado, razon } = req.body;
+    try {
+        const result = await db.query(
+            'UPDATE PROYECTO_CAMION SET Placa=?, personal_manejando=?, fecha_hora_entrada=?, fecha_hora_salida=?, estado=?, razon=? WHERE id=? AND id_Proyecto=?',
+            [Placa, personal_manejando, fecha_hora_entrada, fecha_hora_salida, estado, razon, req.params.cid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Camión actualizado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
 // ── PROYECTO_DOCUMENTACION ────────────────────────────────────────────────────
 exports.getDocumentacion = async (req, res) => {
     try { res.json(await db.query('SELECT * FROM PROYECTO_DOCUMENTACION WHERE id_Proyecto = ?', [req.params.id])); }

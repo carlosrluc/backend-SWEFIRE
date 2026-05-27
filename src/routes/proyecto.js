@@ -186,8 +186,42 @@ router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
  *       201:
  *         description: Camión asignado
  */
+// ── PROYECTO_CAMIONES ───────────────────────────────────────────────────────
 router.get('/:id/camiones', auth, c.getCamiones);
 router.post('/:id/camiones', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.createCamion);
+/**
+ * @openapi
+ * /api/proyectos/{id}/camiones/{cid}:
+ *   put:
+ *     tags: [Proyecto - Camiones]
+ *     summary: Actualizar datos del camión asignado al proyecto
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: cid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               Placa: { type: string }
+ *               personal_manejando: { type: integer }
+ *               fecha_hora_entrada: { type: string, format: date-time }
+ *               fecha_hora_salida: { type: string, format: date-time }
+ *               estado: { type: string, enum: [aceptable, robado, averiado, desconocido] }
+ *               razon: { type: string }
+ *     responses:
+ *       200:
+ *         description: Camión actualizado
+ */
+router.put('/:id/camiones/:cid', auth, permit(['gerente', 'adminproy']), c.updateCamion);
 
 /**
  * @openapi
@@ -330,6 +364,39 @@ router.post('/:id/inventario', auth, permit(['supervisorcampo', 'trabajcampo', '
  *     responses:
  *       200:
  *         description: Eliminado
+ */
+/**
+ * @openapi
+ * /api/proyectos/{id}/inventario/{iid}:
+ *   put:
+ *     tags: [Proyecto - Inventario]
+ *     summary: Actualizar inventario del proyecto
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               Id_Objeto: { type: integer }
+ *               cantidad_objeto: { type: integer }
+ *               estado: { type: string, enum: [aceptable, robado, averiado, desconocido] }
+ *               razon: { type: string }
+ *               fecha_salida: { type: string, format: date }
+ *               fecha_retorno: { type: string, format: date }
+ *               metodo_traslado: { type: string }
+ *     responses:
+ *       200:
+ *         description: Inventario actualizado
  */
 router.get('/:id/inventario/:iid', auth, c.getInventarioById);
 router.put('/:id/inventario/:iid', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.updateInventario);

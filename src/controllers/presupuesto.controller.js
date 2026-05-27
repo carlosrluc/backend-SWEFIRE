@@ -190,7 +190,8 @@ exports.deleteItem = async (req, res) => {
 // Registrar Gasto Real y subir comprobante
 exports.registrarGastoReal = async (req, res) => {
     const idItem = req.params.idItem;
-    const { costo_real, razon } = req.body;
+    const { costo_real, razon, ID_Incidencia } = req.body;
+    const id_incidencia = ID_Incidencia !== undefined ? ID_Incidencia : req.body.id_incidencia;
     let pruebaUrl = null;
     
     if (req.file) {
@@ -209,8 +210,8 @@ exports.registrarGastoReal = async (req, res) => {
         const c_total_presupuesto = Number(item.costo_total) || 0;
         const diferencia = c_real - c_total_presupuesto;
         
-        const updateParams = [c_real, razon, diferencia];
-        let queryStr = 'UPDATE PRESUPUESTO SET costo_real = ?, razon = ?, diferencia = ?, realizacion_gastos = "durante servicio"';
+        const updateParams = [c_real, razon, diferencia, id_incidencia];
+        let queryStr = "UPDATE PRESUPUESTO SET costo_real = ?, razon = ?, diferencia = ?, realizacion_gastos = 'durante servicio', ID_Incidencia = ?";
         
         if (pruebaUrl) {
             queryStr += ', prueba = ?';
@@ -224,10 +225,11 @@ exports.registrarGastoReal = async (req, res) => {
         
         // Si es Material Directo, insertar en INVENTARIO
         if (item.tipo === 'Material Directo') {
+            const idFabricante = req.body.ID_Fabricante || req.body.id_fabricante || 1;
             await db.query(
-                `INSERT INTO INVENTARIO (nombre_objeto, cantidad, precio_compra, factura, estado, lugar_almacenaje)
-                 VALUES (?, ?, ?, ?, 'disponible', 'Por asignar')`,
-                 [item.nombre_gasto, item.cantidad, c_real, pruebaUrl || '']
+                `INSERT INTO INVENTARIO (nombre_objeto, cantidad, precio_compra, factura, estado, lugar_almacenaje, ID_Fabricante)
+                 VALUES (?, ?, ?, ?, 'disponible', 'Por asignar', ?)`,
+                 [item.nombre_gasto || 'Objeto sin nombre', Math.round(item.cantidad) || 0, c_real, pruebaUrl || '', idFabricante]
             );
         }
         
