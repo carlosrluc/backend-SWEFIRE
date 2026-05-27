@@ -350,6 +350,30 @@ exports.getDetallesFranco = async (req, res) => {
             direccionRecojo: recojoResult[0].direccionRecojo
         } : null;
 
+        // Obtener todos los servicios asociados a la cotización
+        const servQuery = `
+            SELECT 
+                c.ID_Servicio as idServicio,
+                s.nombre as nombre_servicio,
+                c.fecha_inicio,
+                c.fecha_finalizacion,
+                c.jornada,
+                c.precio_comercial,
+                c.ubicacion
+            FROM COTIZACION_SERVICIO c
+            LEFT JOIN SERVICIO s ON c.ID_Servicio = s.ID_Servicio
+            WHERE c.ID_Cotizacion = ? AND c.ID_Servicio != 7`;
+        const serviciosResult = await db.query(servQuery, [cotizacionId]);
+        const servicios = serviciosResult.map(row => ({
+            idServicio: row.idServicio,
+            nombre: row.nombre_servicio,
+            fecha_inicio: row.fecha_inicio,
+            fecha_finalizacion: row.fecha_finalizacion,
+            jornada: row.jornada,
+            precio_comercial: row.precio_comercial,
+            ubicacion: row.ubicacion
+        }));
+
         // Verificar si existen mensajes en el chat de la cotización
         const chatCheck = await db.query(
             'SELECT 1 FROM COTIZACION_CHAT_MENSAJE WHERE id_cotizacion = ? LIMIT 1',
@@ -367,6 +391,7 @@ exports.getDetallesFranco = async (req, res) => {
             productos,
             camiones,
             costoRecojo,
+            servicios,
             chat,
             condiciones: {
                 fechaEmision: base.fecha_emision ? new Date(base.fecha_emision).toISOString().split('T')[0] : null,
@@ -377,7 +402,10 @@ exports.getDetallesFranco = async (req, res) => {
             tipoCambio: {
                 tasaCompra: base.tacaCompra || 0,
                 tasaVenta: base.tasaVenta || 0
-            }
+            },
+            // Incluir campos adicionales si existen en la tabla
+            etapas: base.etapas !== undefined ? base.etapas : null,
+            duracion_etapas: base.duracion_etapas !== undefined ? base.duracion_etapas : null
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
