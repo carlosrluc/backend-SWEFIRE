@@ -362,6 +362,33 @@ router.post('/:placa/inventario', c.createCamionInventario);
 /**
  * @openapi
  * /api/camiones/{placa}/inventario/{iid}:
+ *   put:
+ *     tags: [Camión - Inventario]
+ *     summary: Actualizar inventario del camión (ajuste de cantidad con movimientos)
+ *     parameters:
+ *       - in: path
+ *         name: placa
+ *         required: true
+ *         schema: { type: string }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               cantidad_requerida: { type: integer }
+ *               cantidad_actual: { type: integer, description: "Si cambia, descuenta/suma del taller automáticamente" }
+ *               ubicacion_en_camion: { type: string }
+ *               requerido_legal: { type: string, enum: [si, no] }
+ *               razon: { type: string, description: "Motivo del ajuste de cantidad" }
+ *     responses:
+ *       200:
+ *         description: Actualizado
  *   delete:
  *     tags: [Camión - Inventario]
  *     summary: Desasignar objeto del camión
@@ -378,6 +405,7 @@ router.post('/:placa/inventario', c.createCamionInventario);
  *       200:
  *         description: Eliminado
  */
+router.put('/:placa/inventario/:iid', c.updateCamionInventario);
 router.delete('/:placa/inventario/:iid', c.deleteCamionInventario);
 
 module.exports = router;

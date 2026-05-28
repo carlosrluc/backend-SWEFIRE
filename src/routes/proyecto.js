@@ -338,7 +338,9 @@ router.delete('/:id/documentacion/:did', auth, permit(['gerente', 'adminproy']),
  *               razon: { type: string }
  *               fecha_salida: { type: string, format: date }
  *               fecha_retorno: { type: string, format: date }
- *               metodo_traslado: { type: string }
+ *               metodo_traslado: { type: string, description: "Texto libre (ej: taxi, remolque, etc). No determina si va por camión." }
+ *               placa_camion: { type: string, description: "Si el traslado es por camión, enviar la placa explícitamente." }
+ *               id_proyecto_camion: { type: integer, description: "Alternativa a placa_camion: id del viaje en PROYECTO_CAMION." }
  *     responses:
  *       201:
  *         description: Inventario asignado
