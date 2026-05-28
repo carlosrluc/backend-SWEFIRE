@@ -176,14 +176,26 @@ exports.getUbicaciones = async (req, res) => {
                 PI.id as id_proyecto_inventario,
                 PI.id_Proyecto as id_proyecto,
                 P.Proyecto_Nombre as proyecto_nombre,
-                PI.devolucion_pendiente as cantidad,
+                CASE
+                  WHEN PI.devolucion_pendiente > 0 THEN PI.devolucion_pendiente
+                  -- compatibilidad: filas creadas antes de la migración quedaron con 0
+                  ELSE PI.cantidad_objeto
+                END as cantidad,
                 PI.estado as estado_linea,
                 PC.Placa as placa_camion,
                 PI.fecha_devolucion_efectiva
              FROM PROYECTO_INVENTARIO PI
              JOIN PROYECTO P ON P.id_Proyecto = PI.id_Proyecto
              LEFT JOIN PROYECTO_CAMION PC ON PC.id = PI.id_proyecto_camion
-             WHERE PI.Id_Objeto = ? AND PI.devolucion_pendiente > 0`,
+             WHERE PI.Id_Objeto = ?
+               AND (
+                 PI.devolucion_pendiente > 0
+                 OR (
+                   PI.devolucion_pendiente = 0
+                   AND PI.cantidad_objeto > 0
+                   AND P.estado <> 'Completado'
+                 )
+               )`,
             [Id_Objeto]
         );
 
