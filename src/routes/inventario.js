@@ -121,6 +121,43 @@ router.delete('/:id', c.remove);
 
 /**
  * @openapi
+ * /api/inventario/{id}/ubicaciones:
+ *   get:
+ *     tags: [Inventario]
+ *     summary: Distribución del objeto (taller/camiones/proyectos)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Distribución del objeto
+ */
+router.get('/:id/ubicaciones', c.getUbicaciones);
+
+/**
+ * @openapi
+ * /api/inventario/{id}/movimientos:
+ *   get:
+ *     tags: [Inventario]
+ *     summary: Historial de movimientos del objeto
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 100 }
+ *     responses:
+ *       200:
+ *         description: Lista de movimientos
+ */
+router.get('/:id/movimientos', c.getMovimientos);
+
+/**
+ * @openapi
  * /api/inventario/{id}/usos:
  *   get:
  *     tags: [Inventario - Usos]

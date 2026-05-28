@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { withTx, createProyectoInventarioLoteDesdeCamion, createProyectoInventarioLoteDesdeTaller, processProyectoInventarioRetornoById } = require('../services/inventarioStock.service');
 
 const autoUpdateProjectStatus = async () => {
     try {
@@ -312,13 +313,60 @@ exports.getInventario = async (req, res) => {
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createInventario = async (req, res) => {
-    const { Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon } = req.body;
+    const { Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, placa_camion, id_proyecto_camion } = req.body;
     try {
-        const r = await db.query(
-            'INSERT INTO PROYECTO_INVENTARIO (id_Proyecto,Id_Objeto,cantidad_objeto,estado,fecha_salida,fecha_retorno,metodo_traslado,razon) VALUES (?,?,?,?,?,?,?,?)',
-            [req.params.id, Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon]
-        );
-        res.status(201).json({ message: 'Inventario en proyecto creado', id: r.insertId });
+        const id_Proyecto = Number(req.params.id);
+
+        const out = await withTx(db, async (conn) => {
+            // Si viene de camión, descontar de CAMION_INVENTARIO y crear lote con devolucion_pendiente + fechas del viaje
+            // NOTA: `metodo_traslado` es texto libre (taxi, remolque, etc). Solo se considera camión si viene explícito.
+            if (placa_camion || id_proyecto_camion) {
+                let pcId = id_proyecto_camion || null;
+                let placa = placa_camion || null;
+
+                if (!pcId && placa) {
+                    // Elegir el viaje más cercano (activo o futuro) del camión para este proyecto
+                    const pcRows = await conn.query(
+                        `SELECT id FROM PROYECTO_CAMION
+                         WHERE id_Proyecto = ? AND Placa = ?
+                         ORDER BY fecha_hora_entrada DESC
+                         LIMIT 1`,
+                        [id_Proyecto, placa]
+                    );
+                    pcId = pcRows[0]?.id || null;
+                }
+                if (!placa && pcId) {
+                    const pcRows = await conn.query('SELECT Placa FROM PROYECTO_CAMION WHERE id = ?', [pcId]);
+                    placa = pcRows[0]?.Placa || null;
+                }
+                if (!placa) throw new Error('placa_camion requerida para traslado por camión');
+
+                const loteId = await createProyectoInventarioLoteDesdeCamion(conn, {
+                    id_Proyecto,
+                    Placa: placa,
+                    Id_Objeto,
+                    cantidad_objeto,
+                    estado,
+                    razon,
+                    proyectoCamionId: pcId,
+                });
+                return { loteId };
+            }
+
+            const loteId = await createProyectoInventarioLoteDesdeTaller(conn, {
+                id_Proyecto,
+                Id_Objeto,
+                cantidad_objeto,
+                estado,
+                razon,
+                fecha_salida,
+                fecha_retorno,
+                metodo_traslado,
+            });
+            return { loteId };
+        });
+
+        res.status(201).json({ message: 'Inventario en proyecto creado', id: out.loteId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.deleteInventario = async (req, res) => {
@@ -340,10 +388,27 @@ exports.getInventarioById = async (req, res) => {
 
 // ── UPDATE INVENTARIO ───────────────────────────────────────────────────────
 exports.updateInventario = async (req, res) => {
-    const { Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon } = req.body;
+    const { Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, id_proyecto_camion, fecha_devolucion_efectiva } = req.body;
     try {
-        const result = await db.query('UPDATE PROYECTO_INVENTARIO SET Id_Objeto=?, cantidad_objeto=?, estado=?, fecha_salida=?, fecha_retorno=?, metodo_traslado=?, razon=? WHERE id=? AND id_Proyecto=?', [Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, req.params.iid, req.params.id]);
+        const id_Proyecto = Number(req.params.id);
+        const iid = Number(req.params.iid);
+
+        const result = await db.query(
+            `UPDATE PROYECTO_INVENTARIO
+             SET Id_Objeto=?, cantidad_objeto=?, devolucion_pendiente=?, estado=?, fecha_salida=?, fecha_retorno=?, metodo_traslado=?, razon=?, id_proyecto_camion=?, fecha_devolucion_efectiva=?
+             WHERE id=? AND id_Proyecto=?`,
+            [Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, id_proyecto_camion, fecha_devolucion_efectiva, iid, id_Proyecto]
+        );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Inventario no encontrado' });
+
+        // Disparar retorno inmediato si ya aplica (fecha o proyecto completado)
+        try {
+            await processProyectoInventarioRetornoById(db, iid);
+        } catch (e) {
+            // si falla el retorno automático, no bloqueamos el update (solo registramos en logs)
+            console.error('Error procesando retorno inmediato del lote:', e.message);
+        }
+
         res.json({ message: 'Inventario actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };

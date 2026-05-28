@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { withTx, moveCamionToTallerAll, restoreCamionFromTaller, moveTallerToCamion, moveCamionToTaller } = require('../services/inventarioStock.service');
 
 const autoUpdateCamionStatus = async () => {
     try {
@@ -171,15 +172,42 @@ exports.update = async (req, res) => {
         fecha_prox_revision, ID_Fabricante, vencimiento_tarjeta,
         soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado } = req.body;
     try {
-        const result = await db.query(
-            `UPDATE CAMION SET nombre=?,ano_fabricacion=?,modelo=?,color=?,caracteristicas=?,
-             fecha_prox_revision=?,ID_Fabricante=?,vencimiento_tarjeta=?,soat_n_poliza=?,
-             soat_empresa=?,soat_precio=?,soat_dia_pago=?,Estado=? WHERE Placa=?`,
-            [nombre, ano_fabricacion, modelo, color, caracteristicas,
-                fecha_prox_revision, ID_Fabricante, vencimiento_tarjeta,
-                soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado, req.params.placa]
-        );
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        const placa = req.params.placa;
+
+        const out = await withTx(db, async (conn) => {
+            const before = await conn.query('SELECT Estado FROM CAMION WHERE Placa = ? FOR UPDATE', [placa]);
+            if (!before.length) return { notFound: true };
+            const estadoAnterior = before[0].Estado;
+
+            const result = await conn.query(
+                `UPDATE CAMION SET nombre=?,ano_fabricacion=?,modelo=?,color=?,caracteristicas=?,
+                 fecha_prox_revision=?,ID_Fabricante=?,vencimiento_tarjeta=?,soat_n_poliza=?,
+                 soat_empresa=?,soat_precio=?,soat_dia_pago=?,Estado=? WHERE Placa=?`,
+                [nombre, ano_fabricacion, modelo, color, caracteristicas,
+                    fecha_prox_revision, ID_Fabricante, vencimiento_tarjeta,
+                    soat_n_poliza, soat_empresa, soat_precio, soat_dia_pago, Estado, placa]
+            );
+            if (result.affectedRows === 0) return { notFound: true };
+
+            // Transiciones de estado: En mantenimiento / Descalificado
+            const restricted = new Set(['En mantenimiento', 'Descalificado']);
+            const entroRestriccion = Estado && restricted.has(Estado) && !restricted.has(estadoAnterior);
+            const salioRestriccion = Estado && !restricted.has(Estado) && restricted.has(estadoAnterior);
+
+            if (entroRestriccion) {
+                // Regla: todo inventario del camión vuelve al taller (solo CAMION_INVENTARIO)
+                await moveCamionToTallerAll(conn, { Placa: placa, estado_origen: Estado, razon: `Camión pasó a estado ${Estado}` });
+            }
+
+            if (salioRestriccion) {
+                // Regla: al salir, todo su inventario vuelve al camión desde el taller (según retenciones)
+                await restoreCamionFromTaller(conn, { Placa: placa, razon: `Camión salió de estado ${estadoAnterior}` });
+            }
+
+            return { ok: true };
+        });
+
+        if (out?.notFound) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Camión actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -284,13 +312,30 @@ exports.getCamionInventario = async (req, res) => {
 };
 
 exports.createCamionInventario = async (req, res) => {
-    const { Id_Objeto, cantidad_requerida, cantidad_actual, ubicacion_en_camion, requerido_legal } = req.body;
+    const { Id_Objeto, cantidad_requerida, cantidad_actual, ubicacion_en_camion, requerido_legal, razon } = req.body;
     try {
-        const result = await db.query(
-            'INSERT INTO CAMION_INVENTARIO (Placa,Id_Objeto,cantidad_requerida,cantidad_actual,ubicacion_en_camion,requerido_legal) VALUES (?,?,?,?,?,?)',
-            [req.params.placa, Id_Objeto, cantidad_requerida, cantidad_actual, ubicacion_en_camion, requerido_legal]
-        );
-        res.status(201).json({ message: 'Ítem de inventario añadido al camión', id: result.insertId });
+        const placa = req.params.placa;
+        const out = await withTx(db, async (conn) => {
+            const result = await conn.query(
+                'INSERT INTO CAMION_INVENTARIO (Placa,Id_Objeto,cantidad_requerida,cantidad_actual,ubicacion_en_camion,requerido_legal) VALUES (?,?,?,?,?,?)',
+                [placa, Id_Objeto, cantidad_requerida || 0, 0, ubicacion_en_camion, requerido_legal || 'no']
+            );
+
+            // Si se está cargando cantidad_actual al crear, esto implica salida desde taller
+            const qty = Number(cantidad_actual || 0);
+            if (qty > 0) {
+                await moveTallerToCamion(conn, {
+                    Placa: placa,
+                    Id_Objeto,
+                    cantidad: qty,
+                    razon: razon || 'Asignación a camión',
+                    referencia_id: result.insertId,
+                });
+            }
+
+            return { id: result.insertId };
+        });
+        res.status(201).json({ message: 'Ítem de inventario añadido al camión', id: out.id });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -301,5 +346,71 @@ exports.deleteCamionInventario = async (req, res) => {
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Ítem de inventario eliminado del camión' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateCamionInventario = async (req, res) => {
+    const { cantidad_requerida, cantidad_actual, ubicacion_en_camion, requerido_legal, razon } = req.body;
+    try {
+        const placa = req.params.placa;
+        const iid = Number(req.params.iid);
+
+        const out = await withTx(db, async (conn) => {
+            // bloquear estado del camión
+            const cRows = await conn.query('SELECT Estado FROM CAMION WHERE Placa = ? FOR UPDATE', [placa]);
+            if (!cRows.length) return { notFound: true };
+            const estadoCamion = cRows[0].Estado;
+            if (estadoCamion === 'En mantenimiento' || estadoCamion === 'Descalificado') {
+                return { forbidden: true, estadoCamion };
+            }
+
+            // bloquear item
+            const itemRows = await conn.query(
+                'SELECT id, Id_Objeto, cantidad_actual FROM CAMION_INVENTARIO WHERE id = ? AND Placa = ? FOR UPDATE',
+                [iid, placa]
+            );
+            if (!itemRows.length) return { itemNotFound: true };
+            const item = itemRows[0];
+            const beforeQty = Number(item.cantidad_actual || 0);
+
+            // actualizar campos no-cantidad primero
+            const r = await conn.query(
+                `UPDATE CAMION_INVENTARIO
+                 SET cantidad_requerida = ?, ubicacion_en_camion = ?, requerido_legal = ?
+                 WHERE id = ? AND Placa = ?`,
+                [cantidad_requerida, ubicacion_en_camion, requerido_legal, iid, placa]
+            );
+            if (r.affectedRows === 0) return { itemNotFound: true };
+
+            // si se envía cantidad_actual, aplicarla como delta con movimientos automáticos
+            if (cantidad_actual !== undefined && cantidad_actual !== null) {
+                const afterQty = Number(cantidad_actual);
+                const diff = afterQty - beforeQty;
+                if (diff > 0) {
+                    await moveTallerToCamion(conn, {
+                        Placa: placa,
+                        Id_Objeto: item.Id_Objeto,
+                        cantidad: diff,
+                        razon: razon || 'Ajuste de cantidad en camión (incremento)',
+                        referencia_id: iid,
+                    });
+                } else if (diff < 0) {
+                    await moveCamionToTaller(conn, {
+                        Placa: placa,
+                        Id_Objeto: item.Id_Objeto,
+                        cantidad: Math.abs(diff),
+                        razon: razon || 'Ajuste de cantidad en camión (decremento)',
+                        referencia_id: iid,
+                    });
+                }
+            }
+
+            return { ok: true };
+        });
+
+        if (out?.notFound) return res.status(404).json({ error: 'Camión no encontrado' });
+        if (out?.itemNotFound) return res.status(404).json({ error: 'Ítem de inventario del camión no encontrado' });
+        if (out?.forbidden) return res.status(409).json({ error: `No se puede ajustar inventario: camión está en estado ${out.estadoCamion}` });
+        res.json({ message: 'Ítem de inventario del camión actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
