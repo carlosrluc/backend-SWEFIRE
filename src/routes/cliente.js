@@ -406,14 +406,10 @@ router.get('/:id/solicitudes', c.getSolicitudes);
  *         name: id
  *         required: true
  *         schema: { type: string }
- *       - in: query
- *         name: page
- *         schema: { type: integer, default: 1 }
- *         description: Número de página
- *       - in: query
- *         name: limit
- *         schema: { type: integer, default: 10 }
- *         description: Cantidad de resultados por página
+ *       - $ref: '#/components/parameters/PageQuery'
+ *       - $ref: '#/components/parameters/LimitQuery'
+ *       - $ref: '#/components/parameters/CotizacionEstadoQuery'
+ *       - $ref: '#/components/parameters/CotizacionNombreQuery'
  *     responses:
  *       200:
  *         description: Lista de cotizaciones

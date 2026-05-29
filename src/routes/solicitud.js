@@ -254,7 +254,7 @@ router.delete('/:id/medios/:mid', c.deleteMedio);
  *   post:
  *     tags: [Solicitud - Servicios]
  *     summary: Agregar uno o varios servicios a la solicitud
- *     description: Acepta un objeto, un arreglo de servicios, o { servicios: [...] }
+ *     description: "Acepta un objeto, un arreglo de servicios, o un body con clave servicios"
  *     parameters:
  *       - in: path
  *         name: id
@@ -453,7 +453,7 @@ router.delete('/:id/inventario/:iid', c.deleteInventario);
  *   post:
  *     tags: [Solicitud - Camiones]
  *     summary: Agregar uno o varios camiones a la solicitud (alquiler por días)
- *     description: Acepta un objeto, un arreglo, o { camiones: [...] }. id_camion es la placa del camión.
+ *     description: "Acepta un objeto, un arreglo, o un body con clave camiones. id_camion es la placa del camión."
  *     parameters:
  *       - in: path
  *         name: id

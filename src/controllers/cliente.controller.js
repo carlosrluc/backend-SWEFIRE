@@ -198,13 +198,26 @@ exports.getCotizaciones = async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
+        const { estado, nombre } = req.query;
 
-        const countQuery = 'SELECT COUNT(*) as total FROM COTIZACION_COMERCIAL C_C WHERE C_C.DNI_O_RUC = ?';
-        const countResult = await db.query(countQuery, [req.params.id]);
+        const filterClauses = ['C_C.DNI_O_RUC = ?'];
+        const filterArgs = [req.params.id];
+        if (estado) {
+            filterClauses.push('C_C.estado = ?');
+            filterArgs.push(estado);
+        }
+        if (nombre) {
+            filterClauses.push('C_C.nombre LIKE ?');
+            filterArgs.push(`%${nombre}%`);
+        }
+        const whereSql = `WHERE ${filterClauses.join(' AND ')}`;
+
+        const countQuery = `SELECT COUNT(*) as total FROM COTIZACION_COMERCIAL C_C ${whereSql}`;
+        const countResult = await db.query(countQuery, filterArgs);
         const total = countResult[0].total;
 
-        const query = 'SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC WHERE C_C.DNI_O_RUC = ? LIMIT ? OFFSET ?';
-        const rows = await db.query(query, [req.params.id, limit, offset]);
+        const query = `SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC ${whereSql} LIMIT ? OFFSET ?`;
+        const rows = await db.query(query, [...filterArgs, limit, offset]);
 
         res.json({
             data: rows.map(r => formatQuotation(r, req.user ? req.user.rolNormalizado : null)),

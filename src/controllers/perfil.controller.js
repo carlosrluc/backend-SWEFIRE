@@ -592,13 +592,26 @@ exports.getCotizacionesPorPerfil = async (req, res) => {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
+        const { estado, nombre } = req.query;
+
+        const filterClauses = [];
+        const filterArgs = [];
+        if (estado) {
+            filterClauses.push('C.estado = ?');
+            filterArgs.push(estado);
+        }
+        if (nombre) {
+            filterClauses.push('C.nombre LIKE ?');
+            filterArgs.push(`%${nombre}%`);
+        }
+        const extraWhere = filterClauses.length ? ` AND ${filterClauses.join(' AND ')}` : '';
 
         const countSql = `
             SELECT COUNT(*) as total 
             FROM COTIZACION_COMERCIAL C
             JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
-            WHERE CC.DNI_perfil = ?`;
-        const countResult = await db.query(countSql, [req.params.dni]);
+            WHERE CC.DNI_perfil = ?${extraWhere}`;
+        const countResult = await db.query(countSql, [req.params.dni, ...filterArgs]);
         const total = countResult[0].total;
 
         const sql = `
@@ -606,10 +619,10 @@ exports.getCotizacionesPorPerfil = async (req, res) => {
             FROM COTIZACION_COMERCIAL C
             JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
             LEFT JOIN CLIENTE CL ON C.DNI_O_RUC = CL.DNI_O_RUC
-            WHERE CC.DNI_perfil = ?
+            WHERE CC.DNI_perfil = ?${extraWhere}
             LIMIT ? OFFSET ?`;
-        const rows = await db.query(sql, [req.params.dni, limit, offset]);
-        
+        const rows = await db.query(sql, [req.params.dni, ...filterArgs, limit, offset]);
+
         res.json({
             data: rows.map(r => formatQuotation(r, req.user ? req.user.rolNormalizado : null)),
             pagination: { total, page, limit, totalPages: Math.ceil(total / limit) }

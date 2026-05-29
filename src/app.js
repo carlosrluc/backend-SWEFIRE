@@ -65,7 +65,34 @@ const swaggerOptions = {
                         }
                     }
                 }
-            }
+            },
+            parameters: {
+                PageQuery: {
+                    in: 'query',
+                    name: 'page',
+                    schema: { type: 'integer', default: 1 },
+                    description: 'Número de página',
+                },
+                LimitQuery: {
+                    in: 'query',
+                    name: 'limit',
+                    schema: { type: 'integer', default: 10 },
+                    description: 'Cantidad de resultados por página',
+                },
+                CotizacionEstadoQuery: {
+                    in: 'query',
+                    name: 'estado',
+                    schema: { type: 'string' },
+                    description:
+                        'Filtra por estado exacto en BD (ej. Pendiente, aprobado, rechazado por cliente, descartada)',
+                },
+                CotizacionNombreQuery: {
+                    in: 'query',
+                    name: 'nombre',
+                    schema: { type: 'string' },
+                    description: 'Filtra por nombre de la cotización (coincidencia parcial)',
+                },
+            },
         },
         security: [{
             bearerAuth: []

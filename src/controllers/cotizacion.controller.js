@@ -251,8 +251,18 @@ exports.getDetallesFranco = async (req, res) => {
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para ver esta cotización' });
         }
 
-        // Obtener datos base de la cotización
-        const baseResult = await db.query('SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
+        const { estado: estadoFiltro, nombre: nombreFiltro } = req.query;
+        let baseQuery = 'SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ?';
+        const baseArgs = [cotizacionId];
+        if (estadoFiltro) {
+            baseQuery += ' AND estado = ?';
+            baseArgs.push(estadoFiltro);
+        }
+        if (nombreFiltro) {
+            baseQuery += ' AND nombre LIKE ?';
+            baseArgs.push(`%${nombreFiltro}%`);
+        }
+        const baseResult = await db.query(baseQuery, baseArgs);
         if (!baseResult.length) return res.status(404).json({ error: 'Cotización no encontrada' });
         const base = baseResult[0];
 
