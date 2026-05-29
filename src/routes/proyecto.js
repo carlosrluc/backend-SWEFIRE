@@ -1,7 +1,9 @@
 const router = require('express').Router();
 const c = require('../controllers/proyecto.controller');
+const informe = require('../controllers/informe.controller');
 const auth = require('../middlewares/auth.middleware');
 const { permit } = require('../middlewares/role.middleware');
+const { uploadInformeEvidencia } = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
@@ -14,6 +16,8 @@ const { permit } = require('../middlewares/role.middleware');
  *     description: Documentos del proyecto
  *   - name: Proyecto - Inventario
  *     description: Inventario del proyecto
+ *   - name: Proyecto - Informes
+ *     description: Sucesos / informes del proyecto
  */
 
 /**
@@ -402,5 +406,174 @@ router.post('/:id/inventario', auth, permit(['supervisorcampo', 'trabajcampo', '
  */
 router.get('/:id/inventario/:iid', auth, c.getInventarioById);
 router.put('/:id/inventario/:iid', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.updateInventario);
+
+/**
+ * @openapi
+ * /api/proyectos/{id}/informes:
+ *   get:
+ *     tags: [Proyecto - Informes]
+ *     summary: Listar sucesos/informes del proyecto
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: nombre
+ *         schema: { type: string }
+ *         description: Filtrar por nombre del informe (parcial)
+ *       - in: query
+ *         name: id_incidencia
+ *         schema: { type: integer }
+ *         description: Filtrar por incidencia relacionada
+ *       - in: query
+ *         name: relacion
+ *         schema: { type: string, enum: [ninguna] }
+ *         description: Usar "ninguna" para sucesos sin incidencia vinculada
+ *     responses:
+ *       200:
+ *         description: Lista de informes (incluye Autor_Nombre, Autor_Apellido y autor_nombre)
+ *   post:
+ *     tags: [Proyecto - Informes]
+ *     summary: Registrar un suceso en el informe del proyecto
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [hora]
+ *             properties:
+ *               nombre: { type: string, description: "Por defecto copia Proyecto_Nombre" }
+ *               hora: { type: string, example: "14:30:00" }
+ *               descripcion: { type: string }
+ *               ubicacion: { type: string, example: "recepcion de la planta" }
+ *               relacion: { type: string, description: '"ninguna" o id de incidencia' }
+ *               id_incidencia: { type: integer, description: "Alternativa a relacion" }
+ *     description: DNI_autor se toma automáticamente del usuario logueado (JWT)
+ *     responses:
+ *       201:
+ *         description: Informe creado
+ */
+router.get('/:id/informes', auth, informe.getInformes);
+router.post('/:id/informes', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), informe.createInforme);
+
+/**
+ * @openapi
+ * /api/proyectos/{id}/informes/{iid}:
+ *   get:
+ *     tags: [Proyecto - Informes]
+ *     summary: Obtener un suceso del informe
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Informe encontrado
+ *   put:
+ *     tags: [Proyecto - Informes]
+ *     summary: Actualizar suceso del informe
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nombre: { type: string }
+ *               hora: { type: string }
+ *               descripcion: { type: string }
+ *               ubicacion: { type: string }
+ *               relacion: { type: string }
+ *               id_incidencia: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Informe actualizado
+ *   delete:
+ *     tags: [Proyecto - Informes]
+ *     summary: Eliminar suceso del informe
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Eliminado
+ */
+router.get('/:id/informes/:iid', auth, informe.getInformeById);
+router.put('/:id/informes/:iid', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), informe.updateInforme);
+router.delete('/:id/informes/:iid', auth, permit(['gerente', 'adminproy']), informe.deleteInforme);
+
+/**
+ * @openapi
+ * /api/proyectos/{id}/informes/{iid}/evidencia:
+ *   get:
+ *     tags: [Proyecto - Informes]
+ *     summary: Ver/descargar evidencia (PNG/JPEG)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Imagen de evidencia
+ *   post:
+ *     tags: [Proyecto - Informes]
+ *     summary: Subir evidencia fotográfica (PNG/JPEG)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: iid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               evidencia:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Evidencia subida
+ */
+router.get('/:id/informes/:iid/evidencia', auth, informe.getEvidencia);
+router.post('/:id/informes/:iid/evidencia', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), uploadInformeEvidencia.single('evidencia'), informe.uploadEvidencia);
 
 module.exports = router;

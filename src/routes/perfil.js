@@ -59,11 +59,166 @@ router.get('/conductores/disponibles', c.getConductoresDisponibles);
 
 /**
  * @openapi
+ * /api/perfiles/personal:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Listado de personal con campos según rol y datos relacionados
+ *     description: |
+ *       Si el usuario asociado tiene rol **cliente**, solo devuelve campos básicos de contacto.
+ *       Para cualquier otro rol devuelve el perfil completo.
+ *       Incluye brevetes, educación y certificaciones por cada DNI.
+ *     parameters:
+ *       - in: query
+ *         name: nombre
+ *         schema: { type: string }
+ *         description: Filtrar por nombre (parcial)
+ *       - in: query
+ *         name: apellido
+ *         schema: { type: string }
+ *         description: Filtrar por apellido (parcial)
+ *       - in: query
+ *         name: rol
+ *         schema:
+ *           type: string
+ *           enum: [gerente, cliente, supervisorcampo, asistproy, trabajcampo, abogado, trabajtaller]
+ *         description: Filtrar por rol de USUARIO (sin distinguir mayúsculas/acentos)
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *     responses:
+ *       200:
+ *         description: Lista de perfiles formateados por rol
+ */
+router.get('/personal', c.getPersonal);
+
+/**
+ * @openapi
+ * /api/perfiles/personal/{id}:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Obtener un perfil con formato personal (por DNI)
+ *     description: |
+ *       El parámetro **id** es el DNI del perfil.
+ *       Misma lógica de campos por rol que GET /api/perfiles/personal.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: DNI del perfil
+ *     responses:
+ *       200:
+ *         description: Perfil formateado por rol con datos relacionados
+ *       404:
+ *         description: No encontrado
+ *   post:
+ *     tags: [Perfil]
+ *     summary: Crear perfil con DNI del path (formato personal)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: DNI del perfil a crear
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [Nombre, Apellido]
+ *             properties:
+ *               Nombre: { type: string }
+ *               Apellido: { type: string }
+ *               Genero: { type: string }
+ *               RUC: { type: string }
+ *               fecha_nacimiento: { type: string, format: date }
+ *               correo_contacto: { type: string }
+ *               telefono_contacto: { type: string }
+ *               estado_civil: { type: string }
+ *               distrito_residencia: { type: string }
+ *               seguro_vida_ley: { type: string, enum: [si, no] }
+ *               aficiones: { type: string }
+ *               experiencia: { type: string }
+ *               comentarios: { type: string }
+ *               estado: { type: string, enum: [inhabilitado, "en trabajo", disponible] }
+ *               alergias: { type: string }
+ *               condicion_medica: { type: string }
+ *               profesion: { type: string }
+ *               nro_cta_bancaria: { type: string }
+ *     responses:
+ *       201:
+ *         description: Perfil creado con formato personal
+ *       409:
+ *         description: Ya existe un perfil con ese DNI
+ *   put:
+ *     tags: [Perfil]
+ *     summary: Actualizar perfil por DNI (formato personal)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *         description: DNI del perfil
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               Nombre: { type: string }
+ *               Apellido: { type: string }
+ *               Genero: { type: string }
+ *               RUC: { type: string }
+ *               fecha_nacimiento: { type: string, format: date }
+ *               correo_contacto: { type: string }
+ *               telefono_contacto: { type: string }
+ *               estado_civil: { type: string }
+ *               distrito_residencia: { type: string }
+ *               seguro_vida_ley: { type: string, enum: [si, no] }
+ *               aficiones: { type: string }
+ *               experiencia: { type: string }
+ *               comentarios: { type: string }
+ *               estado: { type: string, enum: [inhabilitado, "en trabajo", disponible] }
+ *               alergias: { type: string }
+ *               condicion_medica: { type: string }
+ *               profesion: { type: string }
+ *               nro_cta_bancaria: { type: string }
+ *     responses:
+ *       200:
+ *         description: Perfil actualizado con formato personal
+ *       404:
+ *         description: No encontrado
+ */
+router.get('/personal/:id', c.getPersonalById);
+router.post('/personal/:id', c.createPersonalById);
+router.put('/personal/:id', c.updatePersonalById);
+
+/**
+ * @openapi
  * /api/perfiles:
  *   get:
  *     tags: [Perfil]
  *     summary: Listar todos los perfiles
  *     parameters:
+ *       - in: query
+ *         name: nombre
+ *         schema: { type: string }
+ *         description: Filtrar por nombre (parcial)
+ *       - in: query
+ *         name: apellido
+ *         schema: { type: string }
+ *         description: Filtrar por apellido (parcial)
+ *       - in: query
+ *         name: rol
+ *         schema:
+ *           type: string
+ *           enum: [gerente, cliente, supervisorcampo, asistproy, trabajcampo, abogado, trabajtaller]
+ *         description: Filtrar por rol de USUARIO
  *       - in: query
  *         name: page
  *         schema: { type: integer, default: 1 }
@@ -74,7 +229,7 @@ router.get('/conductores/disponibles', c.getConductoresDisponibles);
  *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de perfiles con metadatos de paginación
+ *         description: Lista de perfiles con metadatos de paginación (incluye campo rol si tiene usuario)
  *   post:
  *     tags: [Perfil]
  *     summary: Crear un perfil

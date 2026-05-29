@@ -61,9 +61,27 @@ const uploadImage = multer({
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
+const informesDir = createDir('informes');
+
+const informeImageFilter = (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/jpg'];
+    if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new Error('Solo se permiten imágenes PNG o JPEG'), false);
+    }
+};
+
+const uploadInformeEvidencia = multer({
+    storage: createStorage(informesDir, 'evidencia'),
+    fileFilter: informeImageFilter,
+    limits: { fileSize: 5 * 1024 * 1024 },
+});
+
 module.exports = {
     uploadCotizacion: uploadCotizacion,
     uploadPDF: uploadPDF,
-    uploadImage: uploadImage
+    uploadImage: uploadImage,
+    uploadInformeEvidencia,
 };
 

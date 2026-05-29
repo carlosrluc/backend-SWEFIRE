@@ -807,3 +807,27 @@ CREATE TABLE IF NOT EXISTS "CAMION_INVENTARIO_RETENCION" (
   CONSTRAINT "CAMION_INVENTARIO_RETENCION_ibfk_2"
     FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
 );
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN: Informes / sucesos de proyecto
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "INFORME" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "nombre" varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "hora" time NOT NULL,
+  "DNI_autor" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text COLLATE utf8mb4_unicode_ci,
+  "evidencia" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ubicacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "id_incidencia" int DEFAULT NULL,
+  "id_Proyecto" int NOT NULL,
+  "fecha_registro" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "INFORME_idx_proyecto" ("id_Proyecto"),
+  KEY "INFORME_idx_incidencia" ("id_incidencia"),
+  KEY "INFORME_idx_autor" ("DNI_autor"),
+  CONSTRAINT "INFORME_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
+  CONSTRAINT "INFORME_ibfk_2" FOREIGN KEY ("DNI_autor") REFERENCES "PERFIL" ("DNI") ON DELETE RESTRICT,
+  CONSTRAINT "INFORME_ibfk_3" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE SET NULL
+);

@@ -1,20 +1,126 @@
 const db = require('../config/db');
 const { formatQuotation } = require('./cotizacion.controller');
 
+const normalizeRol = (rol) => {
+    if (!rol) return null;
+    return rol.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '');
+};
+
+const CAMPOS_PERFIL_CLIENTE = [
+    'DNI', 'Nombre', 'Apellido', 'Genero', 'RUC',
+    'correo_contacto', 'telefono_contacto', 'foto_perfil', 'profesion',
+];
+
+const formatearPerfilPorRol = (row, brevetes, educacion, certificaciones) => {
+    const rolNorm = normalizeRol(row.rol);
+    const relacionado = { brevetes, educacion, certificaciones };
+
+    if (rolNorm === 'cliente') {
+        const perfil = {};
+        for (const campo of CAMPOS_PERFIL_CLIENTE) {
+            perfil[campo] = row[campo] ?? null;
+        }
+        return { ...perfil, rol: row.rol ?? null, ...relacionado };
+    }
+
+    const { rol, ...perfil } = row;
+    return { ...perfil, rol: rol ?? null, ...relacionado };
+};
+
+const agruparPorDni = (rows, campoDni) => {
+    const map = new Map();
+    for (const r of rows) {
+        const dni = r[campoDni];
+        if (!map.has(dni)) map.set(dni, []);
+        map.get(dni).push(r);
+    }
+    return map;
+};
+
+const buildFiltrosPerfil = (query) => {
+    const where = [];
+    const params = [];
+    const { nombre, apellido, rol } = query;
+
+    if (nombre) {
+        where.push('P.Nombre LIKE ?');
+        params.push(`%${nombre}%`);
+    }
+    if (apellido) {
+        where.push('P.Apellido LIKE ?');
+        params.push(`%${apellido}%`);
+    }
+    if (rol) {
+        where.push('u.rol IS NOT NULL AND LOWER(u.rol) = ?');
+        params.push(normalizeRol(rol));
+    }
+
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    return { whereSql, params };
+};
+
+const cargarRelacionadosPorDnis = async (dnis) => {
+    if (!dnis.length) {
+        return { brevetesMap: new Map(), educacionMap: new Map(), certMap: new Map() };
+    }
+    const placeholders = dnis.map(() => '?').join(',');
+    const [brevetesRows, educacionRows, certRows] = await Promise.all([
+        db.query(`SELECT * FROM PERFIL_BREVETE WHERE DNI_perfil IN (${placeholders})`, dnis),
+        db.query(`SELECT * FROM PERFIL_EDUCACION WHERE DNI_perfil IN (${placeholders})`, dnis),
+        db.query(`SELECT * FROM PERFIL_CERTIFICACION WHERE DNI_perfil IN (${placeholders})`, dnis),
+    ]);
+    return {
+        brevetesMap: agruparPorDni(brevetesRows, 'DNI_perfil'),
+        educacionMap: agruparPorDni(educacionRows, 'DNI_perfil'),
+        certMap: agruparPorDni(certRows, 'DNI_perfil'),
+    };
+};
+
+const obtenerPerfilPersonalFormateado = async (dni) => {
+    const rows = await db.query(
+        `SELECT P.*, u.rol
+         FROM PERFIL P
+         LEFT JOIN USUARIO u ON u.dni_perfil = P.DNI
+         WHERE P.DNI = ?`,
+        [dni]
+    );
+    if (!rows.length) return null;
+
+    const { brevetesMap, educacionMap, certMap } = await cargarRelacionadosPorDnis([dni]);
+    return formatearPerfilPorRol(
+        rows[0],
+        brevetesMap.get(dni) || [],
+        educacionMap.get(dni) || [],
+        certMap.get(dni) || [],
+    );
+};
+
 // ── PERFIL ────────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
+        const { whereSql, params } = buildFiltrosPerfil(req.query);
+
+        const countRows = await db.query(
+            `SELECT COUNT(DISTINCT P.DNI) as total
+             FROM PERFIL P
+             LEFT JOIN USUARIO u ON u.dni_perfil = P.DNI
+             ${whereSql}`,
+            params
+        );
+        const total = countRows[0].total;
 
         const rows = await db.query(
-            'SELECT * FROM PERFIL LIMIT ? OFFSET ?',
-            [limit, offset]
+            `SELECT P.*, u.rol
+             FROM PERFIL P
+             LEFT JOIN USUARIO u ON u.dni_perfil = P.DNI
+             ${whereSql}
+             ORDER BY P.Apellido ASC, P.Nombre ASC
+             LIMIT ? OFFSET ?`,
+            [...params, limit, offset]
         );
-
-        const countResult = await db.query('SELECT COUNT(*) as total FROM PERFIL');
-        const total = countResult[0].total;
 
         res.json({
             data: rows,
@@ -26,6 +132,150 @@ exports.getAll = async (req, res) => {
             }
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+/**
+ * Listado de personal con campos según rol de USUARIO y datos relacionados.
+ * Query: nombre, apellido, rol, page, limit
+ */
+exports.getPersonal = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = (page - 1) * limit;
+        const { whereSql, params } = buildFiltrosPerfil(req.query);
+
+        const countRows = await db.query(
+            `SELECT COUNT(DISTINCT P.DNI) as total
+             FROM PERFIL P
+             LEFT JOIN USUARIO u ON u.dni_perfil = P.DNI
+             ${whereSql}`,
+            params
+        );
+        const total = countRows[0].total;
+
+        const perfiles = await db.query(
+            `SELECT P.*, u.rol
+             FROM PERFIL P
+             LEFT JOIN USUARIO u ON u.dni_perfil = P.DNI
+             ${whereSql}
+             ORDER BY P.Apellido ASC, P.Nombre ASC
+             LIMIT ? OFFSET ?`,
+            [...params, limit, offset]
+        );
+
+        if (!perfiles.length) {
+            return res.json({
+                data: [],
+                pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+            });
+        }
+
+        const dnis = perfiles.map((p) => p.DNI);
+        const { brevetesMap, educacionMap, certMap } = await cargarRelacionadosPorDnis(dnis);
+
+        const data = perfiles.map((row) =>
+            formatearPerfilPorRol(
+                row,
+                brevetesMap.get(row.DNI) || [],
+                educacionMap.get(row.DNI) || [],
+                certMap.get(row.DNI) || [],
+            )
+        );
+
+        res.json({
+            data,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+/** Detalle de personal por DNI (mismo formato que /personal) */
+exports.getPersonalById = async (req, res) => {
+    try {
+        const perfil = await obtenerPerfilPersonalFormateado(req.params.id);
+        if (!perfil) return res.status(404).json({ error: 'No encontrado' });
+        res.json(perfil);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+/** Crear perfil usando el DNI del path; responde con formato /personal */
+exports.createPersonalById = async (req, res) => {
+    const dni = req.params.id;
+    const {
+        Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
+        telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
+        aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
+        profesion, nro_cta_bancaria,
+    } = req.body;
+
+    try {
+        if (!Nombre || !Apellido) {
+            return res.status(400).json({ error: 'Nombre y Apellido son requeridos' });
+        }
+
+        const existente = await db.query('SELECT DNI FROM PERFIL WHERE DNI = ?', [dni]);
+        if (existente.length) {
+            return res.status(409).json({ error: 'Ya existe un perfil con ese DNI' });
+        }
+
+        await db.query(
+            `INSERT INTO PERFIL (DNI,Nombre,Apellido,Genero,RUC,fecha_nacimiento,
+             correo_contacto,telefono_contacto,estado_civil,distrito_residencia,
+             seguro_vida_ley,aficiones,experiencia,comentarios,estado,alergias,
+             condicion_medica,profesion,nro_cta_bancaria)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [dni, Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
+             telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
+             aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
+             profesion, nro_cta_bancaria]
+        );
+
+        const perfil = await obtenerPerfilPersonalFormateado(dni);
+        res.status(201).json(perfil);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+};
+
+/** Actualizar perfil por DNI; responde con formato /personal */
+exports.updatePersonalById = async (req, res) => {
+    const dni = req.params.id;
+    const {
+        Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
+        telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
+        aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
+        profesion, nro_cta_bancaria,
+    } = req.body;
+
+    try {
+        const result = await db.query(
+            `UPDATE PERFIL SET Nombre=?,Apellido=?,Genero=?,RUC=?,fecha_nacimiento=?,
+             correo_contacto=?,telefono_contacto=?,estado_civil=?,distrito_residencia=?,
+             seguro_vida_ley=?,aficiones=?,experiencia=?,comentarios=?,estado=?,
+             alergias=?,condicion_medica=?,profesion=?,nro_cta_bancaria=?
+             WHERE DNI=?`,
+            [Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
+             telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
+             aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
+             profesion, nro_cta_bancaria, dni]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+
+        const perfil = await obtenerPerfilPersonalFormateado(dni);
+        res.json(perfil);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.getById = async (req, res) => {
