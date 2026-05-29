@@ -12,6 +12,8 @@ const c = require('../controllers/solicitud.controller');
  *     description: Servicios solicitados
  *   - name: Solicitud - Inventario
  *     description: Inventario solicitado
+ *   - name: Solicitud - Camiones
+ *     description: Camiones solicitados (alquiler por días)
  */
 
 /**
@@ -251,7 +253,8 @@ router.delete('/:id/medios/:mid', c.deleteMedio);
  *         description: Lista de servicios
  *   post:
  *     tags: [Solicitud - Servicios]
- *     summary: Agregar servicio a la solicitud
+ *     summary: Agregar uno o varios servicios a la solicitud
+ *     description: Acepta un objeto, un arreglo de servicios, o { servicios: [...] }
  *     parameters:
  *       - in: path
  *         name: id
@@ -262,16 +265,26 @@ router.delete('/:id/medios/:mid', c.deleteMedio);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [ID_Servicio]
- *             properties:
- *               ID_Servicio: { type: integer }
- *               fecha_inicio_servicio: { type: string, format: date }
- *               fecha_fin_servicio: { type: string, format: date }
- *               horario_servicio: { type: string }
+ *             oneOf:
+ *               - type: object
+ *                 required: [ID_Servicio]
+ *                 properties:
+ *                   ID_Servicio: { type: integer }
+ *                   fecha_inicio_servicio: { type: string, format: date }
+ *                   fecha_fin_servicio: { type: string, format: date }
+ *                   horario_servicio: { type: string }
+ *               - type: array
+ *                 items:
+ *                   type: object
+ *                   required: [ID_Servicio]
+ *                   properties:
+ *                     ID_Servicio: { type: integer }
+ *                     fecha_inicio_servicio: { type: string, format: date }
+ *                     fecha_fin_servicio: { type: string, format: date }
+ *                     horario_servicio: { type: string }
  *     responses:
  *       201:
- *         description: Servicio agregado
+ *         description: Servicio(s) agregado(s)
  */
 router.get('/:id/servicios', c.getServicios);
 router.post('/:id/servicios', c.createServicio);
@@ -422,5 +435,99 @@ router.put('/:id/inventario/:iid', c.updateInventario);
  *         description: Eliminado
  */
 router.delete('/:id/inventario/:iid', c.deleteInventario);
+
+/**
+ * @openapi
+ * /api/solicitudes/{id}/camiones:
+ *   get:
+ *     tags: [Solicitud - Camiones]
+ *     summary: Listar camiones de la solicitud
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Lista de camiones solicitados
+ *   post:
+ *     tags: [Solicitud - Camiones]
+ *     summary: Agregar uno o varios camiones a la solicitud (alquiler por días)
+ *     description: Acepta un objeto, un arreglo, o { camiones: [...] }. id_camion es la placa del camión.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             oneOf:
+ *               - type: object
+ *                 required: [id_camion, numero_dias]
+ *                 properties:
+ *                   id_camion: { type: string, description: "Placa del camión" }
+ *                   numero_dias: { type: integer }
+ *               - type: array
+ *                 items:
+ *                   type: object
+ *                   required: [id_camion, numero_dias]
+ *                   properties:
+ *                     id_camion: { type: string }
+ *                     numero_dias: { type: integer }
+ *     responses:
+ *       201:
+ *         description: Camión(es) agregado(s)
+ */
+router.get('/:id/camiones', c.getCamiones);
+router.post('/:id/camiones', c.createCamion);
+
+/**
+ * @openapi
+ * /api/solicitudes/{id}/camiones/{cid}:
+ *   put:
+ *     tags: [Solicitud - Camiones]
+ *     summary: Actualizar camión de la solicitud
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: cid
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               id_camion: { type: string }
+ *               numero_dias: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Actualizado
+ *   delete:
+ *     tags: [Solicitud - Camiones]
+ *     summary: Eliminar camión de la solicitud
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *       - in: path
+ *         name: cid
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Eliminado
+ */
+router.put('/:id/camiones/:cid', c.updateCamion);
+router.delete('/:id/camiones/:cid', c.deleteCamion);
 
 module.exports = router;

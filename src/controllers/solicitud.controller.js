@@ -1,5 +1,13 @@
 const db = require('../config/db');
 
+/** Acepta un objeto, un array, o { servicios: [...] } */
+const normalizarMatrizBody = (body, claveEnvoltorio) => {
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body[claveEnvoltorio])) return body[claveEnvoltorio];
+    if (body && typeof body === 'object') return [body];
+    return [];
+};
+
 // ── SOLICITUD ─────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
     try {
@@ -51,12 +59,13 @@ exports.getAll = async (req, res) => {
         const total = countResult[0].total;
 
         const detailedRows = await Promise.all(rows.map(async (solicitud) => {
-            const [medios, servicios, inventario] = await Promise.all([
+            const [medios, servicios, inventario, camiones] = await Promise.all([
                 db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
                 db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
+                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID]),
+                db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ?', [solicitud.ID]),
             ]);
-            return { ...solicitud, medios, servicios, inventario };
+            return { ...solicitud, medios, servicios, inventario, camiones };
         }));
 
         res.json({
@@ -102,12 +111,13 @@ exports.getByEstado = async (req, res) => {
         const total = countResult[0].total;
 
         const detailedRows = await Promise.all(rows.map(async (solicitud) => {
-            const [medios, servicios, inventario] = await Promise.all([
+            const [medios, servicios, inventario, camiones] = await Promise.all([
                 db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
                 db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID])
+                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID]),
+                db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ?', [solicitud.ID]),
             ]);
-            return { ...solicitud, medios, servicios, inventario };
+            return { ...solicitud, medios, servicios, inventario, camiones };
         }));
 
         res.json({
@@ -139,12 +149,13 @@ exports.getById = async (req, res) => {
         const rows = await db.query(query, args);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         const solicitud = rows[0];
-        const [medios, servicios, inventario] = await Promise.all([
+        const [medios, servicios, inventario, camiones] = await Promise.all([
             db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id]),
             db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
+            db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id]),
+            db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ?', [req.params.id]),
         ]);
-        res.json({ ...solicitud, medios, servicios, inventario });
+        res.json({ ...solicitud, medios, servicios, inventario, camiones });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -260,13 +271,36 @@ exports.getServicios = async (req, res) => {
 };
 
 exports.createServicio = async (req, res) => {
-    const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio } = req.body;
     try {
-        const result = await db.query(
-            'INSERT INTO SOLICITUD_SERVICIO (ID_Solicitud,ID_Servicio,fecha_inicio_servicio,fecha_fin_servicio,horario_servicio) VALUES (?,?,?,?,?)',
-            [req.params.id, ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio]
-        );
-        res.status(201).json({ message: 'Servicio en solicitud creado', id: result.insertId });
+        const items = normalizarMatrizBody(req.body, 'servicios');
+        if (!items.length) {
+            return res.status(400).json({ error: 'Se requiere un servicio o un arreglo de servicios' });
+        }
+
+        const insertados = [];
+        for (const item of items) {
+            const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio } = item;
+            if (!ID_Servicio) {
+                return res.status(400).json({ error: 'Cada servicio debe incluir ID_Servicio' });
+            }
+            const result = await db.query(
+                'INSERT INTO SOLICITUD_SERVICIO (ID_Solicitud,ID_Servicio,fecha_inicio_servicio,fecha_fin_servicio,horario_servicio) VALUES (?,?,?,?,?)',
+                [req.params.id, ID_Servicio, fecha_inicio_servicio || null, fecha_fin_servicio || null, horario_servicio || null]
+            );
+            insertados.push({
+                id: result.insertId,
+                ID_Solicitud: Number(req.params.id),
+                ID_Servicio,
+                fecha_inicio_servicio,
+                fecha_fin_servicio,
+                horario_servicio,
+            });
+        }
+
+        if (insertados.length === 1) {
+            return res.status(201).json({ message: 'Servicio en solicitud creado', ...insertados[0] });
+        }
+        res.status(201).json({ message: 'Servicios en solicitud creados', data: insertados });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -328,5 +362,76 @@ exports.deleteInventario = async (req, res) => {
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Inventario en solicitud eliminado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// ── SOLICITUD_CAMION ──────────────────────────────────────────────────────────
+exports.getCamiones = async (req, res) => {
+    try {
+        const rows = await db.query(
+            `SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo
+             FROM SOLICITUD_CAMION SC
+             LEFT JOIN CAMION C ON SC.id_camion = C.Placa
+             WHERE SC.ID_Solicitud = ?`,
+            [req.params.id]
+        );
+        res.json(rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.createCamion = async (req, res) => {
+    try {
+        const items = normalizarMatrizBody(req.body, 'camiones');
+        if (!items.length) {
+            return res.status(400).json({ error: 'Se requiere un camión o un arreglo de camiones' });
+        }
+
+        const insertados = [];
+        for (const item of items) {
+            const id_camion = item.id_camion || item.Placa;
+            const { numero_dias } = item;
+            if (!id_camion || numero_dias === undefined || numero_dias === null) {
+                return res.status(400).json({ error: 'Cada camión debe incluir id_camion (placa) y numero_dias' });
+            }
+            const result = await db.query(
+                'INSERT INTO SOLICITUD_CAMION (ID_Solicitud, id_camion, numero_dias) VALUES (?,?,?)',
+                [req.params.id, id_camion, numero_dias]
+            );
+            insertados.push({
+                id: result.insertId,
+                ID_Solicitud: Number(req.params.id),
+                id_camion,
+                numero_dias,
+            });
+        }
+
+        if (insertados.length === 1) {
+            return res.status(201).json({ message: 'Camión en solicitud creado', ...insertados[0] });
+        }
+        res.status(201).json({ message: 'Camiones en solicitud creados', data: insertados });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateCamion = async (req, res) => {
+    const id_camion = req.body.id_camion || req.body.Placa;
+    const { numero_dias } = req.body;
+    try {
+        const result = await db.query(
+            'UPDATE SOLICITUD_CAMION SET id_camion=?, numero_dias=? WHERE id=? AND ID_Solicitud=?',
+            [id_camion, numero_dias, req.params.cid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Camión en solicitud actualizado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.deleteCamion = async (req, res) => {
+    try {
+        const result = await db.query(
+            'DELETE FROM SOLICITUD_CAMION WHERE id=? AND ID_Solicitud=?',
+            [req.params.cid, req.params.id]
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Camión en solicitud eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };

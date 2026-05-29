@@ -362,6 +362,21 @@ CREATE TABLE "SOLICITUD_SERVICIO" (
 );
 
 
+-- swefire_db.SOLICITUD_CAMION definition
+
+CREATE TABLE "SOLICITUD_CAMION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Solicitud" int NOT NULL,
+  "id_camion" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "numero_dias" int NOT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Solicitud" ("ID_Solicitud"),
+  KEY "id_camion" ("id_camion"),
+  CONSTRAINT "SOLICITUD_CAMION_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "SOLICITUD_CAMION_ibfk_2" FOREIGN KEY ("id_camion") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE
+);
+
+
 -- swefire_db.USUARIO definition
 
 CREATE TABLE "USUARIO" (
@@ -830,4 +845,20 @@ CREATE TABLE IF NOT EXISTS "INFORME" (
   CONSTRAINT "INFORME_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
   CONSTRAINT "INFORME_ibfk_2" FOREIGN KEY ("DNI_autor") REFERENCES "PERFIL" ("DNI") ON DELETE RESTRICT,
   CONSTRAINT "INFORME_ibfk_3" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE SET NULL
+);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN: Camiones solicitados en una solicitud (alquiler por días)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "SOLICITUD_CAMION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Solicitud" int NOT NULL,
+  "id_camion" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "numero_dias" int NOT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Solicitud" ("ID_Solicitud"),
+  KEY "id_camion" ("id_camion"),
+  CONSTRAINT "SOLICITUD_CAMION_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "SOLICITUD_CAMION_ibfk_2" FOREIGN KEY ("id_camion") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE
 );
