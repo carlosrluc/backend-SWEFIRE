@@ -139,7 +139,7 @@ exports.login = async (req, res) => {
             WHERE cc.DNI_perfil = ?
             LIMIT 1
         `, [user.dni_perfil]);
-        const nuevo = checkRows.length > 0 ? 'si' : 'no';
+        const nuevo = checkRows.length > 0 ? 'no' : 'si';
 
         const { contrasena: unneeded, temp_pass_unhashed: tempUnneeded, ...userData } = user;
         res.json({ 
