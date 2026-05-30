@@ -47,19 +47,46 @@ exports.getById = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
-// Auto creación de perfil y hashing
+/** Campos de PERFIL permitidos al registrar usuario + perfil (rol cliente). */
+const PERFIL_REGISTRO_KEYS = [
+    'Nombre',
+    'Apellido',
+    'correo_contacto',
+    'telefono_contacto',
+    'distrito_residencia',
+    'profesion',
+];
+
+function extraerPerfilRegistro(body) {
+    const raw = body.perfil || body.cliente;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const perfil = {};
+    if (raw.Nombre !== undefined) perfil.Nombre = raw.Nombre;
+    if (raw.Apellido !== undefined) perfil.Apellido = raw.Apellido;
+    if (raw.correo_contacto !== undefined) perfil.correo_contacto = raw.correo_contacto;
+    if (raw.telefono_contacto !== undefined) perfil.telefono_contacto = raw.telefono_contacto;
+    const distrito = raw.distrito_residencia ?? raw.distrito_recidencia;
+    if (distrito !== undefined) perfil.distrito_residencia = distrito;
+    if (raw.profesion !== undefined) perfil.profesion = raw.profesion;
+    return perfil;
+}
+
 exports.create = async (req, res) => {
-    const { dni_perfil, rol, contrasena, correo, nombre, apellido } = req.body;
+    const { dni_perfil, rol, contrasena, correo } = req.body;
     try {
-        if (!contrasena) {
-            return res.status(400).json({ error: "La contraseña es requerida" });
+        if (!dni_perfil || !correo) {
+            return res.status(400).json({ error: 'dni_perfil y correo son requeridos' });
         }
-        
-        // Crear perfil si no existe (con datos básicos o "Pendiente")
-        await db.query(
-            'INSERT IGNORE INTO PERFIL (DNI, nombre, apellidos, rol) VALUES (?, ?, ?, ?)',
-            [dni_perfil, nombre || 'Pendiente', apellido || 'Pendiente', rol || 'Cliente']
-        );
+        if (!contrasena) {
+            return res.status(400).json({ error: 'La contraseña es requerida' });
+        }
+
+        const perfilExistente = await db.query('SELECT DNI FROM PERFIL WHERE DNI = ?', [dni_perfil]);
+        if (!perfilExistente.length) {
+            return res.status(400).json({
+                error: 'No existe un perfil con ese DNI. Cree el perfil primero o use POST /api/usuarios/con-perfil',
+            });
+        }
 
         const saltRounds = 10;
         const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
@@ -68,8 +95,102 @@ exports.create = async (req, res) => {
             'INSERT INTO USUARIO (dni_perfil,rol,contrasena,correo,temp_pass_unhashed) VALUES (?,?,?,?,?)',
             [dni_perfil, rol, hashedPassword, correo, contrasena]
         );
-        res.status(201).json({ message: 'Usuario creado y perfil asegurado', idusuario: result.insertId });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        res.status(201).json({ message: 'Usuario creado', idusuario: result.insertId });
+    } catch (e) {
+        if (e.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'Ya existe un usuario con ese correo o DNI' });
+        }
+        res.status(500).json({ error: e.message });
+    }
+};
+
+/** Crea PERFIL (campos limitados) y USUARIO en una transacción. */
+exports.createWithPerfil = async (req, res) => {
+    const { dni_perfil, rol, contrasena, correo } = req.body;
+    const perfil = extraerPerfilRegistro(req.body);
+
+    try {
+        if (!dni_perfil || !correo) {
+            return res.status(400).json({ error: 'dni_perfil y correo son requeridos' });
+        }
+        if (!contrasena) {
+            return res.status(400).json({ error: 'La contraseña es requerida' });
+        }
+        if (!perfil) {
+            return res.status(400).json({
+                error: 'Se requiere el objeto perfil (o cliente) con los datos del perfil',
+                campos_permitidos: PERFIL_REGISTRO_KEYS,
+            });
+        }
+        if (!perfil.Nombre || !perfil.Apellido) {
+            return res.status(400).json({ error: 'perfil.Nombre y perfil.Apellido son requeridos' });
+        }
+
+        const rawPerfil = req.body.perfil || req.body.cliente;
+        const allowedPerfilKeys = new Set([...PERFIL_REGISTRO_KEYS, 'distrito_recidencia']);
+        const extraKeys = Object.keys(rawPerfil).filter((k) => !allowedPerfilKeys.has(k));
+        if (extraKeys.length) {
+            return res.status(400).json({
+                error: `Campos no permitidos en perfil: ${extraKeys.join(', ')}`,
+                campos_permitidos: PERFIL_REGISTRO_KEYS,
+            });
+        }
+
+        const existente = await db.query('SELECT DNI FROM PERFIL WHERE DNI = ?', [dni_perfil]);
+        if (existente.length) {
+            return res.status(409).json({ error: 'Ya existe un perfil con ese DNI' });
+        }
+
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(contrasena, saltRounds);
+
+        const conn = await db.getConnection();
+        try {
+            await conn.beginTransaction();
+
+            await conn.query(
+                `INSERT INTO PERFIL (DNI, Nombre, Apellido, correo_contacto, telefono_contacto, distrito_residencia, profesion)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    dni_perfil,
+                    perfil.Nombre,
+                    perfil.Apellido,
+                    perfil.correo_contacto ?? null,
+                    perfil.telefono_contacto ?? null,
+                    perfil.distrito_residencia ?? null,
+                    perfil.profesion ?? null,
+                ]
+            );
+
+            const [userResult] = await conn.query(
+                'INSERT INTO USUARIO (dni_perfil, rol, contrasena, correo, temp_pass_unhashed) VALUES (?, ?, ?, ?, ?)',
+                [dni_perfil, rol, hashedPassword, correo, contrasena]
+            );
+
+            await conn.commit();
+
+            res.status(201).json({
+                message: 'Usuario y perfil creados',
+                idusuario: userResult.insertId,
+                dni_perfil,
+                perfil: {
+                    DNI: dni_perfil,
+                    ...perfil,
+                },
+            });
+        } catch (txErr) {
+            await conn.rollback();
+            throw txErr;
+        } finally {
+            conn.release();
+        }
+    } catch (e) {
+        if (e.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'Ya existe un usuario con ese correo' });
+        }
+
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.update = async (req, res) => {

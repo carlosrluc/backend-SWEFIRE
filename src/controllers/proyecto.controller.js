@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { withTx, createProyectoInventarioLoteDesdeCamion, createProyectoInventarioLoteDesdeTaller, processProyectoInventarioRetornoById } = require('../services/inventarioStock.service');
+const { withTx, createProyectoInventarioLoteDesdeCamion, createProyectoInventarioLoteDesdeTaller, processProyectoInventarioRetornoById, removeProyectoInventarioLote } = require('../services/inventarioStock.service');
 
 const autoUpdateProjectStatus = async () => {
     try {
@@ -371,9 +371,23 @@ exports.createInventario = async (req, res) => {
 };
 exports.deleteInventario = async (req, res) => {
     try {
-        const r = await db.query('DELETE FROM PROYECTO_INVENTARIO WHERE id=? AND id_Proyecto=?', [req.params.iid, req.params.id]);
-        if (r.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
-        res.json({ message: 'Inventario en proyecto eliminado' });
+        const id_Proyecto = Number(req.params.id);
+        const iid = Number(req.params.iid);
+        const { razon } = req.body || {};
+
+        const out = await withTx(db, async (conn) =>
+            removeProyectoInventarioLote(conn, {
+                id_Proyecto,
+                id_proyecto_inventario: iid,
+                razon: razon || 'Eliminación de lote en proyecto',
+            }),
+        );
+
+        if (out.notFound) return res.status(404).json({ error: 'No encontrado' });
+        res.json({
+            message: 'Inventario en proyecto eliminado',
+            cantidad_retornada: out.cantidad_retornada,
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

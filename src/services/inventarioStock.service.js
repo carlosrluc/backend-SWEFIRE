@@ -505,6 +505,96 @@ async function processProyectoInventarioRetornos(db) {
   });
 }
 
+/** DELETE camión/inventario: retorna cantidad_actual al taller y registra movimiento. */
+async function removeCamionInventarioItem(conn, { Placa, camion_inventario_id, razon = null }) {
+  const itemRows = await conn.query(
+    'SELECT id, Id_Objeto, cantidad_actual FROM CAMION_INVENTARIO WHERE id = ? AND Placa = ? FOR UPDATE',
+    [camion_inventario_id, Placa],
+  );
+  if (!itemRows.length) return { notFound: true };
+
+  const item = itemRows[0];
+  const qty = Number(item.cantidad_actual || 0);
+
+  if (qty > 0) {
+    await moveCamionToTaller(conn, {
+      Placa,
+      Id_Objeto: item.Id_Objeto,
+      cantidad: qty,
+      razon: razon || 'Eliminación de ítem del inventario del camión',
+      referencia_id: item.id,
+    });
+  }
+
+  await conn.query('DELETE FROM CAMION_INVENTARIO WHERE id = ? AND Placa = ?', [item.id, Placa]);
+  return { deleted: true, cantidad_retornada: qty };
+}
+
+async function resolvePlacaFromProyectoLote(conn, lote) {
+  if (lote.id_proyecto_camion) {
+    const pc = await conn.query('SELECT Placa FROM PROYECTO_CAMION WHERE id = ?', [lote.id_proyecto_camion]);
+    if (pc[0]?.Placa) return pc[0].Placa;
+  }
+  if (lote.metodo_traslado) {
+    const m = String(lote.metodo_traslado).match(/^camion:\s*(.+)$/i);
+    if (m) return m[1].trim();
+  }
+  return null;
+}
+
+/** DELETE proyecto/inventario: revierte devolucion_pendiente (a camión o taller) y registra movimiento. */
+async function removeProyectoInventarioLote(conn, { id_Proyecto, id_proyecto_inventario, razon = null }) {
+  const rows = await conn.query(
+    `SELECT id, Id_Objeto, devolucion_pendiente, id_proyecto_camion, metodo_traslado
+     FROM PROYECTO_INVENTARIO WHERE id = ? AND id_Proyecto = ? FOR UPDATE`,
+    [id_proyecto_inventario, id_Proyecto],
+  );
+  if (!rows.length) return { notFound: true };
+
+  const lote = rows[0];
+  const qty = Number(lote.devolucion_pendiente || 0);
+
+  if (qty > 0) {
+    const placa = await resolvePlacaFromProyectoLote(conn, lote);
+
+    if (placa) {
+      await ensureCamionInventarioRow(conn, placa, lote.Id_Objeto);
+      await conn.query(
+        'UPDATE CAMION_INVENTARIO SET cantidad_actual = cantidad_actual + ? WHERE Placa = ? AND Id_Objeto = ?',
+        [qty, placa, lote.Id_Objeto],
+      );
+      await createMovimiento(conn, {
+        Id_Objeto: lote.Id_Objeto,
+        cantidad: qty,
+        tipo_movimiento: 'retorno_proyecto_a_camion',
+        origen_tipo: 'proyecto',
+        origen_id: String(id_Proyecto),
+        destino_tipo: 'camion',
+        destino_id: placa,
+        referencia_tabla: 'PROYECTO_INVENTARIO',
+        referencia_id: lote.id,
+        razon: razon || 'Eliminación de lote en proyecto (retorno a camión)',
+      });
+    } else {
+      await addToInventarioCantidad(conn, lote.Id_Objeto, qty);
+      await createMovimiento(conn, {
+        Id_Objeto: lote.Id_Objeto,
+        cantidad: qty,
+        tipo_movimiento: 'retorno_proyecto_a_taller',
+        origen_tipo: 'proyecto',
+        origen_id: String(id_Proyecto),
+        destino_tipo: 'taller',
+        referencia_tabla: 'PROYECTO_INVENTARIO',
+        referencia_id: lote.id,
+        razon: razon || 'Eliminación de lote en proyecto (retorno a taller)',
+      });
+    }
+  }
+
+  await conn.query('DELETE FROM PROYECTO_INVENTARIO WHERE id = ?', [lote.id]);
+  return { deleted: true, cantidad_retornada: qty };
+}
+
 async function processProyectoInventarioRetornoById(db, id_proyecto_inventario) {
   return withTx(db, async (conn) => {
     const lotes = await conn.query(
@@ -716,5 +806,7 @@ module.exports = {
   createProyectoInventarioLoteDesdeTaller,
   processProyectoInventarioRetornos,
   processProyectoInventarioRetornoById,
+  removeCamionInventarioItem,
+  removeProyectoInventarioLote,
 };
 

@@ -1,5 +1,74 @@
 const db = require('../config/db');
 
+/** Acepta un objeto, un array, o { [clave]: [...] } */
+const normalizarMatrizBody = (body, claveEnvoltorio) => {
+    if (Array.isArray(body)) return body;
+    if (body && Array.isArray(body[claveEnvoltorio])) return body[claveEnvoltorio];
+    if (body && typeof body === 'object' && !Array.isArray(body)) return [body];
+    return [];
+};
+
+function toDateTimeInicio(fecha) {
+    if (!fecha) return null;
+    return `${String(fecha).slice(0, 10)} 00:00:00`;
+}
+
+function toDateTimeFin(fecha) {
+    if (!fecha) return null;
+    return `${String(fecha).slice(0, 10)} 23:59:59`;
+}
+
+async function obtenerFechasDesdeCotizacionServicio(dbConn, cotizacionId, cotizacionServicioId) {
+    const rows = await dbConn.query(
+        'SELECT id, fecha_inicio, fecha_finalizacion FROM COTIZACION_SERVICIO WHERE id = ? AND ID_Cotizacion = ?',
+        [cotizacionServicioId, cotizacionId],
+    );
+    if (!rows.length) return null;
+    return {
+        id: rows[0].id,
+        fecha_hora_entrada: toDateTimeInicio(rows[0].fecha_inicio),
+        fecha_hora_salida: toDateTimeFin(rows[0].fecha_finalizacion),
+    };
+}
+
+async function insertarCamionesCotizacion(dbConn, cotizacionId, camionesList, serviciosInsertados) {
+    for (const c of camionesList) {
+        const Placa = c.Placa || c.placa;
+        if (!Placa) throw new Error('Cada camión requiere Placa');
+        if (c.uso === undefined || c.uso === null) {
+            throw new Error('Cada camión requiere uso (índice en servicios o id de COTIZACION_SERVICIO)');
+        }
+
+        const PrecioUnit = c.PrecioUnit ?? c.precioUnit ?? c.preciounit ?? null;
+        const n = Number(c.uso);
+        let cotizacionServicioId;
+        let fecha_hora_entrada;
+        let fecha_hora_salida;
+
+        const svcLocal = serviciosInsertados?.[n] ?? serviciosInsertados?.find((s) => s.id === n);
+        if (svcLocal) {
+            cotizacionServicioId = svcLocal.id;
+            fecha_hora_entrada = toDateTimeInicio(svcLocal.fecha_inicio);
+            fecha_hora_salida = toDateTimeFin(svcLocal.fecha_finalizacion);
+        } else {
+            const fechasDb = await obtenerFechasDesdeCotizacionServicio(dbConn, cotizacionId, n);
+            if (!fechasDb) {
+                throw new Error(`uso ${c.uso} no corresponde a un servicio de la cotización ${cotizacionId}`);
+            }
+            cotizacionServicioId = fechasDb.id;
+            fecha_hora_entrada = fechasDb.fecha_hora_entrada;
+            fecha_hora_salida = fechasDb.fecha_hora_salida;
+        }
+
+        await dbConn.query(
+            `INSERT INTO COTIZACION_CAMION
+                (ID_Cotizacion, Placa, uso, fecha_hora_entrada, fecha_hora_salida, PrecioUnit)
+             VALUES (?,?,?,?,?,?)`,
+            [cotizacionId, Placa, cotizacionServicioId, fecha_hora_entrada, fecha_hora_salida, PrecioUnit],
+        );
+    }
+}
+
 exports.formatQuotation = (row, rol) => {
     let estadoFormateado = "pendiente";
     if (row.estado === "aprobado") estadoFormateado = "aprobado";
@@ -125,23 +194,6 @@ exports.getById = async (req, res) => {
             servicios,
             inventario
         });
-    } catch (e) { res.status(500).json({ error: e.message }); }
-};
-
-exports.create = async (req, res) => {
-    const { version, nombre, id_solicitud, DNI_O_RUC, precio_total, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta } = req.body;
-    const estado = 'Pendiente'; // Siempre iniciar como Pendiente
-    try {
-        const result = await db.query(
-            'INSERT INTO COTIZACION_COMERCIAL (version,nombre,id_solicitud,DNI_O_RUC,precio_total,estado,comentario_cliente,fecha_emision,fecha_vigencia,observacion,Tasa_Cambio,condiciones,tacaCompra,tasaVenta) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            [version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado, comentario_cliente, fecha_emision, fecha_vigencia, observacion, Tasa_Cambio, condiciones, tacaCompra, tasaVenta]
-        );
-
-        if (id_solicitud) {
-            await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID = ?`, [id_solicitud]);
-        }
-
-        res.status(201).json({ message: 'Cotización creada', ID: result.insertId, estado });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -318,11 +370,14 @@ exports.getDetallesFranco = async (req, res) => {
                 cam.soat_precio AS soatPrecio,
                 cam.soat_dia_pago AS soatDiaPago,
                 cc.uso AS uso,
+                cc.PrecioUnit AS precioUnit,
                 cc.fecha_hora_entrada AS fechaEntrada,
                 cc.fecha_hora_salida AS fechaSalida,
-                cc.ID_Piloto AS idPiloto
+                cs.fecha_inicio AS servicioFechaInicio,
+                cs.fecha_finalizacion AS servicioFechaFin
             FROM COTIZACION_CAMION cc
             LEFT JOIN CAMION cam ON cc.Placa = cam.Placa
+            LEFT JOIN COTIZACION_SERVICIO cs ON cc.uso = cs.id
             WHERE cc.ID_Cotizacion = ?`;
         const camionesResult = await db.query(camionesQuery, [cotizacionId]);
         const camiones = camionesResult.map(cam => ({
@@ -341,14 +396,16 @@ exports.getDetallesFranco = async (req, res) => {
             soatPrecio: cam.soatPrecio,
             soatDiaPago: cam.soatDiaPago,
             uso: cam.uso,
+            precioUnit: cam.precioUnit,
             fechaEntrada: cam.fechaEntrada,
             fechaSalida: cam.fechaSalida,
-            idPiloto: cam.idPiloto
+            servicioFechaInicio: cam.servicioFechaInicio,
+            servicioFechaFin: cam.servicioFechaFin,
         }));
 
         // Obtener costo de recojo (COTIZACION_SERVICIO con ID_Servicio = 7)
         const recojoResult = await db.query(
-            `SELECT precio_comercial AS costo, fecha_inicio AS fechaRecojo, ubicacion AS direccionRecojo
+            `SELECT precio_comercial AS costo, fecha_inicio AS fechaRecojo
              FROM COTIZACION_SERVICIO
              WHERE ID_Cotizacion = ? AND ID_Servicio = 7
              LIMIT 1`,
@@ -357,31 +414,30 @@ exports.getDetallesFranco = async (req, res) => {
         const costoRecojo = recojoResult.length > 0 ? {
             costo: recojoResult[0].costo,
             fechaRecojo: recojoResult[0].fechaRecojo,
-            direccionRecojo: recojoResult[0].direccionRecojo
         } : null;
 
         // Obtener todos los servicios asociados a la cotización
         const servQuery = `
             SELECT 
+                c.id AS idCotizacionServicio,
                 c.ID_Servicio as idServicio,
                 s.nombre as nombre_servicio,
                 c.fecha_inicio,
                 c.fecha_finalizacion,
                 c.jornada,
-                c.precio_comercial,
-                c.ubicacion
+                c.precio_comercial
             FROM COTIZACION_SERVICIO c
             LEFT JOIN SERVICIO s ON c.ID_Servicio = s.ID_Servicio
             WHERE c.ID_Cotizacion = ? AND c.ID_Servicio != 7`;
         const serviciosResult = await db.query(servQuery, [cotizacionId]);
         const servicios = serviciosResult.map(row => ({
+            idCotizacionServicio: row.idCotizacionServicio,
             idServicio: row.idServicio,
             nombre: row.nombre_servicio,
             fecha_inicio: row.fecha_inicio,
             fecha_finalizacion: row.fecha_finalizacion,
             jornada: row.jornada,
             precio_comercial: row.precio_comercial,
-            ubicacion: row.ubicacion
         }));
 
         // Verificar si existen mensajes en el chat de la cotización
@@ -426,7 +482,8 @@ exports.create = async (req, res) => {
     const {
         id_solicitud,
         productos,
-        id_camion,
+        servicios,
+        camiones,
         costoRecojo,
         tasaCambio,
         condiciones: cond,
@@ -434,18 +491,30 @@ exports.create = async (req, res) => {
         version, nombre, DNI_O_RUC, estado, comentario_cliente, Tasa_Cambio
     } = req.body;
 
+    const serviciosList = normalizarMatrizBody(servicios, 'servicios');
+    const camionesList = normalizarMatrizBody(camiones, 'camiones');
+
     try {
         // ── Calcular precio_total ────────────────────────────────────────────────
         let precioTotal = 0;
         if (Array.isArray(productos)) {
             precioTotal += productos.reduce((sum, p) => sum + ((p.precio_unitario || 0) * (p.cantidad || 0)), 0);
         }
+        if (serviciosList.length) {
+            precioTotal += serviciosList.reduce((sum, s) => sum + Number(s.precio_comercial || 0), 0);
+        }
+        if (camionesList.length) {
+            precioTotal += camionesList.reduce(
+                (sum, c) => sum + Number(c.PrecioUnit ?? c.precioUnit ?? c.preciounit ?? 0),
+                0,
+            );
+        }
         if (costoRecojo && costoRecojo.costo) {
             precioTotal += Number(costoRecojo.costo);
         }
 
         // ── Insertar cabecera de COTIZACION_COMERCIAL ───────────────────────────
-        const estado = 'Pendiente'; // Force default status
+        const estadoCot = 'Pendiente';
         const result = await db.query(
             `INSERT INTO COTIZACION_COMERCIAL
                 (version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado,
@@ -458,7 +527,7 @@ exports.create = async (req, res) => {
                 id_solicitud || null,
                 DNI_O_RUC || null,
                 precioTotal,
-                estado,
+                estadoCot,
                 comentario_cliente || null,
                 cond?.fechaEmision || null,
                 cond?.fechaVigencia || null,
@@ -482,19 +551,49 @@ exports.create = async (req, res) => {
             }
         }
 
-        // ── Insertar COTIZACION_CAMION ───────────────────────────────────────────
-        if (id_camion) {
-            await db.query(
-                'INSERT INTO COTIZACION_CAMION (ID_Cotizacion, Placa) VALUES (?,?)',
-                [newId, id_camion]
+        // ── Insertar COTIZACION_SERVICIO (matriz) ────────────────────────────────
+        const serviciosInsertados = [];
+        for (let i = 0; i < serviciosList.length; i++) {
+            const s = serviciosList[i];
+            if (!s.ID_Servicio) {
+                return res.status(400).json({ error: `servicios[${i}].ID_Servicio es requerido` });
+            }
+            const ins = await db.query(
+                `INSERT INTO COTIZACION_SERVICIO
+                    (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial)
+                 VALUES (?,?,?,?,?,?)`,
+                [
+                    newId,
+                    s.ID_Servicio,
+                    s.fecha_inicio || null,
+                    s.fecha_finalizacion || null,
+                    s.jornada || null,
+                    s.precio_comercial ?? null,
+                ],
             );
+            serviciosInsertados.push({
+                id: ins.insertId,
+                index: i,
+                fecha_inicio: s.fecha_inicio,
+                fecha_finalizacion: s.fecha_finalizacion,
+            });
+        }
+
+        // ── Insertar COTIZACION_CAMION (matriz; uso → COTIZACION_SERVICIO.id) ───
+        if (camionesList.length) {
+            if (!serviciosInsertados.length) {
+                return res.status(400).json({
+                    error: 'Se requiere al menos un servicio en servicios[] para asociar camiones por uso',
+                });
+            }
+            await insertarCamionesCotizacion(db, newId, camionesList, serviciosInsertados);
         }
 
         // ── Insertar servicio de recojo en COTIZACION_SERVICIO (ID_Servicio=7) ──
         if (costoRecojo && costoRecojo.costo) {
             await db.query(
-                'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion, ID_Servicio, precio_comercial, fecha_inicio, ubicacion) VALUES (?,7,?,?,?)',
-                [newId, costoRecojo.costo, costoRecojo.fechaRecojo || null, costoRecojo.direccionRecojo || null]
+                'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion, ID_Servicio, precio_comercial, fecha_inicio) VALUES (?,7,?,?)',
+                [newId, costoRecojo.costo, costoRecojo.fechaRecojo || null]
             );
         }
 
@@ -503,7 +602,12 @@ exports.create = async (req, res) => {
             await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID = ?`, [id_solicitud]);
         }
 
-        res.status(201).json({ message: 'Cotización creada', ID: newId, precio_total: precioTotal });
+        res.status(201).json({
+            message: 'Cotización creada',
+            ID: newId,
+            precio_total: precioTotal,
+            servicios_insertados: serviciosInsertados.map((s) => ({ id: s.id, index: s.index })),
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -602,8 +706,8 @@ exports.update = async (req, res) => {
             );
             if (costoRecojo && costoRecojo.costo) {
                 await db.query(
-                    'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion, ID_Servicio, precio_comercial, fecha_inicio, ubicacion) VALUES (?,7,?,?,?)',
-                    [req.params.id, costoRecojo.costo, costoRecojo.fechaRecojo || null, costoRecojo.direccionRecojo || null]
+                    'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion, ID_Servicio, precio_comercial, fecha_inicio) VALUES (?,7,?,?)',
+                    [req.params.id, costoRecojo.costo, costoRecojo.fechaRecojo || null]
                 );
             }
         }
@@ -634,22 +738,22 @@ exports.getServicios = async (req, res) => {
 };
 
 exports.createServicio = async (req, res) => {
-    const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion } = req.body;
+    const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial } = req.body;
     try {
         const result = await db.query(
-            'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion,ID_Servicio,fecha_inicio,fecha_finalizacion,jornada,precio_comercial,ubicacion) VALUES (?,?,?,?,?,?,?)',
-            [req.params.id, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion]
+            'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion,ID_Servicio,fecha_inicio,fecha_finalizacion,jornada,precio_comercial) VALUES (?,?,?,?,?,?)',
+            [req.params.id, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial]
         );
         res.status(201).json({ message: 'Servicio en cotización creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.updateServicio = async (req, res) => {
-    const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion } = req.body;
+    const { ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial } = req.body;
     try {
         const result = await db.query(
-            'UPDATE COTIZACION_SERVICIO SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=?, ubicacion=? WHERE id=? AND ID_Cotizacion=?',
-            [ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, ubicacion, req.params.sid, req.params.id]
+            'UPDATE COTIZACION_SERVICIO SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=? WHERE id=? AND ID_Cotizacion=?',
+            [ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, req.params.sid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio en cotización actualizado' });
@@ -668,27 +772,51 @@ exports.deleteServicio = async (req, res) => {
 
 // ── COTIZACION_CAMION ─────────────────────────────────────────────────────────
 exports.getCamiones = async (req, res) => {
-    try { res.json(await db.query('SELECT CC.*, C.nombre as Camion_Nombre, P.Nombre as Piloto_Nombre, P.Apellido as Piloto_Apellido FROM COTIZACION_CAMION CC LEFT JOIN CAMION C ON CC.Placa = C.Placa LEFT JOIN USUARIO U ON CC.ID_Piloto = U.idusuario LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI WHERE CC.ID_Cotizacion = ?', [req.params.id])); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        res.json(await db.query(
+            `SELECT CC.*, C.nombre as Camion_Nombre,
+                    CS.fecha_inicio AS servicio_fecha_inicio,
+                    CS.fecha_finalizacion AS servicio_fecha_finalizacion
+             FROM COTIZACION_CAMION CC
+             LEFT JOIN CAMION C ON CC.Placa = C.Placa
+             LEFT JOIN COTIZACION_SERVICIO CS ON CC.uso = CS.id
+             WHERE CC.ID_Cotizacion = ?`,
+            [req.params.id],
+        ));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.createCamion = async (req, res) => {
-    const { Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit } = req.body;
+    const { Placa, uso, PrecioUnit, preciounit } = req.body;
+    const precio = PrecioUnit ?? preciounit ?? null;
     try {
+        const fechas = await obtenerFechasDesdeCotizacionServicio(db, req.params.id, uso);
+        if (!fechas) {
+            return res.status(400).json({ error: 'uso debe ser el id de un COTIZACION_SERVICIO de esta cotización' });
+        }
         const result = await db.query(
-            'INSERT INTO COTIZACION_CAMION (ID_Cotizacion,Placa,uso,fecha_hora_entrada,fecha_hora_salida,ID_Piloto,preciounit) VALUES (?,?,?,?,?,?,?)',
-            [req.params.id, Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit]
+            `INSERT INTO COTIZACION_CAMION
+                (ID_Cotizacion, Placa, uso, fecha_hora_entrada, fecha_hora_salida, PrecioUnit)
+             VALUES (?,?,?,?,?,?)`,
+            [req.params.id, Placa, uso, fechas.fecha_hora_entrada, fechas.fecha_hora_salida, precio],
         );
         res.status(201).json({ message: 'Camión en cotización creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.updateCamion = async (req, res) => {
-    const { Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit } = req.body;
+    const { Placa, uso, PrecioUnit, preciounit } = req.body;
+    const precio = PrecioUnit ?? preciounit ?? null;
     try {
+        const fechas = await obtenerFechasDesdeCotizacionServicio(db, req.params.id, uso);
+        if (!fechas) {
+            return res.status(400).json({ error: 'uso debe ser el id de un COTIZACION_SERVICIO de esta cotización' });
+        }
         const result = await db.query(
-            'UPDATE COTIZACION_CAMION SET Placa=?, uso=?, fecha_hora_entrada=?, fecha_hora_salida=?, ID_Piloto=?, preciounit=? WHERE id=? AND ID_Cotizacion=?',
-            [Placa, uso, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, preciounit, req.params.cid, req.params.id]
+            `UPDATE COTIZACION_CAMION
+             SET Placa=?, uso=?, fecha_hora_entrada=?, fecha_hora_salida=?, PrecioUnit=?
+             WHERE id=? AND ID_Cotizacion=?`,
+            [Placa, uso, fechas.fecha_hora_entrada, fechas.fecha_hora_salida, precio, req.params.cid, req.params.id],
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Camión en cotización actualizado' });
@@ -956,11 +1084,17 @@ exports.uploadOrdenCompra = async (req, res) => {
                     }
 
                     // 4. Migrar Camiones (COTIZACION_CAMION -> PROYECTO_CAMION)
-                    const camiones = await db.query('SELECT Placa, fecha_hora_entrada, fecha_hora_salida, ID_Piloto, uso AS razon FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
+                    const camiones = await db.query(
+                        `SELECT cc.Placa, cc.fecha_hora_entrada, cc.fecha_hora_salida, cc.uso, cs.ID_Servicio
+                         FROM COTIZACION_CAMION cc
+                         LEFT JOIN COTIZACION_SERVICIO cs ON cc.uso = cs.id
+                         WHERE cc.ID_Cotizacion = ?`,
+                        [cotizacionId],
+                    );
                     for (const cam of camiones) {
                         await db.query(
                             'INSERT INTO PROYECTO_CAMION (id_Proyecto, Placa, fecha_hora_entrada, fecha_hora_salida, personal_manejando, razon, estado) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                            [idProyecto, cam.Placa, cam.fecha_hora_entrada, cam.fecha_hora_salida, cam.ID_Piloto, cam.razon, 'aceptable']
+                            [idProyecto, cam.Placa, cam.fecha_hora_entrada, cam.fecha_hora_salida, null, cam.uso, 'aceptable'],
                         );
                     }
 

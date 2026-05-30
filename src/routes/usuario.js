@@ -29,6 +29,7 @@ const c = require('../controllers/usuario.controller');
  *   post:
  *     tags: [Usuario]
  *     summary: Crear un usuario
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:
@@ -44,10 +45,55 @@ const c = require('../controllers/usuario.controller');
  *               temp_pass_unhashed: { type: string, example: "secret123" }
  *     responses:
  *       201:
- *         description: Usuario creado
+ *         description: Usuario creado (requiere que el perfil con dni_perfil ya exista)
+ *       400:
+ *         description: Perfil inexistente o datos inválidos
  */
 router.get('/', c.getAll);
 router.post('/', c.create);
+
+/**
+ * @openapi
+ * /api/usuarios/con-perfil:
+ *   post:
+ *     tags: [Usuario]
+ *     summary: Crear usuario y perfil (registro cliente)
+ *     security: []
+ *     description: |
+ *       Crea un registro en PERFIL y otro en USUARIO en una sola operación.
+ *       El objeto **perfil** (o **cliente**) solo admite campos de contacto del perfil.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [dni_perfil, contrasena, correo, perfil]
+ *             properties:
+ *               dni_perfil: { type: string, example: "12345678" }
+ *               rol: { type: string, example: "cliente" }
+ *               contrasena: { type: string, example: "secret123" }
+ *               correo: { type: string, example: "usuario@email.com" }
+ *               perfil:
+ *                 type: object
+ *                 required: [Nombre, Apellido]
+ *                 description: Solo estos campos de la tabla PERFIL
+ *                 properties:
+ *                   Nombre: { type: string }
+ *                   Apellido: { type: string }
+ *                   correo_contacto: { type: string }
+ *                   telefono_contacto: { type: string }
+ *                   distrito_residencia: { type: string, description: "También acepta distrito_recidencia" }
+ *                   profesion: { type: string }
+ *     responses:
+ *       201:
+ *         description: Usuario y perfil creados
+ *       400:
+ *         description: Datos inválidos
+ *       409:
+ *         description: DNI o correo ya registrado
+ */
+router.post('/con-perfil', c.createWithPerfil);
 
 /**
  * @openapi
@@ -110,6 +156,7 @@ router.delete('/:id', c.remove);
  *   post:
  *     tags: [Usuario]
  *     summary: Iniciar sesión
+ *     security: []
  *     requestBody:
  *       required: true
  *       content:

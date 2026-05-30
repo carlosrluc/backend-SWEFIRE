@@ -55,14 +55,34 @@ const { uploadCotizacion } = require('../middlewares/upload.middleware');
  *                     intencion: { type: string, enum: [alquilar, comprar] }
  *                     cantidad: { type: integer }
  *                     precio_unitario: { type: number }
- *               id_camion: { type: string, description: Placa del camión asignado }
+ *               servicios:
+ *                 type: array
+ *                 description: Servicios de la cotización (COTIZACION_SERVICIO)
+ *                 items:
+ *                   type: object
+ *                   required: [ID_Servicio]
+ *                   properties:
+ *                     ID_Servicio: { type: integer }
+ *                     fecha_inicio: { type: string, format: date }
+ *                     fecha_finalizacion: { type: string, format: date }
+ *                     jornada: { type: string }
+ *                     precio_comercial: { type: number }
+ *               camiones:
+ *                 type: array
+ *                 description: Camiones asignados. uso = índice en servicios[] (0-based) o id de COTIZACION_SERVICIO
+ *                 items:
+ *                   type: object
+ *                   required: [Placa, uso]
+ *                   properties:
+ *                     Placa: { type: string, description: Placa del camión }
+ *                     uso: { type: integer, description: Índice en servicios[] o id COTIZACION_SERVICIO }
+ *                     PrecioUnit: { type: number }
  *               costoRecojo:
  *                 type: object
  *                 description: Costo de recojo - se guarda como servicio ID=7 en COTIZACION_SERVICIO
  *                 properties:
  *                   costo: { type: number }
  *                   fechaRecojo: { type: string, format: date }
- *                   direccionRecojo: { type: string }
  *               tasaCambio:
  *                 type: object
  *                 properties:
@@ -138,7 +158,6 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
  *                 properties:
  *                   costo: { type: number }
  *                   fechaRecojo: { type: string, format: date }
- *                   direccionRecojo: { type: string }
  *               tasaCambio:
  *                 type: object
  *                 properties:
@@ -249,7 +268,6 @@ router.get('/:id/detalles-franco', auth, permit(['cliente', 'abogado', 'trabajta
  *               fecha_finalizacion: { type: string, format: date }
  *               jornada: { type: string }
  *               precio_comercial: { type: number }
- *               ubicacion: { type: string }
  *     responses:
  *       201:
  *         description: Servicio agregado
@@ -284,7 +302,6 @@ router.post('/:id/servicios', auth, permit(['abogado', 'trabajtaller', 'gerente'
  *               fecha_finalizacion: { type: string, format: date }
  *               jornada: { type: string }
  *               precio_comercial: { type: number }
- *               ubicacion: { type: string }
  *     responses:
  *       200:
  *         description: Servicio actualizado
@@ -340,14 +357,11 @@ router.delete('/:id/servicios/:sid', auth, permit(['gerente', 'adminproy']), c.d
  *         application/json:
  *           schema:
  *             type: object
- *             required: [Placa]
+ *             required: [Placa, uso]
  *             properties:
  *               Placa: { type: string }
- *               uso: { type: string }
- *               fecha_hora_entrada: { type: string, format: date-time }
- *               fecha_hora_salida: { type: string, format: date-time }
- *               ID_Piloto: { type: integer }
- *               preciounit: { type: number }
+ *               uso: { type: integer, description: id de COTIZACION_SERVICIO (fechas automáticas) }
+ *               PrecioUnit: { type: number }
  *     responses:
  *       201:
  *         description: Camión asignado
@@ -378,11 +392,8 @@ router.post('/:id/camiones', auth, permit(['abogado', 'trabajtaller', 'gerente',
  *             type: object
  *             properties:
  *               Placa: { type: string }
- *               uso: { type: string }
- *               fecha_hora_entrada: { type: string, format: date-time }
- *               fecha_hora_salida: { type: string, format: date-time }
- *               ID_Piloto: { type: integer }
- *               preciounit: { type: number }
+ *               uso: { type: integer, description: id de COTIZACION_SERVICIO }
+ *               PrecioUnit: { type: number }
  *     responses:
  *       200:
  *         description: Camión actualizado

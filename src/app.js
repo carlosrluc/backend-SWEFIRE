@@ -107,12 +107,23 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
 }));
 
 const authMiddleware = require('./middlewares/auth.middleware');
+
+/** Rutas públicas bajo /api (sin Bearer). Solo registro y login de usuario. */
+const PUBLIC_API_ROUTES = [
+    { method: 'POST', path: '/usuarios/login' },
+    { method: 'POST', path: '/usuarios' },
+    { method: 'POST', path: '/usuarios/con-perfil' },
+];
+
+function isPublicApiRoute(req) {
+    const path = req.path.endsWith('/') && req.path.length > 1
+        ? req.path.slice(0, -1)
+        : req.path;
+    return PUBLIC_API_ROUTES.some((r) => r.method === req.method && r.path === path);
+}
+
 app.use('/api', (req, res, next) => {
-    // Rutas excluidas de JWT
-    const bypassPaths = ['/usuarios/login', '/health', '/db-health'];
-    if (bypassPaths.includes(req.path) || req.path.startsWith('/usuarios/temp-pass/')) {
-        return next();
-    }
+    if (isPublicApiRoute(req)) return next();
     return authMiddleware(req, res, next);
 });
 

@@ -1,5 +1,5 @@
 const db = require('../config/db');
-const { withTx, moveCamionToTallerAll, restoreCamionFromTaller, moveTallerToCamion, moveCamionToTaller } = require('../services/inventarioStock.service');
+const { withTx, moveCamionToTallerAll, restoreCamionFromTaller, moveTallerToCamion, moveCamionToTaller, removeCamionInventarioItem } = require('../services/inventarioStock.service');
 
 const autoUpdateCamionStatus = async () => {
     try {
@@ -341,11 +341,23 @@ exports.createCamionInventario = async (req, res) => {
 
 exports.deleteCamionInventario = async (req, res) => {
     try {
-        const result = await db.query(
-            'DELETE FROM CAMION_INVENTARIO WHERE id=? AND Placa=?', [req.params.iid, req.params.placa]
+        const placa = req.params.placa;
+        const iid = Number(req.params.iid);
+        const { razon } = req.body || {};
+
+        const out = await withTx(db, async (conn) =>
+            removeCamionInventarioItem(conn, {
+                Placa: placa,
+                camion_inventario_id: iid,
+                razon: razon || 'Eliminación de ítem del inventario del camión',
+            }),
         );
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
-        res.json({ message: 'Ítem de inventario eliminado del camión' });
+
+        if (out.notFound) return res.status(404).json({ error: 'No encontrado' });
+        res.json({
+            message: 'Ítem de inventario eliminado del camión',
+            cantidad_retornada_taller: out.cantidad_retornada,
+        });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
