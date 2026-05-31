@@ -308,6 +308,60 @@ router.delete('/:id/documentacion/:did', auth, permit(['gerente', 'adminproy']),
 
 /**
  * @openapi
+ * /api/proyectos/{id}/inventario-por-servicio:
+ *   get:
+ *     tags: [Proyecto - Inventario]
+ *     summary: Inventario requerido agregado por servicios de la cotización
+ *     description: |
+ *       Suma materiales de SERVICIO_INVENTARIO_REQUERIDO por estancia (para inventario / para proyecto).
+ *       El costo de faltante solo aplica a estancia "para inventario" (stock en taller).
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Objetos requeridos con stock en taller y costo de faltante
+ *       404:
+ *         description: Proyecto no encontrado
+ */
+router.get('/:id/inventario-por-servicio', auth, c.getInventarioPorServicio);
+
+/**
+ * @openapi
+ * /api/proyectos/{id}/inventario-por-servicio/exportar:
+ *   post:
+ *     tags: [Proyecto - Inventario]
+ *     summary: Exportar inventario disponible al proyecto
+ *     description: |
+ *       Toma el inventario agregado por servicios (misma lógica que GET inventario-por-servicio).
+ *       Para estancia "para inventario": asigna al proyecto solo lo disponible en taller (min requerido, stock).
+ *       Para estancia "para proyecto": asigna la cantidad requerida completa sin descontar taller.
+ *       fecha_salida y fecha_retorno del lote = fecha_inicio y fecha_fin del proyecto.
+ *       Los faltantes van al presupuesto vía POST /api/presupuestos/cotizacion/{id}/faltantes-inventario/exportar.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       201:
+ *         description: Lotes creados en PROYECTO_INVENTARIO
+ *       400:
+ *         description: Proyecto sin cotización
+ *       404:
+ *         description: Proyecto no encontrado
+ */
+router.post(
+    '/:id/inventario-por-servicio/exportar',
+    auth,
+    permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']),
+    c.exportInventarioPorServicio,
+);
+
+/**
+ * @openapi
  * /api/proyectos/{id}/inventario:
  *   get:
  *     tags: [Proyecto - Inventario]

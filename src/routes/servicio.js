@@ -8,6 +8,8 @@ const c = require('../controllers/servicio.controller');
  *     description: Gestión de servicios ofrecidos
  *   - name: Servicio - Personal Requerido
  *     description: Personal requerido por cada servicio
+ *   - name: Servicio - Inventario Requerido
+ *     description: Materiales de referencia requeridos por cada servicio
  */
 
 /**
@@ -195,5 +197,218 @@ router.post('/:id/personal', c.createPersonal);
  */
 router.put('/:id/personal/:pid', c.updatePersonal);
 router.delete('/:id/personal/:pid', c.deletePersonal);
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     ServicioInventarioRequerido:
+ *       type: object
+ *       properties:
+ *         ID_Servicio:
+ *           type: integer
+ *           example: 1
+ *         Id_Objeto:
+ *           type: integer
+ *           example: 5
+ *         cantidad:
+ *           type: integer
+ *           example: 2
+ *         estancia:
+ *           type: string
+ *           enum: ['para proyecto', 'para inventario']
+ *           example: 'para inventario'
+ *         nombre_objeto:
+ *           type: string
+ *           example: 'Extintor PQS 6kg'
+ *     ServicioInventarioRequeridoInput:
+ *       type: object
+ *       required: [Id_Objeto, cantidad]
+ *       properties:
+ *         Id_Objeto:
+ *           type: integer
+ *           example: 5
+ *         cantidad:
+ *           type: integer
+ *           minimum: 1
+ *           example: 2
+ *         estancia:
+ *           type: string
+ *           enum: ['para proyecto', 'para inventario']
+ *           default: 'para inventario'
+ *     ServicioInventarioRequeridoUpdate:
+ *       type: object
+ *       properties:
+ *         cantidad:
+ *           type: integer
+ *           minimum: 1
+ *           example: 3
+ *         estancia:
+ *           type: string
+ *           enum: ['para proyecto', 'para inventario']
+ */
+
+/**
+ * @openapi
+ * /api/servicios/{id}/inventario-requerido:
+ *   get:
+ *     tags: [Servicio - Inventario Requerido]
+ *     summary: Listar inventario requerido del servicio (SERVICIO_INVENTARIO_REQUERIDO)
+ *     description: Materiales de referencia por servicio. No mueve stock hasta asignar a un proyecto.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID_Servicio
+ *     responses:
+ *       200:
+ *         description: Lista de materiales requeridos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/ServicioInventarioRequerido'
+ *       500:
+ *         description: Error del servidor
+ *   post:
+ *     tags: [Servicio - Inventario Requerido]
+ *     summary: Crear registro en SERVICIO_INVENTARIO_REQUERIDO
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID_Servicio
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ServicioInventarioRequeridoInput'
+ *     responses:
+ *       201:
+ *         description: Registro creado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: 'Inventario requerido creado' }
+ *                 ID_Servicio: { type: integer }
+ *                 Id_Objeto: { type: integer }
+ *                 cantidad: { type: integer }
+ *                 estancia: { type: string }
+ *       400:
+ *         description: Datos inválidos
+ *       404:
+ *         description: Servicio u objeto de inventario no encontrado
+ *       409:
+ *         description: El objeto ya está registrado para este servicio
+ *       500:
+ *         description: Error del servidor
+ */
+router.get('/:id/inventario-requerido', c.getInventarioRequerido);
+router.post('/:id/inventario-requerido', c.createInventarioRequerido);
+
+/**
+ * @openapi
+ * /api/servicios/{id}/inventario-requerido/{idObjeto}:
+ *   get:
+ *     tags: [Servicio - Inventario Requerido]
+ *     summary: Obtener un material requerido del servicio
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID_Servicio
+ *       - in: path
+ *         name: idObjeto
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Id_Objeto (clave compuesta con ID_Servicio)
+ *     responses:
+ *       200:
+ *         description: Registro encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ServicioInventarioRequerido'
+ *       404:
+ *         description: No encontrado
+ *       500:
+ *         description: Error del servidor
+ *   put:
+ *     tags: [Servicio - Inventario Requerido]
+ *     summary: Actualizar cantidad o estancia
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID_Servicio
+ *       - in: path
+ *         name: idObjeto
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Id_Objeto
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ServicioInventarioRequeridoUpdate'
+ *     responses:
+ *       200:
+ *         description: Actualizado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string }
+ *                 ID_Servicio: { type: integer }
+ *                 Id_Objeto: { type: integer }
+ *                 cantidad: { type: integer }
+ *                 estancia: { type: string }
+ *       400:
+ *         description: Datos inválidos
+ *       404:
+ *         description: No encontrado
+ *       500:
+ *         description: Error del servidor
+ *   delete:
+ *     tags: [Servicio - Inventario Requerido]
+ *     summary: Eliminar registro de SERVICIO_INVENTARIO_REQUERIDO
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID_Servicio
+ *       - in: path
+ *         name: idObjeto
+ *         required: true
+ *         schema: { type: integer }
+ *         description: Id_Objeto
+ *     responses:
+ *       200:
+ *         description: Eliminado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: 'Inventario requerido eliminado' }
+ *       404:
+ *         description: No encontrado
+ *       500:
+ *         description: Error del servidor
+ */
+router.get('/:id/inventario-requerido/:idObjeto', c.getInventarioRequeridoByObjeto);
+router.put('/:id/inventario-requerido/:idObjeto', c.updateInventarioRequerido);
+router.delete('/:id/inventario-requerido/:idObjeto', c.deleteInventarioRequerido);
 
 module.exports = router;

@@ -1,5 +1,15 @@
 const db = require('../config/db');
-const { withTx, createProyectoInventarioLoteDesdeCamion, createProyectoInventarioLoteDesdeTaller, processProyectoInventarioRetornoById, removeProyectoInventarioLote } = require('../services/inventarioStock.service');
+const {
+    withTx,
+    getInventarioCantidad,
+    createProyectoInventarioLoteDesdeCamion,
+    createProyectoInventarioLoteDesdeTaller,
+    processProyectoInventarioRetornoById,
+    removeProyectoInventarioLote,
+} = require('../services/inventarioStock.service');
+const { aggregateInventarioPorProyecto } = require('../services/inventarioPorServicio.service');
+
+const RAZON_EXPORT_INVENTARIO_SERVICIOS = 'Exportación inventario requerido por servicios';
 
 const autoUpdateProjectStatus = async () => {
     try {
@@ -307,13 +317,150 @@ exports.deleteDocumentacion = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+// ── Inventario agregado por servicios del proyecto (vía cotización) ───────────
+exports.getInventarioPorServicio = async (req, res) => {
+    try {
+        const idProyecto = Number(req.params.id);
+        const { proyecto, items, servicios: serviciosProyecto } = await aggregateInventarioPorProyecto(db, idProyecto);
+
+        if (!proyecto) return res.status(404).json({ error: 'Proyecto no encontrado' });
+        if (!proyecto.id_cotizacion) {
+            return res.json({
+                id_Proyecto: idProyecto,
+                id_cotizacion: null,
+                mensaje: 'El proyecto no tiene cotización asociada; no hay servicios para calcular inventario.',
+                data: [],
+            });
+        }
+
+        const data = items.map(({ faltante, costo, ...rest }) => ({
+            ...rest,
+            costo,
+        }));
+
+        res.json({
+            id_Proyecto: idProyecto,
+            id_cotizacion: proyecto.id_cotizacion,
+            servicios_del_proyecto: serviciosProyecto.map((s) => ({
+                ID_Servicio: s.ID_Servicio,
+                nombre: s.nombre,
+            })),
+            total_objetos: data.length,
+            costo_total_faltante: Math.round(
+                data.filter((x) => x.estancia === 'para inventario').reduce((sum, x) => sum + x.costo, 0) * 100,
+            ) / 100,
+            data,
+        });
+    } catch (e) {
+        if (e.code === 'ER_NO_SUCH_TABLE' && /SERVICIO_INVENTARIO_REQUERIDO/i.test(e.message)) {
+            return res.status(500).json({
+                error: 'Tabla SERVICIO_INVENTARIO_REQUERIDO no existe. Ejecute la migración en schema.sql',
+            });
+        }
+        res.status(500).json({ error: e.message });
+    }
+};
+
+exports.exportInventarioPorServicio = async (req, res) => {
+    try {
+        const idProyecto = Number(req.params.id);
+
+        const out = await withTx(db, async (conn) => {
+            const { proyecto, items, servicios: serviciosProyecto } = await aggregateInventarioPorProyecto(conn, idProyecto);
+            if (!proyecto) return { notFound: true };
+            if (!proyecto.id_cotizacion) return { noCotizacion: true };
+
+            const lotesProyecto = [];
+
+            for (const item of items) {
+                if (item.estancia === 'para inventario') {
+                    const stock = await getInventarioCantidad(conn, item.id_inventario);
+                    const cantidadExport = Math.min(item.cantidad_requerida, stock);
+
+                    if (cantidadExport > 0) {
+                        const loteId = await createProyectoInventarioLoteDesdeTaller(conn, {
+                            id_Proyecto: idProyecto,
+                            Id_Objeto: item.id_inventario,
+                            cantidad_objeto: cantidadExport,
+                            estado: 'aceptable',
+                            razon: RAZON_EXPORT_INVENTARIO_SERVICIOS,
+                            fecha_salida: proyecto.fecha_inicio,
+                            fecha_retorno: proyecto.fecha_fin,
+                            estancia: 'para inventario',
+                        });
+                        lotesProyecto.push({
+                            id_proyecto_inventario: loteId,
+                            id_inventario: item.id_inventario,
+                            nombre_objeto: item.nombre_objeto,
+                            estancia: item.estancia,
+                            cantidad_exportada: cantidadExport,
+                        });
+                    }
+                } else if (item.cantidad_requerida > 0) {
+                    const loteId = await createProyectoInventarioLoteDesdeTaller(conn, {
+                        id_Proyecto: idProyecto,
+                        Id_Objeto: item.id_inventario,
+                        cantidad_objeto: item.cantidad_requerida,
+                        estado: 'aceptable',
+                        razon: RAZON_EXPORT_INVENTARIO_SERVICIOS,
+                        fecha_salida: proyecto.fecha_inicio,
+                        fecha_retorno: proyecto.fecha_fin,
+                        estancia: 'para proyecto',
+                    });
+                    lotesProyecto.push({
+                        id_proyecto_inventario: loteId,
+                        id_inventario: item.id_inventario,
+                        nombre_objeto: item.nombre_objeto,
+                        estancia: item.estancia,
+                        cantidad_exportada: item.cantidad_requerida,
+                    });
+                }
+            }
+
+            return { proyecto, serviciosProyecto, lotesProyecto };
+        });
+
+        if (out.notFound) return res.status(404).json({ error: 'Proyecto no encontrado' });
+        if (out.noCotizacion) {
+            return res.status(400).json({
+                error: 'El proyecto no tiene cotización asociada; no se puede exportar inventario por servicios.',
+            });
+        }
+
+        res.status(201).json({
+            message: 'Inventario disponible exportado al proyecto',
+            id_Proyecto: idProyecto,
+            id_cotizacion: out.proyecto.id_cotizacion,
+            fecha_salida: out.proyecto.fecha_inicio,
+            fecha_retorno: out.proyecto.fecha_fin,
+            razon: RAZON_EXPORT_INVENTARIO_SERVICIOS,
+            servicios_del_proyecto: out.serviciosProyecto.map((s) => ({
+                ID_Servicio: s.ID_Servicio,
+                nombre: s.nombre,
+            })),
+            lotes_proyecto_inventario: out.lotesProyecto,
+            total_lotes: out.lotesProyecto.length,
+        });
+    } catch (e) {
+        if (e.code === 'ER_NO_SUCH_TABLE' && /SERVICIO_INVENTARIO_REQUERIDO/i.test(e.message)) {
+            return res.status(500).json({
+                error: 'Tabla SERVICIO_INVENTARIO_REQUERIDO no existe. Ejecute la migración en schema.sql',
+            });
+        }
+        res.status(500).json({ error: e.message });
+    }
+};
+
 // ── PROYECTO_INVENTARIO ───────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
     try { res.json(await db.query('SELECT PI.*, I.nombre_objeto as Objeto_Nombre FROM PROYECTO_INVENTARIO PI LEFT JOIN INVENTARIO I ON PI.Id_Objeto = I.Id_Objeto WHERE PI.id_Proyecto = ?', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createInventario = async (req, res) => {
-    const { Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, placa_camion, id_proyecto_camion } = req.body;
+    const {
+        Id_Objeto, cantidad_objeto, estado, fecha_salida, fecha_retorno, metodo_traslado, razon,
+        placa_camion, id_proyecto_camion, estancia,
+    } = req.body;
     try {
         const id_Proyecto = Number(req.params.id);
 
@@ -349,6 +496,7 @@ exports.createInventario = async (req, res) => {
                     estado,
                     razon,
                     proyectoCamionId: pcId,
+                    estancia,
                 });
                 return { loteId };
             }
@@ -362,6 +510,7 @@ exports.createInventario = async (req, res) => {
                 fecha_salida,
                 fecha_retorno,
                 metodo_traslado,
+                estancia,
             });
             return { loteId };
         });
@@ -402,16 +551,19 @@ exports.getInventarioById = async (req, res) => {
 
 // ── UPDATE INVENTARIO ───────────────────────────────────────────────────────
 exports.updateInventario = async (req, res) => {
-    const { Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, id_proyecto_camion, fecha_devolucion_efectiva } = req.body;
+    const {
+        Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno,
+        metodo_traslado, razon, id_proyecto_camion, fecha_devolucion_efectiva, estancia,
+    } = req.body;
     try {
         const id_Proyecto = Number(req.params.id);
         const iid = Number(req.params.iid);
 
         const result = await db.query(
             `UPDATE PROYECTO_INVENTARIO
-             SET Id_Objeto=?, cantidad_objeto=?, devolucion_pendiente=?, estado=?, fecha_salida=?, fecha_retorno=?, metodo_traslado=?, razon=?, id_proyecto_camion=?, fecha_devolucion_efectiva=?
+             SET Id_Objeto=?, cantidad_objeto=?, devolucion_pendiente=?, estado=?, fecha_salida=?, fecha_retorno=?, metodo_traslado=?, razon=?, id_proyecto_camion=?, fecha_devolucion_efectiva=?, estancia=?
              WHERE id=? AND id_Proyecto=?`,
-            [Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, id_proyecto_camion, fecha_devolucion_efectiva, iid, id_Proyecto]
+            [Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, id_proyecto_camion, fecha_devolucion_efectiva, estancia, iid, id_Proyecto]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'Inventario no encontrado' });
 

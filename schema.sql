@@ -295,6 +295,21 @@ CREATE TABLE "SERVICIO_PERSONAL_REQUERIDO" (
 );
 
 
+-- swefire_db.SERVICIO_INVENTARIO_REQUERIDO definition
+-- Materiales de referencia por servicio (no descuenta stock hasta asignar a proyecto)
+
+CREATE TABLE "SERVICIO_INVENTARIO_REQUERIDO" (
+  "ID_Servicio" int NOT NULL,
+  "Id_Objeto" int NOT NULL,
+  "cantidad" int NOT NULL DEFAULT 1,
+  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'para inventario',
+  PRIMARY KEY ("ID_Servicio", "Id_Objeto"),
+  KEY "SERVICIO_INVENTARIO_REQ_idx_objeto" ("Id_Objeto"),
+  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
+);
+
+
 -- swefire_db.SOLICITUD definition
 
 CREATE TABLE "SOLICITUD" (
@@ -695,6 +710,7 @@ CREATE TABLE "PROYECTO_INVENTARIO" (
   "fecha_retorno" date DEFAULT NULL,
   "metodo_traslado" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "razon" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci DEFAULT 'para inventario',
   PRIMARY KEY ("id"),
   KEY "id_Proyecto" ("id_Proyecto"),
   KEY "Id_Objeto" ("Id_Objeto"),
@@ -870,3 +886,25 @@ ALTER TABLE "COTIZACION_CAMION" MODIFY "uso" int DEFAULT NULL;
 ALTER TABLE "COTIZACION_CAMION" ADD KEY IF NOT EXISTS "COTIZACION_CAMION_idx_uso" ("uso");
 ALTER TABLE "COTIZACION_CAMION" ADD CONSTRAINT IF NOT EXISTS "COTIZACION_CAMION_ibfk_uso"
   FOREIGN KEY ("uso") REFERENCES "COTIZACION_SERVICIO" ("id") ON DELETE SET NULL ON UPDATE RESTRICT;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN: inventario requerido por servicio (referencia, no descuenta taller)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE IF NOT EXISTS "SERVICIO_INVENTARIO_REQUERIDO" (
+  "ID_Servicio" int NOT NULL,
+  "Id_Objeto" int NOT NULL,
+  "cantidad" int NOT NULL DEFAULT 1,
+  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'para inventario',
+  PRIMARY KEY ("ID_Servicio", "Id_Objeto"),
+  KEY "SERVICIO_INVENTARIO_REQ_idx_objeto" ("Id_Objeto"),
+  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
+);
+
+-- Si la tabla ya existía sin estancia:
+ALTER TABLE "SERVICIO_INVENTARIO_REQUERIDO"
+  ADD COLUMN IF NOT EXISTS "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'para inventario';
+
+ALTER TABLE "PROYECTO_INVENTARIO"
+  ADD COLUMN IF NOT EXISTS "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci DEFAULT 'para inventario';

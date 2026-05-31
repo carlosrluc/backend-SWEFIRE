@@ -104,3 +104,121 @@ exports.deletePersonal = async (req, res) => {
         res.json({ message: 'Personal requerido eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+// ── SERVICIO_INVENTARIO_REQUERIDO ─────────────────────────────────────────────
+const ESTANCIAS_VALIDAS = new Set(['para proyecto', 'para inventario']);
+
+const inventarioRequeridoSelect = `
+    SELECT sir.ID_Servicio, sir.Id_Objeto, sir.cantidad, sir.estancia,
+           i.nombre_objeto
+    FROM SERVICIO_INVENTARIO_REQUERIDO sir
+    LEFT JOIN INVENTARIO i ON i.Id_Objeto = sir.Id_Objeto
+`;
+
+exports.getInventarioRequerido = async (req, res) => {
+    try {
+        const rows = await db.query(
+            `${inventarioRequeridoSelect} WHERE sir.ID_Servicio = ? ORDER BY i.nombre_objeto`,
+            [req.params.id],
+        );
+        res.json(rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.getInventarioRequeridoByObjeto = async (req, res) => {
+    try {
+        const rows = await db.query(
+            `${inventarioRequeridoSelect} WHERE sir.ID_Servicio = ? AND sir.Id_Objeto = ?`,
+            [req.params.id, req.params.idObjeto],
+        );
+        if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
+        res.json(rows[0]);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.createInventarioRequerido = async (req, res) => {
+    const { Id_Objeto, cantidad, estancia } = req.body;
+    const estanciaFinal = estancia || 'para inventario';
+
+    if (!Id_Objeto) return res.status(400).json({ error: 'Id_Objeto es requerido' });
+    if (!cantidad || Number(cantidad) <= 0) {
+        return res.status(400).json({ error: 'cantidad debe ser mayor a 0' });
+    }
+    if (!ESTANCIAS_VALIDAS.has(estanciaFinal)) {
+        return res.status(400).json({ error: 'estancia inválida. Use: para proyecto | para inventario' });
+    }
+
+    try {
+        const servicio = await db.query('SELECT ID_Servicio FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
+        if (!servicio.length) return res.status(404).json({ error: 'Servicio no encontrado' });
+
+        const objeto = await db.query('SELECT Id_Objeto FROM INVENTARIO WHERE Id_Objeto = ?', [Id_Objeto]);
+        if (!objeto.length) return res.status(404).json({ error: 'Objeto de inventario no encontrado' });
+
+        await db.query(
+            'INSERT INTO SERVICIO_INVENTARIO_REQUERIDO (ID_Servicio, Id_Objeto, cantidad, estancia) VALUES (?,?,?,?)',
+            [req.params.id, Id_Objeto, cantidad, estanciaFinal],
+        );
+        res.status(201).json({
+            message: 'Inventario requerido creado',
+            ID_Servicio: Number(req.params.id),
+            Id_Objeto,
+            cantidad: Number(cantidad),
+            estancia: estanciaFinal,
+        });
+    } catch (e) {
+        if (e.code === 'ER_DUP_ENTRY') {
+            return res.status(409).json({ error: 'El objeto ya está registrado para este servicio' });
+        }
+        res.status(500).json({ error: e.message });
+    }
+};
+
+exports.updateInventarioRequerido = async (req, res) => {
+    const { cantidad, estancia } = req.body;
+
+    if (cantidad !== undefined && Number(cantidad) <= 0) {
+        return res.status(400).json({ error: 'cantidad debe ser mayor a 0' });
+    }
+    if (estancia !== undefined && !ESTANCIAS_VALIDAS.has(estancia)) {
+        return res.status(400).json({ error: 'estancia inválida. Use: para proyecto | para inventario' });
+    }
+    if (cantidad === undefined && estancia === undefined) {
+        return res.status(400).json({ error: 'Debe enviar cantidad y/o estancia para actualizar' });
+    }
+
+    try {
+        const actual = await db.query(
+            'SELECT cantidad, estancia FROM SERVICIO_INVENTARIO_REQUERIDO WHERE ID_Servicio = ? AND Id_Objeto = ?',
+            [req.params.id, req.params.idObjeto],
+        );
+        if (!actual.length) return res.status(404).json({ error: 'No encontrado' });
+
+        const cantidadFinal = cantidad !== undefined ? Number(cantidad) : actual[0].cantidad;
+        const estanciaFinal = estancia !== undefined ? estancia : actual[0].estancia;
+
+        const result = await db.query(
+            'UPDATE SERVICIO_INVENTARIO_REQUERIDO SET cantidad = ?, estancia = ? WHERE ID_Servicio = ? AND Id_Objeto = ?',
+            [cantidadFinal, estanciaFinal, req.params.id, req.params.idObjeto],
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({
+            message: 'Inventario requerido actualizado',
+            ID_Servicio: Number(req.params.id),
+            Id_Objeto: Number(req.params.idObjeto),
+            cantidad: cantidadFinal,
+            estancia: estanciaFinal,
+        });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.deleteInventarioRequerido = async (req, res) => {
+    try {
+        const result = await db.query(
+            'DELETE FROM SERVICIO_INVENTARIO_REQUERIDO WHERE ID_Servicio = ? AND Id_Objeto = ?',
+            [req.params.id, req.params.idObjeto],
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Inventario requerido eliminado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};

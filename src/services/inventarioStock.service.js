@@ -201,7 +201,16 @@ async function restoreCamionFromTaller(conn, { Placa, razon = null }) {
   }
 }
 
-async function createProyectoInventarioLoteDesdeCamion(conn, { id_Proyecto, Placa, Id_Objeto, cantidad_objeto, estado, razon, proyectoCamionId }) {
+async function createProyectoInventarioLoteDesdeCamion(conn, {
+  id_Proyecto,
+  Placa,
+  Id_Objeto,
+  cantidad_objeto,
+  estado,
+  razon,
+  proyectoCamionId,
+  estancia = 'para inventario',
+}) {
   if (!cantidad_objeto || cantidad_objeto <= 0) throw new Error('cantidad_objeto inválida');
 
   // lock camion item
@@ -235,10 +244,12 @@ async function createProyectoInventarioLoteDesdeCamion(conn, { id_Proyecto, Plac
   );
 
   const metodo_traslado = `camion: ${Placa}`;
+  const estanciaFinal = estancia === 'para proyecto' ? 'para proyecto' : 'para inventario';
+
   const r = await conn.query(
     `INSERT INTO PROYECTO_INVENTARIO
-      (id_Proyecto, Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, fecha_devolucion_efectiva, metodo_traslado, razon, id_proyecto_camion)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      (id_Proyecto, Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, fecha_devolucion_efectiva, metodo_traslado, razon, id_proyecto_camion, estancia)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       id_Proyecto,
       Id_Objeto,
@@ -251,6 +262,7 @@ async function createProyectoInventarioLoteDesdeCamion(conn, { id_Proyecto, Plac
       metodo_traslado,
       razon || null,
       proyectoCamionId || null,
+      estanciaFinal,
     ],
   );
 
@@ -270,17 +282,31 @@ async function createProyectoInventarioLoteDesdeCamion(conn, { id_Proyecto, Plac
   return r.insertId;
 }
 
-async function createProyectoInventarioLoteDesdeTaller(conn, { id_Proyecto, Id_Objeto, cantidad_objeto, estado, razon, fecha_salida, fecha_retorno, metodo_traslado }) {
+async function createProyectoInventarioLoteDesdeTaller(conn, {
+  id_Proyecto,
+  Id_Objeto,
+  cantidad_objeto,
+  estado,
+  razon,
+  fecha_salida,
+  fecha_retorno,
+  metodo_traslado,
+  estancia = 'para inventario',
+}) {
   if (!cantidad_objeto || cantidad_objeto <= 0) throw new Error('cantidad_objeto inválida');
 
-  const actual = await getInventarioCantidad(conn, Id_Objeto);
-  if (actual < cantidad_objeto) throw new Error('Stock insuficiente en taller');
-  await updateInventarioCantidad(conn, Id_Objeto, actual - cantidad_objeto);
+  const estanciaFinal = estancia === 'para proyecto' ? 'para proyecto' : 'para inventario';
+
+  if (estanciaFinal === 'para inventario') {
+    const actual = await getInventarioCantidad(conn, Id_Objeto);
+    if (actual < cantidad_objeto) throw new Error('Stock insuficiente en taller');
+    await updateInventarioCantidad(conn, Id_Objeto, actual - cantidad_objeto);
+  }
 
   const r = await conn.query(
     `INSERT INTO PROYECTO_INVENTARIO
-      (id_Proyecto, Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, metodo_traslado, razon)
-     VALUES (?,?,?,?,?,?,?,?,?)`,
+      (id_Proyecto, Id_Objeto, cantidad_objeto, devolucion_pendiente, estado, fecha_salida, fecha_retorno, metodo_traslado, razon, estancia)
+     VALUES (?,?,?,?,?,?,?,?,?,?)`,
     [
       id_Proyecto,
       Id_Objeto,
@@ -291,20 +317,23 @@ async function createProyectoInventarioLoteDesdeTaller(conn, { id_Proyecto, Id_O
       fecha_retorno || null,
       metodo_traslado || null,
       razon || null,
+      estanciaFinal,
     ],
   );
 
-  await createMovimiento(conn, {
-    Id_Objeto,
-    cantidad: cantidad_objeto,
-    tipo_movimiento: 'salida_taller_a_proyecto',
-    origen_tipo: 'taller',
-    destino_tipo: 'proyecto',
-    destino_id: String(id_Proyecto),
-    referencia_tabla: 'PROYECTO_INVENTARIO',
-    referencia_id: r.insertId,
-    razon,
-  });
+  if (estanciaFinal === 'para inventario') {
+    await createMovimiento(conn, {
+      Id_Objeto,
+      cantidad: cantidad_objeto,
+      tipo_movimiento: 'salida_taller_a_proyecto',
+      origen_tipo: 'taller',
+      destino_tipo: 'proyecto',
+      destino_id: String(id_Proyecto),
+      referencia_tabla: 'PROYECTO_INVENTARIO',
+      referencia_id: r.insertId,
+      razon,
+    });
+  }
 
   return r.insertId;
 }

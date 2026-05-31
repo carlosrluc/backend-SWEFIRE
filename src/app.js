@@ -46,7 +46,7 @@ const swaggerOptions = {
                 'API REST completa para el proyecto SWEFIRE. ' +
                 'Permite gestionar (CRUD) todas las tablas de la base de datos MariaDB: ' +
                 'Perfiles, Usuarios, Clientes, Fabricantes, Inventario, Camiones, ' +
-                'Servicios, Solicitudes, Cotizaciones, Presupuestos, Proyectos, Trabajos e Incidencias.',
+                'Servicios (incl. inventario requerido por servicio), Solicitudes, Cotizaciones, Presupuestos, Proyectos, Trabajos e Incidencias.',
         },
         servers: [
             {

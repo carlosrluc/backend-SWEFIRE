@@ -1,4 +1,6 @@
 const db = require('../config/db');
+const { withTx, getInventarioCantidad } = require('../services/inventarioStock.service');
+const { aggregateInventarioPorCotizacion } = require('../services/inventarioPorServicio.service');
 
 // Obtener todos los items del presupuesto de una cotización (con filtro opcional por tipo)
 exports.getByCotizacion = async (req, res) => {
@@ -103,6 +105,82 @@ exports.getTotales = async (req, res) => {
         
         res.json(totales);
     } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// Registrar en PRESUPUESTO los faltantes de inventario requerido por servicios de la cotización
+exports.exportFaltantesInventarioPorCotizacion = async (req, res) => {
+    try {
+        const idCotizacion = Number(req.params.id);
+
+        const out = await withTx(db, async (conn) => {
+            const { cotizacion, items, servicios } = await aggregateInventarioPorCotizacion(conn, idCotizacion);
+            if (!cotizacion) return { notFound: true };
+
+            const lineasPresupuesto = [];
+            let costoTotalPresupuesto = 0;
+
+            for (const item of items) {
+                if (item.estancia !== 'para inventario') continue;
+
+                const stock = await getInventarioCantidad(conn, item.id_inventario);
+                const faltante = Math.max(0, item.cantidad_requerida - stock);
+                if (faltante <= 0) continue;
+
+                const costoUnitario = item.precio_compra;
+                const costoTotal = Math.round(faltante * costoUnitario * 100) / 100;
+                const pr = await conn.query(
+                    `INSERT INTO PRESUPUESTO (
+                        ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto,
+                        costo_unitario, cantidad, costo_total, moneda, estancia
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        idCotizacion,
+                        'Material Directo',
+                        'en preparacion',
+                        item.nombre_objeto,
+                        costoUnitario,
+                        faltante,
+                        costoTotal,
+                        'soles',
+                        'para inventario',
+                    ],
+                );
+                costoTotalPresupuesto += costoTotal;
+                lineasPresupuesto.push({
+                    id_presupuesto: pr.insertId,
+                    id_inventario: item.id_inventario,
+                    nombre_objeto: item.nombre_objeto,
+                    cantidad: faltante,
+                    costo_unitario: costoUnitario,
+                    costo_total: costoTotal,
+                    moneda: 'soles',
+                });
+            }
+
+            return { servicios, lineasPresupuesto, costoTotalPresupuesto };
+        });
+
+        if (out.notFound) return res.status(404).json({ error: 'Cotización no encontrada' });
+
+        res.status(201).json({
+            message: 'Faltantes de inventario registrados en presupuesto',
+            ID_Cotizacion: idCotizacion,
+            servicios_de_cotizacion: out.servicios.map((s) => ({
+                ID_Servicio: s.ID_Servicio,
+                nombre: s.nombre,
+            })),
+            lineas_presupuesto: out.lineasPresupuesto,
+            total_lineas: out.lineasPresupuesto.length,
+            costo_total_faltante: Math.round(out.costoTotalPresupuesto * 100) / 100,
+        });
+    } catch (e) {
+        if (e.code === 'ER_NO_SUCH_TABLE' && /SERVICIO_INVENTARIO_REQUERIDO/i.test(e.message)) {
+            return res.status(500).json({
+                error: 'Tabla SERVICIO_INVENTARIO_REQUERIDO no existe. Ejecute la migración en schema.sql',
+            });
+        }
+        res.status(500).json({ error: e.message });
+    }
 };
 
 // Crear un item de presupuesto

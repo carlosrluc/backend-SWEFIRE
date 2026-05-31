@@ -82,6 +82,30 @@ router.post('/cotizacion/:id', c.createItem);
 
 /**
  * @openapi
+ * /api/presupuestos/cotizacion/{id}/faltantes-inventario/exportar:
+ *   post:
+ *     tags: [Presupuesto]
+ *     summary: Registrar faltantes de inventario en el presupuesto de la cotización
+ *     description: |
+ *       Calcula lo requerido por los servicios de la cotización (SERVICIO_INVENTARIO_REQUERIDO)
+ *       y agrega a PRESUPUESTO solo el faltante de stock en taller (estancia "para inventario").
+ *       tipo Material Directo, costo_unitario = precio_compra, moneda soles.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID_Cotizacion
+ *     responses:
+ *       201:
+ *         description: Líneas de presupuesto creadas por faltante
+ *       404:
+ *         description: Cotización no encontrada
+ */
+router.post('/cotizacion/:id/faltantes-inventario/exportar', c.exportFaltantesInventarioPorCotizacion);
+
+/**
+ * @openapi
  * /api/presupuestos/cotizacion/{id}/totales:
  *   get:
  *     tags: [Presupuesto]
