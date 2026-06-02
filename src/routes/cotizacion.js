@@ -21,6 +21,114 @@ const { uploadCotizacion } = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     UpsertQuotationInventoryItem:
+ *       type: object
+ *       required: [id, cantidad, precio_unitario, intencion]
+ *       properties:
+ *         id: { type: string, description: ID_Inventario }
+ *         nombre: { type: string }
+ *         cantidad: { type: number }
+ *         precio_unitario: { type: number }
+ *         intencion: { type: string, enum: [comprar, alquilar] }
+ *         dias_alquilados: { type: number, nullable: true }
+ *     UpsertQuotationServiceItem:
+ *       type: object
+ *       required: [id, startDate, dueDate, unitPrice]
+ *       properties:
+ *         id: { type: string, description: ID_Servicio }
+ *         name: { type: string }
+ *         startDate: { type: string, format: date }
+ *         dueDate: { type: string, format: date }
+ *         schedule: { type: string }
+ *         unitPrice: { type: number }
+ *     UpsertQuotationTruckItem:
+ *       type: object
+ *       required: [plate]
+ *       properties:
+ *         plate: { type: string }
+ *         model: { type: string }
+ *         color: { type: string }
+ *         maintenanceDate: { type: string, format: date }
+ *         description: { type: string }
+ *         uso: { type: integer, description: 'Legacy — índice en services[] o id COTIZACION_SERVICIO. Default índice del camión.' }
+ *         unitPrice: { type: number, description: 'Legacy — PrecioUnit' }
+ *     UpsertQuotationDTO:
+ *       type: object
+ *       required: [name]
+ *       properties:
+ *         name: { type: string }
+ *         id_solicitud: { type: integer, description: 'Requerido por BD si no hay valor previo' }
+ *         DNI_O_RUC: { type: string, description: 'Requerido por BD si no hay valor previo' }
+ *         inventory:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/UpsertQuotationInventoryItem' }
+ *         services:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/UpsertQuotationServiceItem' }
+ *         trucks:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/UpsertQuotationTruckItem' }
+ *         pickupService:
+ *           type: object
+ *           properties:
+ *             pickupCost: { type: number }
+ *             pickupDate: { type: string, format: date }
+ *             pickupAddress: { type: string }
+ *         quotationConditions:
+ *           type: object
+ *           properties:
+ *             emissionDate: { type: string, format: date }
+ *             expirationDate: { type: string, format: date }
+ *             conditions: { type: string }
+ *             observations: { type: string }
+ *         quotationRate:
+ *           type: object
+ *           properties:
+ *             sellingRate: { type: number }
+ *             buyingRate: { type: number }
+ *         phases:
+ *           type: object
+ *           properties:
+ *             items:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: string }
+ *                   name: { type: string }
+ *                   description: { type: string }
+ *                   duration: { type: number }
+ *                   activities:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string }
+ *                         name: { type: string }
+ *         productos:
+ *           type: array
+ *           description: Alias legacy de inventory
+ *         servicios:
+ *           type: array
+ *           description: Alias legacy de services
+ *         camiones:
+ *           type: array
+ *           description: Alias legacy de trucks
+ *         costoRecojo:
+ *           type: object
+ *           description: Alias legacy de pickupService
+ *         condiciones:
+ *           type: object
+ *           description: Alias legacy de quotationConditions
+ *         tasaCambio:
+ *           type: object
+ *           description: Alias legacy de quotationRate
+ */
+
+/**
+ * @openapi
  * /api/cotizaciones:
  *   get:
  *     tags: [Cotización]
@@ -35,72 +143,17 @@ const { uploadCotizacion } = require('../middlewares/upload.middleware');
  *         description: Lista de cotizaciones con metadatos de paginación
  *   post:
  *     tags: [Cotización]
- *     summary: Crear una cotización (con productos, camión y servicio de recojo)
+ *     summary: Crear cotización (UpsertQuotationDTO o formato legacy)
+ *     description: |
+ *       Acepta el payload del frontend (`name`, `inventory`, `services`, `trucks`, etc.)
+ *       y también el formato legacy (`nombre`, `productos`, `servicios`, `camiones`, etc.).
+ *       Ambos pueden mezclarse; el formato nuevo tiene prioridad en alias equivalentes.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               id_solicitud: { type: integer, description: ID de la solicitud asociada }
- *               productos:
- *                 type: array
- *                 description: Productos a incluir en la cotización
- *                 items:
- *                   type: object
- *                   required: [id, intencion, cantidad, precio_unitario]
- *                   properties:
- *                     id: { type: string, description: ID_Inventario del producto }
- *                     intencion: { type: string, enum: [alquilar, comprar] }
- *                     cantidad: { type: integer }
- *                     precio_unitario: { type: number }
- *               servicios:
- *                 type: array
- *                 description: Servicios de la cotización (COTIZACION_SERVICIO)
- *                 items:
- *                   type: object
- *                   required: [ID_Servicio]
- *                   properties:
- *                     ID_Servicio: { type: integer }
- *                     fecha_inicio: { type: string, format: date }
- *                     fecha_finalizacion: { type: string, format: date }
- *                     jornada: { type: string }
- *                     precio_comercial: { type: number }
- *               camiones:
- *                 type: array
- *                 description: Camiones asignados. uso = índice en servicios[] (0-based) o id de COTIZACION_SERVICIO
- *                 items:
- *                   type: object
- *                   required: [Placa, uso]
- *                   properties:
- *                     Placa: { type: string, description: Placa del camión }
- *                     uso: { type: integer, description: Índice en servicios[] o id COTIZACION_SERVICIO }
- *                     PrecioUnit: { type: number }
- *               costoRecojo:
- *                 type: object
- *                 description: Costo de recojo - se guarda como servicio ID=7 en COTIZACION_SERVICIO
- *                 properties:
- *                   costo: { type: number }
- *                   fechaRecojo: { type: string, format: date }
- *               tasaCambio:
- *                 type: object
- *                 properties:
- *                   tasaCompra: { type: number }
- *                   tasaVenta: { type: number }
- *               condiciones:
- *                 type: object
- *                 properties:
- *                   fechaEmision: { type: string, format: date }
- *                   fechaVigencia: { type: string, format: date }
- *                   condiciones: { type: string }
- *                   observaciones: { type: string }
- *               version: { type: integer, example: 1, description: Campo legacy (default 1) }
- *               nombre: { type: string, description: Campo legacy }
- *               DNI_O_RUC: { type: string, description: Campo legacy - DNI o RUC del cliente }
- *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada], description: Campo legacy }
- *               comentario_cliente: { type: string, description: Campo legacy }
- *               Tasa_Cambio: { type: number, description: Campo legacy }
+ *             $ref: '#/components/schemas/UpsertQuotationDTO'
  *     responses:
  *       201:
  *         description: Cotización creada. Devuelve el ID y el precio_total calculado.
@@ -126,7 +179,10 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
  *         description: No encontrada
  *   put:
  *     tags: [Cotización]
- *     summary: Actualizar cotización (reemplaza productos, camión y servicio de recojo)
+ *     summary: Actualizar cotización (UpsertQuotationDTO o formato legacy)
+ *     description: |
+ *       Reemplaza secciones enviadas (`inventory`, `services`, `trucks`, etc.).
+ *       También acepta alias legacy (`productos`, `servicios`, `camiones`, ...).
  *     parameters:
  *       - in: path
  *         name: id
@@ -137,41 +193,7 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               id_solicitud: { type: integer, description: ID de la solicitud asociada }
- *               productos:
- *                 type: array
- *                 description: Reemplaza todo el inventario de la cotización
- *                 items:
- *                   type: object
- *                   required: [id, intencion, cantidad, precio_unitario]
- *                   properties:
- *                     id: { type: string, description: ID_Inventario del producto }
- *                     intencion: { type: string, enum: [alquilar, comprar] }
- *                     cantidad: { type: integer }
- *                     precio_unitario: { type: number }
- *               id_camion: { type: string, description: Placa del camión (reemplaza el camión actual) }
- *               costoRecojo:
- *                 type: object
- *                 description: Costo de recojo - guarda como servicio ID=7 en COTIZACION_SERVICIO
- *                 properties:
- *                   costo: { type: number }
- *                   fechaRecojo: { type: string, format: date }
- *               tasaCambio:
- *                 type: object
- *                 properties:
- *                   tasaCompra: { type: number }
- *                   tasaVenta: { type: number }
- *               condiciones:
- *                 type: object
- *                 properties:
- *                   fechaEmision: { type: string, format: date }
- *                   fechaVigencia: { type: string, format: date }
- *                   condiciones: { type: string }
- *                   observaciones: { type: string }
- *               estado: { type: string, enum: [aprobado, "rechazado por cliente", descartada] }
- *               comentario_cliente: { type: string }
+ *             $ref: '#/components/schemas/UpsertQuotationDTO'
  *     responses:
  *       200:
  *         description: Cotización actualizada. Devuelve el precio_total calculado.
@@ -215,8 +237,10 @@ router.get('/:id/detalles', auth, permit(['cliente', 'abogado', 'trabajtaller', 
  * /api/cotizaciones/{id}/detalles-franco:
  *   get:
  *     tags: [Cotización]
- *     summary: Obtener detalles completos de una cotización (formato Franco)
- *     description: Devuelve la cotización con cliente, productos, array de camiones (con todos sus datos), costo de recojo y condiciones.
+ *     summary: Obtener detalles completos (UpsertQuotationDTO + legacy)
+ *     description: |
+ *       Devuelve el payload compatible con UpsertQuotationDTO (`name`, `inventory`, `services`, `trucks`, ...)
+ *       y mantiene campos legacy (`productos`, `servicios`, `camiones`, `condiciones`, `tipoCambio`, etc.).
  *     parameters:
  *       - in: path
  *         name: id
@@ -420,6 +444,36 @@ router.put('/:id/camiones/:cid', auth, permit(['trabajtaller', 'gerente', 'admin
  *         description: Eliminado
  */
 router.delete('/:id/camiones/:cid', auth, permit(['gerente', 'adminproy']), c.deleteCamion);
+
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/inventario-por-servicio:
+ *   get:
+ *     tags: [Cotización - Inventario]
+ *     summary: Inventario requerido agregado por servicios de la cotización
+ *     description: |
+ *       Suma materiales de SERVICIO_INVENTARIO_REQUERIDO según los servicios en COTIZACION_SERVICIO.
+ *       Agrupa por objeto y estancia (para inventario / para proyecto).
+ *       El costo de faltante solo aplica a estancia "para inventario" (stock en taller).
+ *       Pensado para el flujo de presupuestos sin depender de un proyecto.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: ID_Cotizacion
+ *     responses:
+ *       200:
+ *         description: Objetos requeridos con stock en taller y costo de faltante
+ *       404:
+ *         description: Cotización no encontrada
+ */
+router.get(
+    '/:id/inventario-por-servicio',
+    auth,
+    permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']),
+    c.getInventarioPorServicio,
+);
 
 /**
  * @openapi

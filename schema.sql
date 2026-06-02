@@ -446,6 +446,8 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
   "Orden_compra" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "duracion_etapa" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "etapas" int DEFAULT NULL,
+  "etapas_detalle" json DEFAULT NULL,
+  "direccion_recojo" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("ID"),
   KEY "COTIZACION_COMERCIAL_ibfk_2" ("DNI_O_RUC"),
   KEY "COTIZACION_COMERCIAL_ibfk_1" ("id_solicitud"),
@@ -908,3 +910,39 @@ ALTER TABLE "SERVICIO_INVENTARIO_REQUERIDO"
 
 ALTER TABLE "PROYECTO_INVENTARIO"
   ADD COLUMN IF NOT EXISTS "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci DEFAULT 'para inventario';
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN: cotización — fases (JSON) y dirección de recojo
+-- Compatible MySQL / MariaDB (sin ADD COLUMN IF NOT EXISTS)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- etapas_detalle (JSON en MariaDB 10.2+ / MySQL 5.7+; si falla el tipo JSON use LONGTEXT)
+SET @col_exists = (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'COTIZACION_COMERCIAL'
+    AND COLUMN_NAME = 'etapas_detalle'
+);
+SET @sql_etapas = IF(
+  @col_exists = 0,
+  'ALTER TABLE `COTIZACION_COMERCIAL` ADD COLUMN `etapas_detalle` JSON DEFAULT NULL',
+  'SELECT ''etapas_detalle ya existe'' AS info'
+);
+PREPARE stmt FROM @sql_etapas;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @col_exists = (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'COTIZACION_COMERCIAL'
+    AND COLUMN_NAME = 'direccion_recojo'
+);
+SET @sql_recojo = IF(
+  @col_exists = 0,
+  'ALTER TABLE `COTIZACION_COMERCIAL` ADD COLUMN `direccion_recojo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL',
+  'SELECT ''direccion_recojo ya existe'' AS info'
+);
+PREPARE stmt FROM @sql_recojo;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
