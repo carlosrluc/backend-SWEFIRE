@@ -7,7 +7,8 @@ const SELECT_INFORME = `
            P.Proyecto_Nombre,
            PER.Nombre AS Autor_Nombre,
            PER.Apellido AS Autor_Apellido,
-           INC.estado AS Incidencia_Estado
+           INC.estado AS Incidencia_Estado,
+           INC.nombre_incidencia AS Incidencia_Nombre
     FROM INFORME I
     JOIN PROYECTO P ON P.id_Proyecto = I.id_Proyecto
     JOIN PERFIL PER ON PER.DNI = I.DNI_autor

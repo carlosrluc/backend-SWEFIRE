@@ -12,6 +12,41 @@ const { permit } = require('../middlewares/role.middleware');
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     Incidencia:
+ *       type: object
+ *       properties:
+ *         id_incidencia: { type: integer }
+ *         nombre_incidencia: { type: string, maxLength: 100, example: 'Pérdida extintor sector A' }
+ *         id_proyecto: { type: integer }
+ *         empresa_involucrada: { type: string }
+ *         cotizacion_remuneracion: { type: integer }
+ *         comentario: { type: string }
+ *         estado:
+ *           type: string
+ *           enum:
+ *             - 'Sin enviar'
+ *             - 'Cotizacion sin respuesta'
+ *             - 'Cotizacion disputada'
+ *             - 'Pago por recibir'
+ *             - 'Pago realizado'
+ *             - 'Material recuperado'
+ *         Cotizacion_Nombre: { type: string }
+ *         Cliente_Nombre: { type: string }
+ *     IncidenciaInput:
+ *       type: object
+ *       properties:
+ *         nombre_incidencia: { type: string, maxLength: 100 }
+ *         id_proyecto: { type: integer }
+ *         empresa_involucrada: { type: string }
+ *         cotizacion_remuneracion: { type: integer }
+ *         comentario: { type: string }
+ *         estado: { type: string }
+ */
+
+/**
+ * @openapi
  * /api/incidencias:
  *   get:
  *     tags: [Incidencias]
@@ -23,9 +58,25 @@ const { permit } = require('../middlewares/role.middleware');
  *       - in: query
  *         name: limit
  *         schema: { type: integer, default: 10 }
+ *       - in: query
+ *         name: nombre
+ *         schema: { type: string }
+ *         description: Filtrar por nombre_incidencia (coincidencia parcial)
+ *       - in: query
+ *         name: estado
+ *         schema: { type: string }
  *     responses:
  *       200:
  *         description: Lista de incidencias
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Incidencia'
  *   post:
  *     tags: [Incidencias]
  *     summary: Crear incidencia
@@ -34,13 +85,7 @@ const { permit } = require('../middlewares/role.middleware');
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               id_proyecto: { type: integer }
- *               empresa_involucrada: { type: string }
- *               cotizacion_remuneracion: { type: integer }
- *               comentario: { type: string }
- *               estado: { type: string }
+ *             $ref: '#/components/schemas/IncidenciaInput'
  *     responses:
  *       201:
  *         description: Incidencia creada
@@ -53,15 +98,49 @@ router.post('/', auth, permit(['abogado', 'gerente', 'adminproy', 'supervisorcam
  * /api/incidencias/proyecto/{id_proyecto}:
  *   get:
  *     tags: [Incidencias]
- *     summary: Obtener incidencias por ID de proyecto
+ *     summary: Listar incidencias por ID de proyecto
+ *     description: |
+ *       Devuelve las filas de INCIDENCIA donde id_proyecto coincide.
+ *       Equivalente a GET /api/proyectos/{id}/incidencias.
  *     parameters:
  *       - in: path
  *         name: id_proyecto
  *         required: true
  *         schema: { type: integer }
+ *         description: id_Proyecto
+ *       - in: query
+ *         name: nombre
+ *         schema: { type: string }
+ *         description: Filtrar por nombre_incidencia (coincidencia parcial)
+ *       - in: query
+ *         name: estado
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum:
+ *             - 'Sin enviar'
+ *             - 'Cotizacion sin respuesta'
+ *             - 'Cotizacion disputada'
+ *             - 'Pago por recibir'
+ *             - 'Pago realizado'
+ *             - 'Material recuperado'
  *     responses:
  *       200:
- *         description: Lista de incidencias del proyecto
+ *         description: Incidencias del proyecto
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id_Proyecto: { type: integer }
+ *                 Proyecto_Nombre: { type: string }
+ *                 total: { type: integer }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Incidencia'
+ *       404:
+ *         description: Proyecto no encontrado
  */
 router.get('/proyecto/:id_proyecto', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy', 'supervisorcampo']), c.getByProyecto);
 
@@ -79,9 +158,14 @@ router.get('/proyecto/:id_proyecto', auth, permit(['cliente', 'abogado', 'trabaj
  *     responses:
  *       200:
  *         description: Incidencia encontrada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Incidencia'
  *   put:
  *     tags: [Incidencias]
  *     summary: Actualizar incidencia
+ *     description: Campos enviados reemplazan los existentes; los omitidos se conservan.
  *     parameters:
  *       - in: path
  *         name: id
@@ -92,13 +176,7 @@ router.get('/proyecto/:id_proyecto', auth, permit(['cliente', 'abogado', 'trabaj
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               id_proyecto: { type: integer }
- *               empresa_involucrada: { type: string }
- *               cotizacion_remuneracion: { type: integer }
- *               comentario: { type: string }
- *               estado: { type: string }
+ *             $ref: '#/components/schemas/IncidenciaInput'
  *     responses:
  *       200:
  *         description: Actualizada

@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const c = require('../controllers/proyecto.controller');
+const incidenciaC = require('../controllers/incidencia.controller');
 const informe = require('../controllers/informe.controller');
 const auth = require('../middlewares/auth.middleware');
 const { permit } = require('../middlewares/role.middleware');
@@ -18,6 +19,8 @@ const { uploadInformeEvidencia } = require('../middlewares/upload.middleware');
  *     description: Inventario del proyecto
  *   - name: Proyecto - Informes
  *     description: Sucesos / informes del proyecto
+ *   - name: Proyecto - Incidencias
+ *     description: Incidencias asociadas al proyecto
  */
 
 /**
@@ -460,6 +463,46 @@ router.post('/:id/inventario', auth, permit(['supervisorcampo', 'trabajcampo', '
  */
 router.get('/:id/inventario/:iid', auth, c.getInventarioById);
 router.put('/:id/inventario/:iid', auth, permit(['supervisorcampo', 'trabajcampo', 'abogado', 'gerente', 'adminproy']), c.updateInventario);
+
+/**
+ * @openapi
+ * /api/proyectos/{id}/incidencias:
+ *   get:
+ *     tags: [Proyecto - Incidencias]
+ *     summary: Listar incidencias del proyecto
+ *     description: |
+ *       Incidencias con id_proyecto = {id}. Misma respuesta que
+ *       GET /api/incidencias/proyecto/{id_proyecto}.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *         description: id_Proyecto
+ *       - in: query
+ *         name: estado
+ *         required: false
+ *         schema:
+ *           type: string
+ *           enum:
+ *             - 'Sin enviar'
+ *             - 'Cotizacion sin respuesta'
+ *             - 'Cotizacion disputada'
+ *             - 'Pago por recibir'
+ *             - 'Pago realizado'
+ *             - 'Material recuperado'
+ *     responses:
+ *       200:
+ *         description: Lista de incidencias del proyecto
+ *       404:
+ *         description: Proyecto no encontrado
+ */
+router.get(
+    '/:id/incidencias',
+    auth,
+    permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy', 'supervisorcampo']),
+    incidenciaC.getByProyecto,
+);
 
 /**
  * @openapi

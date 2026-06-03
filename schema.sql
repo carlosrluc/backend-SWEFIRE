@@ -582,6 +582,7 @@ CREATE TABLE "COTIZACION_CHAT_MENSAJE" (
 
 CREATE TABLE "INCIDENCIA" (
   "id_incidencia" int NOT NULL AUTO_INCREMENT,
+  "nombre_incidencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "id_proyecto" int DEFAULT NULL,
   "empresa_involucrada" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "cotizacion_remuneracion" int DEFAULT NULL,
@@ -944,5 +945,24 @@ SET @sql_recojo = IF(
   'SELECT ''direccion_recojo ya existe'' AS info'
 );
 PREPARE stmt FROM @sql_recojo;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN: INCIDENCIA.nombre_incidencia
+-- ─────────────────────────────────────────────────────────────────────────────
+
+SET @col_exists = (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'INCIDENCIA'
+    AND COLUMN_NAME = 'nombre_incidencia'
+);
+SET @sql_nombre_inc = IF(
+  @col_exists = 0,
+  'ALTER TABLE `INCIDENCIA` ADD COLUMN `nombre_incidencia` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL AFTER `id_incidencia`',
+  'SELECT ''nombre_incidencia ya existe'' AS info'
+);
+PREPARE stmt FROM @sql_nombre_inc;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
