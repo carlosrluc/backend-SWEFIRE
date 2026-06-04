@@ -11,6 +11,48 @@ const { uploadServicioFoto } = require('../middlewares/upload.middleware');
  *     description: Personal requerido por cada servicio
  *   - name: Servicio - Inventario Requerido
  *     description: Materiales de referencia requeridos por cada servicio
+ *   - name: Servicio - Público
+ *     description: Endpoints públicos del catálogo de servicios (sin autenticación)
+ */
+
+/**
+ * @openapi
+ * components:
+ *   schemas:
+ *     ServicioPublico:
+ *       type: object
+ *       description: Servicio activo expuesto al catálogo público (sin precio_regular)
+ *       properties:
+ *         ID_Servicio:
+ *           type: integer
+ *           example: 3
+ *         nombre:
+ *           type: string
+ *           example: Contraincendios
+ *         descripcion:
+ *           type: string
+ *           example: Instalación y mantenimiento de sistemas contra incendio
+ *         condicional_precio:
+ *           type: string
+ *           nullable: true
+ *         observaciones:
+ *           type: string
+ *           nullable: true
+ *         Estado:
+ *           type: string
+ *           enum: [Activo]
+ *           example: Activo
+ *         foto:
+ *           type: string
+ *           nullable: true
+ *           example: /uploads/servicios/foto_1710000000-123.jpeg
+ *     ServicioPublicoListResponse:
+ *       type: object
+ *       properties:
+ *         data:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/ServicioPublico'
  */
 
 /**
@@ -55,6 +97,39 @@ const { uploadServicioFoto } = require('../middlewares/upload.middleware');
  */
 router.get('/', c.getAll);
 router.post('/', c.create);
+
+/**
+ * @openapi
+ * /api/servicios/publico:
+ *   get:
+ *     tags: [Servicio - Público, Servicio]
+ *     summary: Catálogo público de servicios activos
+ *     description: |
+ *       **Ruta pública** (no requiere Bearer).
+ *
+ *       Devuelve todos los servicios con `Estado = "Activo"`, excluye el servicio **ID 7** (envío/recojo)
+ *       y **no incluye** el campo `precio_regular`.
+ *     security: []
+ *     responses:
+ *       200:
+ *         description: Lista de servicios públicos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ServicioPublicoListResponse'
+ *             example:
+ *               data:
+ *                 - ID_Servicio: 3
+ *                   nombre: Contraincendios
+ *                   descripcion: Instalación y mantenimiento
+ *                   condicional_precio: null
+ *                   observaciones: null
+ *                   Estado: Activo
+ *                   foto: /uploads/servicios/foto_1710000000-123.jpeg
+ *       500:
+ *         description: Error del servidor
+ */
+router.get('/publico', c.getPublico);
 
 /**
  * @openapi

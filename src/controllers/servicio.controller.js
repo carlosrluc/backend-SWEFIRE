@@ -37,6 +37,19 @@ exports.getAll = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
+/** Catálogo público: activos, sin servicio 7, sin precio_regular */
+exports.getPublico = async (req, res) => {
+    try {
+        const rows = await db.query(
+            `SELECT ID_Servicio, nombre, descripcion, condicional_precio, observaciones, Estado, foto
+             FROM SERVICIO
+             WHERE Estado = 'Activo' AND ID_Servicio != 7
+             ORDER BY ID_Servicio DESC`,
+        );
+        res.json({ data: rows });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
 exports.getById = async (req, res) => {
     try {
         const rows = await db.query('SELECT * FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
