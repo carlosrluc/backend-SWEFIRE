@@ -8,7 +8,7 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const rows = await db.query(
-            'SELECT * FROM SERVICIO LIMIT ? OFFSET ?',
+            'SELECT * FROM SERVICIO ORDER BY ID_Servicio DESC LIMIT ? OFFSET ?',
             [limit, offset]
         );
 
