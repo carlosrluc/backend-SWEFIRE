@@ -69,7 +69,17 @@ exports.remove = async (req, res) => {
 
 // ── CLIENTE_CONTACTO ──────────────────────────────────────────────────────────
 exports.getContactos = async (req, res) => {
-    try { res.json(await db.query('SELECT CC.*, P.Nombre as Contacto_Nombre, P.Apellido as Contacto_Apellido FROM CLIENTE_CONTACTO CC LEFT JOIN PERFIL P ON CC.DNI_perfil = P.DNI WHERE CC.DNI_O_RUC = ? ORDER BY CC.id DESC', [req.params.id])); }
+    try {
+        res.json(await db.query(
+            `SELECT CC.*, P.Nombre AS Contacto_Nombre, P.Apellido AS Contacto_Apellido,
+                    P.telefono_contacto, P.correo_contacto
+             FROM CLIENTE_CONTACTO CC
+             LEFT JOIN PERFIL P ON CC.DNI_perfil = P.DNI
+             WHERE CC.DNI_O_RUC = ?
+             ORDER BY CC.id DESC`,
+            [req.params.id]
+        ));
+    }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 

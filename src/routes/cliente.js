@@ -127,7 +127,7 @@ router.delete('/:id', c.remove);
  *         schema: { type: string }
  *     responses:
  *       200:
- *         description: Lista de contactos
+ *         description: Lista de contactos (incluye telefono_contacto y correo_contacto del PERFIL vinculado por DNI_perfil)
  *   post:
  *     tags: [Cliente - Contactos]
  *     summary: Agregar contacto al cliente
