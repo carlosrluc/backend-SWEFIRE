@@ -8,11 +8,19 @@ const {
     removeProyectoInventarioLote,
 } = require('../services/inventarioStock.service');
 const { aggregateInventarioPorProyecto } = require('../services/inventarioPorServicio.service');
+const {
+    syncProyectoEtapasFromCotizacion,
+    autoStartProyectoEtapas,
+    ensureTerminadoEtapaForProyectosCompletados,
+    enrichProyecto,
+    enrichProyectos,
+} = require('../services/proyectoEtapas.service');
 
 const RAZON_EXPORT_INVENTARIO_SERVICIOS = 'Exportación inventario requerido por servicios';
 
 const autoUpdateProjectStatus = async () => {
     try {
+        await autoStartProyectoEtapas(db);
         await db.query(`
             UPDATE PROYECTO 
             SET estado = CASE 
@@ -20,8 +28,9 @@ const autoUpdateProjectStatus = async () => {
                 WHEN CURDATE() >= fecha_inicio AND CURDATE() <= fecha_fin THEN 'En Ejecución'
                 ELSE estado 
             END
-            WHERE estado NOT IN ('Cancelado', 'Rechazado')
+            WHERE estado NOT IN ('Cancelado', 'Rechazado', 'En proceso legal')
         `);
+        await ensureTerminadoEtapaForProyectosCompletados(db);
     } catch (e) {
         console.error('Error auto-actualizando estados de proyectos:', e);
     }
@@ -85,8 +94,10 @@ exports.getAll = async (req, res) => {
         const countResult = await db.query(countQueryStr, queryParams);
         const total = countResult[0].total;
 
+        const data = await enrichProyectos(db, rows);
+
         res.json({
-            data: rows,
+            data,
             pagination: {
                 total,
                 page,
@@ -118,7 +129,8 @@ exports.getActiveAndCompleted = async (req, res) => {
         `;
 
         const rows = await db.query(queryStr);
-        res.json(rows);
+        const data = await enrichProyectos(db, rows);
+        res.json(data);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -140,7 +152,7 @@ exports.proyecto_todo = async (req, res) => {
             [id_proyecto]
         );
         if (!pRows.length) return res.status(404).json({ error: 'Proyecto no encontrado' });
-        const proyecto = pRows[0];
+        const proyecto = await enrichProyecto(db, pRows[0]);
 
         // 2. Obtener camiones asociados al proyecto
         // No existe un precio de alquiler de camión en la base de datos, así que enviamos 0 y subtotal 0, o calculamos sobre algún otro atributo
@@ -211,13 +223,13 @@ exports.getById = async (req, res) => {
             [req.params.id]
         );
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-        res.json(rows[0]);
+        res.json(await enrichProyecto(db, rows[0]));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.create = async (req, res) => {
     const { descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-        orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
+        orden_servicio, informe_final, factura, fecha_inicio, hora_inicio, fecha_fin, observaciones, estado } = req.body;
     try {
         let Proyecto_Nombre = null;
         if (id_cotizacion) {
@@ -229,25 +241,29 @@ exports.create = async (req, res) => {
 
         const result = await db.query(
             `INSERT INTO PROYECTO (Proyecto_Nombre,descripcion_servicio,ID_Trabajo,Id_Cliente,ubicacion,id_cotizacion,
-             orden_servicio,informe_final,factura,fecha_inicio,fecha_fin,observaciones,estado)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             orden_servicio,informe_final,factura,fecha_inicio,hora_inicio,fecha_fin,observaciones,estado)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [Proyecto_Nombre, descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-                orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado]
+                orden_servicio, informe_final, factura, fecha_inicio, hora_inicio || null, fecha_fin, observaciones, estado]
         );
-        res.status(201).json({ message: 'Proyecto creado', id_Proyecto: result.insertId });
+        const idProyecto = result.insertId;
+        if (id_cotizacion) {
+            await syncProyectoEtapasFromCotizacion(db, idProyecto, id_cotizacion);
+        }
+        res.status(201).json({ message: 'Proyecto creado', id_Proyecto: idProyecto });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.update = async (req, res) => {
     const { descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-        orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado } = req.body;
+        orden_servicio, informe_final, factura, fecha_inicio, hora_inicio, fecha_fin, observaciones, estado } = req.body;
     try {
         const result = await db.query(
             `UPDATE PROYECTO SET descripcion_servicio=?,ID_Trabajo=?,Id_Cliente=?,ubicacion=?,id_cotizacion=?,
-             orden_servicio=?,informe_final=?,factura=?,fecha_inicio=?,fecha_fin=?,observaciones=?,estado=?
+             orden_servicio=?,informe_final=?,factura=?,fecha_inicio=?,hora_inicio=?,fecha_fin=?,observaciones=?,estado=?
              WHERE id_Proyecto=?`,
             [descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion,
-                orden_servicio, informe_final, factura, fecha_inicio, fecha_fin, observaciones, estado, req.params.id]
+                orden_servicio, informe_final, factura, fecha_inicio, hora_inicio || null, fecha_fin, observaciones, estado, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Proyecto actualizado' });

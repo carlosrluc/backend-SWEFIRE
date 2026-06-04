@@ -1,5 +1,11 @@
 const db = require('../config/db');
 const { aggregateInventarioPorCotizacion } = require('../services/inventarioPorServicio.service');
+const { syncProyectoEtapasFromCotizacion } = require('../services/proyectoEtapas.service');
+const {
+    loadCotizacionEtapasTree,
+    syncCotizacionEtapasFromPhases,
+    ensureCotizacionEtapasFromJson,
+} = require('../services/cotizacionEtapas.service');
 const {
     normalizarMatrizBody,
     normalizeInventoryItem,
@@ -525,9 +531,13 @@ exports.getDetallesFranco = async (req, res) => {
         );
         const chat = chatCheck.length > 0 ? "si" : "no";
 
+        await ensureCotizacionEtapasFromJson(db, cotizacionId);
+        const etapasTree = await loadCotizacionEtapasTree(db, cotizacionId);
+
         // Construir respuesta (formato UpsertQuotationDTO + legacy)
         const upsertDto = buildUpsertQuotationResponse({
             base,
+            etapasTree,
             productosRows: productos.map((p) => ({
                 id: p.id,
                 nombre: p.nombre,
@@ -669,6 +679,12 @@ exports.create = async (req, res) => {
             await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID = ?`, [id_solicitud]);
         }
 
+        if (normalized.phasesProvided) {
+            await syncCotizacionEtapasFromPhases(db, newId, normalized.phases ?? { items: [] });
+        } else if (normalized.etapas_detalle) {
+            await ensureCotizacionEtapasFromJson(db, newId);
+        }
+
         res.status(201).json({
             message: 'Cotización creada',
             ID: newId,
@@ -806,6 +822,12 @@ exports.update = async (req, res) => {
                     [cotizacionId, id_camion],
                 );
             }
+        }
+
+        if (normalized.phasesProvided) {
+            await syncCotizacionEtapasFromPhases(db, cotizacionId, normalized.phases ?? { items: [] });
+        } else if (normalized.etapas_detalle !== undefined) {
+            await ensureCotizacionEtapasFromJson(db, cotizacionId);
         }
 
         if (normalized.costoRecojo !== undefined) {
@@ -1250,6 +1272,8 @@ exports.uploadOrdenCompra = async (req, res) => {
                         [descripcionServicio, idTrabajo, clienteId, ubicacion, cotizacionId, urlDescargaPdf]
                     );
                     const idProyecto = projResult.insertId;
+
+                    await syncProyectoEtapasFromCotizacion(db, idProyecto, cotizacionId);
 
                     // Actualizar Id_Proyecto en Trabajo
                     await db.query('UPDATE TRABAJO SET Id_Proyecto = ? WHERE Id_trabajo = ?', [idProyecto, idTrabajo]);

@@ -40,7 +40,7 @@ const { uploadInformeEvidencia } = require('../middlewares/upload.middleware');
  *         description: Cantidad de resultados por página
  *     responses:
  *       200:
- *         description: Lista de proyectos con metadatos de paginación
+ *         description: Lista de proyectos con etapas, etapa_actual, actividad_actual y paginación
  *   post:
  *     tags: [Proyecto]
  *     summary: Crear un proyecto
@@ -57,6 +57,7 @@ const { uploadInformeEvidencia } = require('../middlewares/upload.middleware');
  *               id_cotizacion: { type: integer }
  *               orden_compra: { type: string, description: "URL de redirección al PDF de la cotización" }
  *               fecha_inicio: { type: string, format: date }
+ *               hora_inicio: { type: string, example: "08:00:00", description: "Hora de inicio del proyecto (opcional)" }
  *               fecha_fin: { type: string, format: date }
  *               observaciones: { type: string }
  *               estado: { type: string, enum: ["No iniciado", "En Ejecución", Completado, "En proceso legal"] }
@@ -544,14 +545,17 @@ router.get(
  *         application/json:
  *           schema:
  *             type: object
- *             required: [hora]
+ *             required: [fecha, hora]
  *             properties:
  *               nombre: { type: string, description: "Por defecto copia Proyecto_Nombre" }
- *               hora: { type: string, example: "14:30:00" }
+ *               fecha: { type: string, format: date, example: "2026-06-03", description: "Día en que ocurrió el suceso (no es la fecha de subida)" }
+ *               hora: { type: string, example: "14:30:00", description: "Hora en que ocurrió el suceso" }
  *               descripcion: { type: string }
  *               ubicacion: { type: string, example: "recepcion de la planta" }
  *               relacion: { type: string, description: '"ninguna" o id de incidencia' }
  *               id_incidencia: { type: integer, description: "Alternativa a relacion" }
+ *               id_proyecto_etapa: { type: integer, description: "ID de PROYECTO_ETAPA (etapa del proyecto)" }
+ *               id_proyecto_actividad: { type: integer, description: "ID de PROYECTO_ACTIVIDAD (actividad dentro de la etapa)" }
  *     description: DNI_autor se toma automáticamente del usuario logueado (JWT)
  *     responses:
  *       201:
@@ -598,14 +602,17 @@ router.post('/:id/informes', auth, permit(['supervisorcampo', 'trabajcampo', 'ab
  *             type: object
  *             properties:
  *               nombre: { type: string }
+ *               fecha: { type: string, format: date }
  *               hora: { type: string }
  *               descripcion: { type: string }
  *               ubicacion: { type: string }
  *               relacion: { type: string }
  *               id_incidencia: { type: integer }
+ *               id_proyecto_etapa: { type: integer }
+ *               id_proyecto_actividad: { type: integer }
  *     responses:
  *       200:
- *         description: Informe actualizado
+ *         description: Informe actualizado (PUT parcial)
  *   delete:
  *     tags: [Proyecto - Informes]
  *     summary: Eliminar suceso del informe

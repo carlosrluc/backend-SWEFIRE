@@ -78,8 +78,28 @@ function normalizeRate(body) {
     };
 }
 
+function parsePhasesRaw(raw) {
+    if (raw == null) return null;
+    if (typeof raw === 'string') {
+        try {
+            return JSON.parse(raw);
+        } catch (_) {
+            return null;
+        }
+    }
+    return raw;
+}
+
+/** Acepta `phases` (UpsertQuotationDTO) o `etapas_detalle` (JSON legacy en body). */
 function normalizePhases(body) {
-    const raw = body.phases;
+    let raw;
+    if (body.phases !== undefined) {
+        raw = body.phases;
+    } else if (body.etapas_detalle !== undefined) {
+        raw = parsePhasesRaw(body.etapas_detalle);
+    } else {
+        return undefined;
+    }
     if (!raw) return undefined;
 
     const items = raw.items ?? (Array.isArray(raw) ? raw : []);
@@ -133,7 +153,9 @@ function normalizeCotizacionPayload(body = {}) {
     const costoRecojo = normalizePickup(body);
     const condiciones = normalizeConditions(body);
     const tasaCambio = normalizeRate(body);
-    const phasesData = normalizePhases(body);
+    const phasesData = (body.phases !== undefined || body.etapas_detalle !== undefined)
+        ? normalizePhases(body)
+        : undefined;
 
     return {
         nombre: body.name ?? body.nombre,
@@ -152,6 +174,8 @@ function normalizeCotizacionPayload(body = {}) {
         etapas: phasesData?.etapas,
         duracion_etapa: phasesData?.duracion_etapa,
         etapas_detalle: phasesData?.etapas_detalle,
+        phases: phasesData?.phases,
+        phasesProvided: body.phases !== undefined || body.etapas_detalle !== undefined,
         direccion_recojo: costoRecojo?.direccion_recojo ?? body.direccion_recojo ?? null,
     };
 }
@@ -195,6 +219,7 @@ function buildUpsertQuotationResponse({
     serviciosRows = [],
     camionesRows = [],
     costoRecojo = null,
+    etapasTree = null,
 }) {
     const inventory = productosRows.map((row) => ({
         id: String(row.id ?? row.ID_Inventario ?? ''),
@@ -248,7 +273,23 @@ function buildUpsertQuotationResponse({
             sellingRate: Number(base.tasaVenta ?? 0),
             buyingRate: Number(base.tacaCompra ?? 0),
         },
-        phases: parsePhasesFromRow(base),
+        phases: etapasTree
+            ? {
+                items: etapasTree.map((etapa, ei) => ({
+                    id: etapa.referencia || String(etapa.id ?? `etapa-${ei + 1}`),
+                    id_bd: etapa.id,
+                    name: etapa.nombre,
+                    description: etapa.descripcion ?? '',
+                    duration: Number(etapa.duracion) || 0,
+                    activities: (etapa.actividades || []).map((act, ai) => ({
+                        id: act.referencia || String(act.id ?? `act-${ei + 1}-${ai + 1}`),
+                        id_bd: act.id,
+                        name: act.nombre,
+                    })),
+                })),
+            }
+            : parsePhasesFromRow(base),
+        etapas_tabla: etapasTree || undefined,
     };
 }
 

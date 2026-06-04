@@ -90,13 +90,17 @@ const { uploadCotizacion } = require('../middlewares/upload.middleware');
  *             buyingRate: { type: number }
  *         phases:
  *           type: object
+ *           description: |
+ *             Etapas/actividades de la cotización. Al guardar se persisten en COTIZACION_ETAPA y COTIZACION_ACTIVIDAD.
+ *             También se acepta el alias legacy `etapas_detalle` (mismo JSON que antes iba solo a la columna JSON).
  *           properties:
  *             items:
  *               type: array
  *               items:
  *                 type: object
  *                 properties:
- *                   id: { type: string }
+ *                   id: { type: string, description: 'Referencia estable del front (fase-1, phase_1_...). El orden lo define la posición en items[].' }
+ *                   id_bd: { type: integer, description: 'ID numérico en COTIZACION_ETAPA (solo en respuestas GET)' }
  *                   name: { type: string }
  *                   description: { type: string }
  *                   duration: { type: number }
@@ -105,7 +109,8 @@ const { uploadCotizacion } = require('../middlewares/upload.middleware');
  *                     items:
  *                       type: object
  *                       properties:
- *                         id: { type: string }
+ *                         id: { type: string, description: 'Referencia estable (act-1, act-2). Orden = posición en activities[].' }
+ *                         id_bd: { type: integer, description: 'ID numérico en COTIZACION_ACTIVIDAD (solo GET)' }
  *                         name: { type: string }
  *         productos:
  *           type: array
@@ -125,6 +130,10 @@ const { uploadCotizacion } = require('../middlewares/upload.middleware');
  *         tasaCambio:
  *           type: object
  *           description: Alias legacy de quotationRate
+ *         etapas_detalle:
+ *           type: object
+ *           description: |
+ *             Alias legacy del body (mismo shape que phases). Opcional si ya envías `phases`.
  */
 
 /**

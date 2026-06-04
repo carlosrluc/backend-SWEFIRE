@@ -457,6 +457,41 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
 );
 
 
+-- swefire_db.COTIZACION_ETAPA definition
+
+CREATE TABLE "COTIZACION_ETAPA" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Cotizacion" int NOT NULL,
+  "referencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text COLLATE utf8mb4_unicode_ci,
+  "duracion" int NOT NULL DEFAULT 0,
+  "orden" int NOT NULL DEFAULT 1,
+  PRIMARY KEY ("id"),
+  UNIQUE KEY "uk_cotizacion_etapa_referencia" ("ID_Cotizacion","referencia"),
+  KEY "idx_cotizacion_etapa_cotizacion" ("ID_Cotizacion"),
+  CONSTRAINT "COTIZACION_ETAPA_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
+);
+
+
+-- swefire_db.COTIZACION_ACTIVIDAD definition
+
+CREATE TABLE "COTIZACION_ACTIVIDAD" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_cotizacion_etapa" int NOT NULL,
+  "ID_Cotizacion" int NOT NULL,
+  "referencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "orden" int NOT NULL DEFAULT 1,
+  PRIMARY KEY ("id"),
+  UNIQUE KEY "uk_cotizacion_act_referencia" ("ID_Cotizacion","referencia"),
+  KEY "idx_cotizacion_act_etapa" ("id_cotizacion_etapa"),
+  KEY "idx_cotizacion_act_cotizacion" ("ID_Cotizacion"),
+  CONSTRAINT "COTIZACION_ACTIVIDAD_ibfk_1" FOREIGN KEY ("id_cotizacion_etapa") REFERENCES "COTIZACION_ETAPA" ("id") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_ACTIVIDAD_ibfk_2" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
+);
+
+
 -- swefire_db.COTIZACION_INVENTARIO definition
 
 CREATE TABLE "COTIZACION_INVENTARIO" (
@@ -655,10 +690,13 @@ CREATE TABLE "PROYECTO" (
   "informe_final" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "factura" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_inicio" date DEFAULT NULL,
+  "hora_inicio" time DEFAULT NULL,
   "fecha_fin" date DEFAULT NULL,
   "observaciones" text COLLATE utf8mb4_unicode_ci,
   "estado" enum('No iniciado','Pendiente','En Ejecución','Completado','En proceso legal','Cancelado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'Pendiente',
   "Proyecto_Nombre" varchar(250) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "etapa_actual_id" int DEFAULT NULL,
+  "actividad_actual_id" int DEFAULT NULL,
   PRIMARY KEY ("id_Proyecto"),
   KEY "fk_proyecto_trabajo" ("ID_Trabajo"),
   KEY "PROYECTO_ibfk_2" ("id_cotizacion"),
@@ -667,6 +705,59 @@ CREATE TABLE "PROYECTO" (
   CONSTRAINT "PROYECTO_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT "PROYECTO_ibfk_2" FOREIGN KEY ("id_cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE RESTRICT ON UPDATE RESTRICT
 );
+
+
+-- swefire_db.PROYECTO_ETAPA definition
+
+CREATE TABLE "PROYECTO_ETAPA" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_Proyecto" int NOT NULL,
+  "tipo" enum('pendiente','cotizacion','terminado') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cotizacion',
+  "id_cotizacion_etapa" int DEFAULT NULL,
+  "codigo" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text COLLATE utf8mb4_unicode_ci,
+  "duracion" int NOT NULL DEFAULT 0,
+  "orden" int NOT NULL DEFAULT 1,
+  "estado" enum('no comenzado','en progreso','completada') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no comenzado',
+  "fecha_inicio" datetime DEFAULT NULL,
+  "fecha_fin" datetime DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "idx_proyecto_etapa_proyecto" ("id_Proyecto"),
+  KEY "idx_proyecto_etapa_cot_etapa" ("id_cotizacion_etapa"),
+  CONSTRAINT "PROYECTO_ETAPA_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_ETAPA_ibfk_cot_etapa" FOREIGN KEY ("id_cotizacion_etapa") REFERENCES "COTIZACION_ETAPA" ("id") ON DELETE SET NULL
+);
+
+
+-- swefire_db.PROYECTO_ACTIVIDAD definition
+
+CREATE TABLE "PROYECTO_ACTIVIDAD" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_proyecto_etapa" int NOT NULL,
+  "id_Proyecto" int NOT NULL,
+  "id_cotizacion_actividad" int DEFAULT NULL,
+  "codigo" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "orden" int NOT NULL DEFAULT 1,
+  "estado" enum('no comenzado','en progreso','completada') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no comenzado',
+  "fecha_inicio" datetime DEFAULT NULL,
+  "fecha_fin" datetime DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "idx_proyecto_act_etapa" ("id_proyecto_etapa"),
+  KEY "idx_proyecto_act_proyecto" ("id_Proyecto"),
+  KEY "idx_proyecto_act_cot_act" ("id_cotizacion_actividad"),
+  CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_1" FOREIGN KEY ("id_proyecto_etapa") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_2" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_cot_act" FOREIGN KEY ("id_cotizacion_actividad") REFERENCES "COTIZACION_ACTIVIDAD" ("id") ON DELETE SET NULL
+);
+
+
+ALTER TABLE "PROYECTO"
+  ADD CONSTRAINT "PROYECTO_ibfk_etapa_actual"
+    FOREIGN KEY ("etapa_actual_id") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE SET NULL,
+  ADD CONSTRAINT "PROYECTO_ibfk_actividad_actual"
+    FOREIGN KEY ("actividad_actual_id") REFERENCES "PROYECTO_ACTIVIDAD" ("id") ON DELETE SET NULL;
 
 
 -- swefire_db.PROYECTO_CAMION definition
@@ -847,12 +938,15 @@ CREATE TABLE IF NOT EXISTS "CAMION_INVENTARIO_RETENCION" (
 CREATE TABLE IF NOT EXISTS "INFORME" (
   "id" int NOT NULL AUTO_INCREMENT,
   "nombre" varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "fecha" date DEFAULT NULL,
   "hora" time NOT NULL,
   "DNI_autor" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
   "descripcion" text COLLATE utf8mb4_unicode_ci,
   "evidencia" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "ubicacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "id_incidencia" int DEFAULT NULL,
+  "id_proyecto_etapa" int DEFAULT NULL,
+  "id_proyecto_actividad" int DEFAULT NULL,
   "id_Proyecto" int NOT NULL,
   "fecha_registro" datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY ("id"),
@@ -861,7 +955,9 @@ CREATE TABLE IF NOT EXISTS "INFORME" (
   KEY "INFORME_idx_autor" ("DNI_autor"),
   CONSTRAINT "INFORME_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
   CONSTRAINT "INFORME_ibfk_2" FOREIGN KEY ("DNI_autor") REFERENCES "PERFIL" ("DNI") ON DELETE RESTRICT,
-  CONSTRAINT "INFORME_ibfk_3" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE SET NULL
+  CONSTRAINT "INFORME_ibfk_3" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE SET NULL,
+  CONSTRAINT "INFORME_ibfk_etapa" FOREIGN KEY ("id_proyecto_etapa") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE SET NULL,
+  CONSTRAINT "INFORME_ibfk_actividad" FOREIGN KEY ("id_proyecto_actividad") REFERENCES "PROYECTO_ACTIVIDAD" ("id") ON DELETE SET NULL
 );
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -984,5 +1080,29 @@ SET @sql_servicio_foto = IF(
   'SELECT ''foto ya existe'' AS info'
 );
 PREPARE stmt FROM @sql_servicio_foto;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN: PROYECTO etapas/actividades + INFORME vínculo
+-- (ejecutar sql/migrate_proyecto_etapas.sql en BD existente)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN: INFORME.fecha (día de ocurrencia del suceso, distinto de fecha_registro)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+SET @col_exists = (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'INFORME'
+    AND COLUMN_NAME = 'fecha'
+);
+SET @sql_informe_fecha = IF(
+  @col_exists = 0,
+  'ALTER TABLE `INFORME` ADD COLUMN `fecha` date DEFAULT NULL AFTER `nombre`',
+  'SELECT ''fecha ya existe'' AS info'
+);
+PREPARE stmt FROM @sql_informe_fecha;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

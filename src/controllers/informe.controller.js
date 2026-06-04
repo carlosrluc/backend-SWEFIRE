@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
+const { validarEtapaActividadProyecto, recalcFechasEtapasDesdeInformes } = require('../services/proyectoEtapas.service');
 
 const SELECT_INFORME = `
     SELECT I.*,
@@ -8,17 +9,37 @@ const SELECT_INFORME = `
            PER.Nombre AS Autor_Nombre,
            PER.Apellido AS Autor_Apellido,
            INC.estado AS Incidencia_Estado,
-           INC.nombre_incidencia AS Incidencia_Nombre
+           INC.nombre_incidencia AS Incidencia_Nombre,
+           PE.codigo AS Etapa_Codigo,
+           PE.nombre AS Etapa_Nombre,
+           PE.estado AS Etapa_Estado,
+           PA.codigo AS Actividad_Codigo,
+           PA.nombre AS Actividad_Nombre,
+           PA.estado AS Actividad_Estado
     FROM INFORME I
     JOIN PROYECTO P ON P.id_Proyecto = I.id_Proyecto
     JOIN PERFIL PER ON PER.DNI = I.DNI_autor
     LEFT JOIN INCIDENCIA INC ON INC.id_incidencia = I.id_incidencia
+    LEFT JOIN PROYECTO_ETAPA PE ON PE.id = I.id_proyecto_etapa
+    LEFT JOIN PROYECTO_ACTIVIDAD PA ON PA.id = I.id_proyecto_actividad
 `;
 
 const mapInforme = (row) => ({
     ...row,
     relacion: row.id_incidencia ? String(row.id_incidencia) : 'ninguna',
     autor_nombre: [row.Autor_Nombre, row.Autor_Apellido].filter(Boolean).join(' ').trim() || null,
+    etapa: row.id_proyecto_etapa ? {
+        id: row.id_proyecto_etapa,
+        codigo: row.Etapa_Codigo,
+        nombre: row.Etapa_Nombre,
+        estado: row.Etapa_Estado,
+    } : null,
+    actividad: row.id_proyecto_actividad ? {
+        id: row.id_proyecto_actividad,
+        codigo: row.Actividad_Codigo,
+        nombre: row.Actividad_Nombre,
+        estado: row.Actividad_Estado,
+    } : null,
 });
 
 const parseRelacionIncidencia = (relacion, id_incidencia) => {
@@ -32,6 +53,20 @@ const parseRelacionIncidencia = (relacion, id_incidencia) => {
     }
     const parsed = Number(relacion);
     if (Number.isNaN(parsed)) throw new Error('relacion inválida: use "ninguna" o el id de incidencia');
+    return parsed;
+};
+
+const parseFechaOcurrencia = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    const s = String(value).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new Error('fecha inválida (use YYYY-MM-DD)');
+    return s;
+};
+
+const parseOptionalId = (value, label) => {
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = Number(value);
+    if (Number.isNaN(parsed)) throw new Error(`${label} inválido`);
     return parsed;
 };
 
@@ -100,8 +135,9 @@ exports.getInformeById = async (req, res) => {
 exports.createInforme = async (req, res) => {
     const id_Proyecto = Number(req.params.id);
     const {
-        nombre, hora, descripcion, ubicacion,
+        nombre, fecha, hora, descripcion, ubicacion,
         relacion, id_incidencia,
+        id_proyecto_etapa, id_proyecto_actividad,
     } = req.body;
 
     try {
@@ -112,16 +148,27 @@ exports.createInforme = async (req, res) => {
         if (!hora) {
             return res.status(400).json({ error: 'hora es requerida' });
         }
+        const fechaOcurrencia = parseFechaOcurrencia(fecha);
+        if (!fechaOcurrencia) {
+            return res.status(400).json({ error: 'fecha es requerida (día en que ocurrió el suceso, YYYY-MM-DD)' });
+        }
 
         const nombreFinal = nombre || await obtenerNombreProyectoDefault(id_Proyecto);
         const idInc = parseRelacionIncidencia(relacion, id_incidencia);
         await validarIncidenciaProyecto(idInc, id_Proyecto);
 
+        const idEtapa = parseOptionalId(id_proyecto_etapa, 'id_proyecto_etapa');
+        const idActividad = parseOptionalId(id_proyecto_actividad, 'id_proyecto_actividad');
+        await validarEtapaActividadProyecto(db, id_Proyecto, idEtapa, idActividad);
+
         const result = await db.query(
-            `INSERT INTO INFORME (nombre, hora, DNI_autor, descripcion, ubicacion, id_incidencia, id_Proyecto)
-             VALUES (?,?,?,?,?,?,?)`,
-            [nombreFinal, hora, DNI_autor, descripcion || null, ubicacion || null, idInc, id_Proyecto]
+            `INSERT INTO INFORME
+                (nombre, fecha, hora, DNI_autor, descripcion, ubicacion, id_incidencia, id_proyecto_etapa, id_proyecto_actividad, id_Proyecto)
+             VALUES (?,?,?,?,?,?,?,?,?,?)`,
+            [nombreFinal, fechaOcurrencia, hora, DNI_autor, descripcion || null, ubicacion || null, idInc, idEtapa, idActividad, id_Proyecto]
         );
+
+        await recalcFechasEtapasDesdeInformes(db, id_Proyecto);
 
         const rows = await db.query(
             `${SELECT_INFORME} WHERE I.id = ?`,
@@ -137,21 +184,58 @@ exports.updateInforme = async (req, res) => {
     const id_Proyecto = Number(req.params.id);
     const id = Number(req.params.iid);
     const {
-        nombre, hora, descripcion, ubicacion,
+        nombre, fecha, hora, descripcion, ubicacion,
         relacion, id_incidencia,
+        id_proyecto_etapa, id_proyecto_actividad,
     } = req.body;
 
     try {
-        const idInc = parseRelacionIncidencia(relacion, id_incidencia);
+        const actual = await db.query(
+            'SELECT * FROM INFORME WHERE id = ? AND id_Proyecto = ?',
+            [id, id_Proyecto],
+        );
+        if (!actual.length) return res.status(404).json({ error: 'No encontrado' });
+        const cur = actual[0];
+
+        const idInc = parseRelacionIncidencia(
+            relacion !== undefined ? relacion : (cur.id_incidencia ? String(cur.id_incidencia) : 'ninguna'),
+            id_incidencia !== undefined ? id_incidencia : cur.id_incidencia,
+        );
         await validarIncidenciaProyecto(idInc, id_Proyecto);
+
+        const idEtapa = id_proyecto_etapa !== undefined
+            ? parseOptionalId(id_proyecto_etapa, 'id_proyecto_etapa')
+            : cur.id_proyecto_etapa;
+        const idActividad = id_proyecto_actividad !== undefined
+            ? parseOptionalId(id_proyecto_actividad, 'id_proyecto_actividad')
+            : cur.id_proyecto_actividad;
+        await validarEtapaActividadProyecto(db, id_Proyecto, idEtapa, idActividad);
+
+        const fechaFinal = fecha !== undefined
+            ? parseFechaOcurrencia(fecha) || cur.fecha
+            : cur.fecha;
 
         const result = await db.query(
             `UPDATE INFORME
-             SET nombre=?, hora=?, descripcion=?, ubicacion=?, id_incidencia=?
+             SET nombre=?, fecha=?, hora=?, descripcion=?, ubicacion=?, id_incidencia=?,
+                 id_proyecto_etapa=?, id_proyecto_actividad=?
              WHERE id=? AND id_Proyecto=?`,
-            [nombre, hora, descripcion, ubicacion, idInc, id, id_Proyecto]
+            [
+                nombre !== undefined ? nombre : cur.nombre,
+                fechaFinal,
+                hora !== undefined ? hora : cur.hora,
+                descripcion !== undefined ? descripcion : cur.descripcion,
+                ubicacion !== undefined ? ubicacion : cur.ubicacion,
+                idInc,
+                idEtapa,
+                idActividad,
+                id,
+                id_Proyecto,
+            ],
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+
+        await recalcFechasEtapasDesdeInformes(db, id_Proyecto);
 
         const rows = await db.query(
             `${SELECT_INFORME} WHERE I.id = ?`,
@@ -180,6 +264,7 @@ exports.deleteInforme = async (req, res) => {
         }
 
         await db.query('DELETE FROM INFORME WHERE id = ? AND id_Proyecto = ?', [req.params.iid, req.params.id]);
+        await recalcFechasEtapasDesdeInformes(db, Number(req.params.id));
         res.json({ message: 'Informe eliminado' });
     } catch (e) {
         res.status(500).json({ error: e.message });
