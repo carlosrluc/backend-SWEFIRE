@@ -113,7 +113,7 @@ const PUBLIC_API_ROUTES = [
     { method: 'POST', path: '/usuarios/login' },
     { method: 'POST', path: '/usuarios' },
     { method: 'POST', path: '/usuarios/con-perfil' },
-    { method: 'GET', path: '/servicios/publico' },
+    { method: 'GET', path: '/servicios/publicos' },
 ];
 
 function isPublicApiRoute(req) {

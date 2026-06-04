@@ -100,7 +100,7 @@ router.post('/', c.create);
 
 /**
  * @openapi
- * /api/servicios/publico:
+ * /api/servicios/publicos:
  *   get:
  *     tags: [Servicio - Público, Servicio]
  *     summary: Catálogo público de servicios activos
@@ -129,7 +129,7 @@ router.post('/', c.create);
  *       500:
  *         description: Error del servidor
  */
-router.get('/publico', c.getPublico);
+router.get('/publicos', c.getPublico);
 
 /**
  * @openapi
