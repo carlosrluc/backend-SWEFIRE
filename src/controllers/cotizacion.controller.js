@@ -222,7 +222,7 @@ exports.getAll = async (req, res) => {
             countQuery += condition;
         }
 
-        query += ' LIMIT ? OFFSET ?';
+        query += ' ORDER BY C_C.ID DESC LIMIT ? OFFSET ?';
         args.push(limit, offset);
 
         const rows = await db.query(query, args);
@@ -255,9 +255,9 @@ exports.getById = async (req, res) => {
         const solicitud = rows[0];
         // Obtener datos de subtablas relacionadas
         const [medios, servicios, inventario] = await Promise.all([
-            db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])
+            db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id]),
+            db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id]),
+            db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [req.params.id])
         ]);
         // Devolver la solicitud con sus sub‑arrays
         res.json({
@@ -305,7 +305,8 @@ exports.getDetalles = async (req, res) => {
                 c.dias_alquilados
             FROM COTIZACION_INVENTARIO c 
             LEFT JOIN INVENTARIO i ON c.ID_Inventario = i.Id_Objeto 
-            WHERE c.ID_Cotizacion = ?`;
+            WHERE c.ID_Cotizacion = ?
+            ORDER BY c.id DESC`;
         const inventarioResult = await db.query(invQuery, [cotizacionId]);
 
         // Obtener camiones
@@ -316,7 +317,8 @@ exports.getDetalles = async (req, res) => {
             FROM COTIZACION_CAMION c 
             LEFT JOIN USUARIO u ON c.ID_Piloto = u.idusuario 
             LEFT JOIN PERFIL p ON u.dni_perfil = p.DNI 
-            WHERE c.ID_Cotizacion = ?`;
+            WHERE c.ID_Cotizacion = ?
+            ORDER BY c.id DESC`;
         const camionesResult = await db.query(camQuery, [cotizacionId]);
 
         // Obtener servicios
@@ -330,7 +332,8 @@ exports.getDetalles = async (req, res) => {
                 s.nombre as nombre_servicio 
             FROM COTIZACION_SERVICIO c 
             LEFT JOIN SERVICIO s ON c.ID_Servicio = s.ID_Servicio 
-            WHERE c.ID_Cotizacion = ?`;
+            WHERE c.ID_Cotizacion = ?
+            ORDER BY c.id DESC`;
         const serviciosResult = await db.query(servQuery, [cotizacionId]);
 
         const mapByKey = (arr, key) => arr.reduce((obj, item) => {
@@ -413,7 +416,8 @@ exports.getDetallesFranco = async (req, res) => {
                 c.dias_alquilados AS diasAlquilados
             FROM COTIZACION_INVENTARIO c 
             LEFT JOIN INVENTARIO i ON c.ID_Inventario = i.Id_Objeto 
-            WHERE c.ID_Cotizacion = ?`;
+            WHERE c.ID_Cotizacion = ?
+            ORDER BY c.id DESC`;
         const inventarioResult = await db.query(invQuery, [cotizacionId]);
         const productos = inventarioResult.map(row => ({
             id: row.id,
@@ -450,7 +454,8 @@ exports.getDetallesFranco = async (req, res) => {
             FROM COTIZACION_CAMION cc
             LEFT JOIN CAMION cam ON cc.Placa = cam.Placa
             LEFT JOIN COTIZACION_SERVICIO cs ON cc.uso = cs.id
-            WHERE cc.ID_Cotizacion = ?`;
+            WHERE cc.ID_Cotizacion = ?
+            ORDER BY cc.id DESC`;
         const camionesResult = await db.query(camionesQuery, [cotizacionId]);
         const camiones = camionesResult.map(cam => ({
             placa: cam.placa,
@@ -500,7 +505,8 @@ exports.getDetallesFranco = async (req, res) => {
                 c.precio_comercial
             FROM COTIZACION_SERVICIO c
             LEFT JOIN SERVICIO s ON c.ID_Servicio = s.ID_Servicio
-            WHERE c.ID_Cotizacion = ? AND c.ID_Servicio != 7`;
+            WHERE c.ID_Cotizacion = ? AND c.ID_Servicio != 7
+            ORDER BY c.id DESC`;
         const serviciosResult = await db.query(servQuery, [cotizacionId]);
         const servicios = serviciosResult.map(row => ({
             idCotizacionServicio: row.idCotizacionServicio,
@@ -838,7 +844,7 @@ exports.remove = async (req, res) => {
 
 // ── COTIZACION_SERVICIO ───────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
-    try { res.json(await db.query('SELECT CS.*, S.nombre as Servicio_Nombre FROM COTIZACION_SERVICIO CS LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio WHERE CS.ID_Cotizacion = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT CS.*, S.nombre as Servicio_Nombre FROM COTIZACION_SERVICIO CS LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio WHERE CS.ID_Cotizacion = ? ORDER BY CS.id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -885,7 +891,8 @@ exports.getCamiones = async (req, res) => {
              FROM COTIZACION_CAMION CC
              LEFT JOIN CAMION C ON CC.Placa = C.Placa
              LEFT JOIN COTIZACION_SERVICIO CS ON CC.uso = CS.id
-             WHERE CC.ID_Cotizacion = ?`,
+             WHERE CC.ID_Cotizacion = ?
+             ORDER BY CC.id DESC`,
             [req.params.id],
         ));
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -981,7 +988,7 @@ exports.getInventarioPorServicio = async (req, res) => {
 
 // ── COTIZACION_INVENTARIO ─────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT CI.*, I.nombre_objeto as Objeto_Nombre FROM COTIZACION_INVENTARIO CI LEFT JOIN INVENTARIO I ON CI.ID_Inventario = I.Id_Objeto WHERE CI.ID_Cotizacion = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT CI.*, I.nombre_objeto as Objeto_Nombre FROM COTIZACION_INVENTARIO CI LEFT JOIN INVENTARIO I ON CI.ID_Inventario = I.Id_Objeto WHERE CI.ID_Cotizacion = ? ORDER BY CI.id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -1047,7 +1054,7 @@ exports.deleteInventario = async (req, res) => {
 
 // ── COTIZACION_PERSONAL ───────────────────────────────────────────────────────
 exports.getPersonal = async (req, res) => {
-    try { res.json(await db.query('SELECT CP.*, P.Nombre as Personal_Nombre, P.Apellido as Personal_Apellido FROM COTIZACION_PERSONAL CP LEFT JOIN USUARIO U ON CP.ID_Usuario = U.idusuario LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI WHERE CP.ID_Cotizacion = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT CP.*, P.Nombre as Personal_Nombre, P.Apellido as Personal_Apellido FROM COTIZACION_PERSONAL CP LEFT JOIN USUARIO U ON CP.ID_Usuario = U.idusuario LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI WHERE CP.ID_Cotizacion = ? ORDER BY CP.id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 

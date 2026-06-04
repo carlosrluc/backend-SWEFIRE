@@ -74,7 +74,7 @@ exports.getInformes = async (req, res) => {
         const rows = await db.query(
             `${SELECT_INFORME}
              WHERE ${where.join(' AND ')}
-             ORDER BY I.fecha_registro DESC, I.hora DESC`,
+             ORDER BY I.id DESC`,
             params
         );
 

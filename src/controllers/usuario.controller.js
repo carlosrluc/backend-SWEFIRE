@@ -15,6 +15,7 @@ exports.getAll = async (req, res) => {
             `SELECT U.idusuario, U.dni_perfil, U.rol, U.correo, P.Nombre as Perfil_Nombre, P.Apellido as Perfil_Apellido 
              FROM USUARIO U 
              LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI 
+             ORDER BY U.idusuario DESC
              LIMIT ? OFFSET ?`,
             [limit, offset]
         );

@@ -51,7 +51,7 @@ exports.getAll = async (req, res) => {
             countQuery += condition;
         }
 
-        query += ' LIMIT ? OFFSET ?';
+        query += ' ORDER BY S.ID DESC LIMIT ? OFFSET ?';
         args.push(limit, offset);
 
         const rows = await db.query(query, args);
@@ -60,10 +60,10 @@ exports.getAll = async (req, res) => {
 
         const detailedRows = await Promise.all(rows.map(async (solicitud) => {
             const [medios, servicios, inventario, camiones] = await Promise.all([
-                db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ?', [solicitud.ID]),
+                db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [solicitud.ID]),
+                db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [solicitud.ID]),
+                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [solicitud.ID]),
+                db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [solicitud.ID]),
             ]);
             return { ...solicitud, medios, servicios, inventario, camiones };
         }));
@@ -103,7 +103,7 @@ exports.getByEstado = async (req, res) => {
             countArgs.push(...clientIds);
         }
 
-        query += ' LIMIT ? OFFSET ?';
+        query += ' ORDER BY S.ID DESC LIMIT ? OFFSET ?';
         args.push(limit, offset);
 
         const rows = await db.query(query, args);
@@ -112,10 +112,10 @@ exports.getByEstado = async (req, res) => {
 
         const detailedRows = await Promise.all(rows.map(async (solicitud) => {
             const [medios, servicios, inventario, camiones] = await Promise.all([
-                db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [solicitud.ID]),
-                db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ?', [solicitud.ID]),
+                db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [solicitud.ID]),
+                db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [solicitud.ID]),
+                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [solicitud.ID]),
+                db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [solicitud.ID]),
             ]);
             return { ...solicitud, medios, servicios, inventario, camiones };
         }));
@@ -150,10 +150,10 @@ exports.getById = async (req, res) => {
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         const solicitud = rows[0];
         const [medios, servicios, inventario, camiones] = await Promise.all([
-            db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id]),
-            db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ?', [req.params.id]),
+            db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id]),
+            db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id]),
+            db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [req.params.id]),
+            db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [req.params.id]),
         ]);
         res.json({ ...solicitud, medios, servicios, inventario, camiones });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -227,7 +227,7 @@ exports.remove = async (req, res) => {
 
 // ── SOLICITUD_MEDIO_COMUNICACION ──────────────────────────────────────────────
 exports.getMedios = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -266,7 +266,7 @@ exports.deleteMedio = async (req, res) => {
 
 // ── SOLICITUD_SERVICIO ────────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -328,7 +328,7 @@ exports.deleteServicio = async (req, res) => {
 
 // ── SOLICITUD_INVENTARIO ──────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -372,7 +372,8 @@ exports.getCamiones = async (req, res) => {
             `SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo
              FROM SOLICITUD_CAMION SC
              LEFT JOIN CAMION C ON SC.id_camion = C.Placa
-             WHERE SC.ID_Solicitud = ?`,
+             WHERE SC.ID_Solicitud = ?
+             ORDER BY SC.id DESC`,
             [req.params.id]
         );
         res.json(rows);

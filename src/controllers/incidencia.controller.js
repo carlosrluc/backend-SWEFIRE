@@ -186,7 +186,7 @@ exports.remove = async (req, res) => {
 // ── INCIDENCIA_OBJETOS ────────────────────────────────────────────────────────
 exports.getObjetos = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM INCIDENCIA_OBJETOS WHERE id_incidencia = ?', [req.params.id]);
+        const rows = await db.query('SELECT * FROM INCIDENCIA_OBJETOS WHERE id_incidencia = ? ORDER BY id DESC', [req.params.id]);
         res.json(rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -218,7 +218,8 @@ exports.getInvolucrados = async (req, res) => {
              FROM INVOLUCRADO I 
              LEFT JOIN TRABAJO T ON I.id_trabajo = T.Id_trabajo 
              LEFT JOIN PERFIL P ON I.dni_involucrado = P.DNI 
-             WHERE I.id_incidencia = ?`, 
+             WHERE I.id_incidencia = ?
+             ORDER BY I.id DESC`, 
             [req.params.id]
         );
         res.json(rows);

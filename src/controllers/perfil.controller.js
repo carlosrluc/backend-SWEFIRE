@@ -117,7 +117,7 @@ exports.getAll = async (req, res) => {
              FROM PERFIL P
              LEFT JOIN USUARIO u ON u.dni_perfil = P.DNI
              ${whereSql}
-             ORDER BY P.Apellido ASC, P.Nombre ASC
+             ORDER BY P.DNI DESC
              LIMIT ? OFFSET ?`,
             [...params, limit, offset]
         );
@@ -159,7 +159,7 @@ exports.getPersonal = async (req, res) => {
              FROM PERFIL P
              LEFT JOIN USUARIO u ON u.dni_perfil = P.DNI
              ${whereSql}
-             ORDER BY P.Apellido ASC, P.Nombre ASC
+             ORDER BY P.DNI DESC
              LIMIT ? OFFSET ?`,
             [...params, limit, offset]
         );
@@ -400,7 +400,7 @@ exports.getCertificacionPDF = (req, res) => handleFileGet(req, res, 'PERFIL_CERT
 // ── PERFIL_EDUCACION ──────────────────────────────────────────────────────────
 exports.getEducacion = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM PERFIL_EDUCACION WHERE DNI_perfil = ?', [req.params.dni]);
+        const rows = await db.query('SELECT * FROM PERFIL_EDUCACION WHERE DNI_perfil = ? ORDER BY id DESC', [req.params.dni]);
         res.json(rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -441,7 +441,7 @@ exports.deleteEducacion = async (req, res) => {
 // ── PERFIL_BREVETE ────────────────────────────────────────────────────────────
 exports.getBrevete = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM PERFIL_BREVETE WHERE DNI_perfil = ?', [req.params.dni]);
+        const rows = await db.query('SELECT * FROM PERFIL_BREVETE WHERE DNI_perfil = ? ORDER BY id DESC', [req.params.dni]);
         res.json(rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -482,7 +482,7 @@ exports.deleteBrevete = async (req, res) => {
 // ── PERFIL_CERTIFICACION ──────────────────────────────────────────────────────
 exports.getCertificacion = async (req, res) => {
     try {
-        const rows = await db.query('SELECT * FROM PERFIL_CERTIFICACION WHERE DNI_perfil = ?', [req.params.dni]);
+        const rows = await db.query('SELECT * FROM PERFIL_CERTIFICACION WHERE DNI_perfil = ? ORDER BY id DESC', [req.params.dni]);
         res.json(rows);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -537,6 +537,7 @@ exports.getTrabajadoresDisponibles = async (req, res) => {
                 FROM TRABAJO_JORNADA 
                 WHERE dia = ?
             )
+            ORDER BY p.DNI DESC
         `;
         const rows = await db.query(sql, [fecha]);
         res.json(rows);
@@ -567,6 +568,7 @@ exports.getConductoresDisponibles = async (req, res) => {
                 FROM TRABAJO_JORNADA 
                 WHERE dia = ?
             )
+            ORDER BY p.DNI DESC
         `;
         const rows = await db.query(sql, [fecha]);
         res.json(rows);
@@ -582,7 +584,8 @@ exports.getSolicitudesPorPerfil = async (req, res) => {
             SELECT S.* 
             FROM SOLICITUD S
             JOIN CLIENTE_CONTACTO CC ON S.Id_Cliente = CC.DNI_O_RUC
-            WHERE CC.DNI_perfil = ?`;
+            WHERE CC.DNI_perfil = ?
+            ORDER BY S.ID DESC`;
         res.json(await db.query(sql, [req.params.dni]));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -620,6 +623,7 @@ exports.getCotizacionesPorPerfil = async (req, res) => {
             JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
             LEFT JOIN CLIENTE CL ON C.DNI_O_RUC = CL.DNI_O_RUC
             WHERE CC.DNI_perfil = ?${extraWhere}
+            ORDER BY C.ID DESC
             LIMIT ? OFFSET ?`;
         const rows = await db.query(sql, [req.params.dni, ...filterArgs, limit, offset]);
 
@@ -636,7 +640,8 @@ exports.getProyectosPorPerfil = async (req, res) => {
             SELECT P.* 
             FROM PROYECTO P
             JOIN CLIENTE_CONTACTO CC ON P.Id_Cliente = CC.DNI_O_RUC
-            WHERE CC.DNI_perfil = ?`;
+            WHERE CC.DNI_perfil = ?
+            ORDER BY P.id_Proyecto DESC`;
         res.json(await db.query(sql, [req.params.dni]));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
@@ -647,29 +652,30 @@ exports.getIncidenciasPorPerfil = async (req, res) => {
             SELECT I.* 
             FROM INCIDENCIA I
             JOIN CLIENTE_CONTACTO CC ON I.empresa_involucrada = CC.DNI_O_RUC
-            WHERE CC.DNI_perfil = ?`;
+            WHERE CC.DNI_perfil = ?
+            ORDER BY I.id_incidencia DESC`;
         res.json(await db.query(sql, [req.params.dni]));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 // ── TABLAS CON PK DE PERFIL ───────────────────────────────────────────────────
 exports.getTrabajosJornadaPorPerfil = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM TRABAJO_JORNADA WHERE DNI_Trabajador = ?', [req.params.dni])); }
+    try { res.json(await db.query('SELECT * FROM TRABAJO_JORNADA WHERE DNI_Trabajador = ? ORDER BY id DESC', [req.params.dni])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getTrabajosRRHHPorPerfil = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM TRABAJO_RRHH WHERE DNI_Trabajador = ?', [req.params.dni])); }
+    try { res.json(await db.query('SELECT * FROM TRABAJO_RRHH WHERE DNI_Trabajador = ? ORDER BY id DESC', [req.params.dni])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getInvolucradoPorPerfil = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM INVOLUCRADO WHERE dni_involucrado = ?', [req.params.dni])); }
+    try { res.json(await db.query('SELECT * FROM INVOLUCRADO WHERE dni_involucrado = ? ORDER BY id DESC', [req.params.dni])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getCredencialesRRHHPorPerfil = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM PERFIL_CREDENCIALES_RRHH WHERE DNI_perfil = ?', [req.params.dni])); }
+    try { res.json(await db.query('SELECT * FROM PERFIL_CREDENCIALES_RRHH WHERE DNI_perfil = ? ORDER BY id DESC', [req.params.dni])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -679,7 +685,8 @@ exports.getEmpresasContactoPorPerfil = async (req, res) => {
             SELECT C.*, CC.cargo_en_empresa, CC.lugar_trabajo
             FROM CLIENTE C
             JOIN CLIENTE_CONTACTO CC ON C.DNI_O_RUC = CC.DNI_O_RUC
-            WHERE CC.DNI_perfil = ?`;
+            WHERE CC.DNI_perfil = ?
+            ORDER BY CC.id DESC`;
         res.json(await db.query(sql, [req.params.dni])); 
     }
     catch (e) { res.status(500).json({ error: e.message }); }

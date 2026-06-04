@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const c = require('../controllers/servicio.controller');
+const { uploadServicioFoto } = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
@@ -47,6 +48,7 @@ const c = require('../controllers/servicio.controller');
  *               condicional_precio: { type: string }
  *               observaciones: { type: string }
  *               Estado: { type: string, enum: [Activo, Desactivado] }
+ *               foto: { type: string, nullable: true, description: 'URL relativa; usar POST /servicios/{id}/foto para subir imagen' }
  *     responses:
  *       201:
  *         description: Servicio creado
@@ -109,6 +111,63 @@ router.post('/', c.create);
 router.get('/:id', c.getById);
 router.put('/:id', c.update);
 router.delete('/:id', c.remove);
+
+/**
+ * @openapi
+ * /api/servicios/{id}/foto:
+ *   get:
+ *     tags: [Servicio]
+ *     summary: Ver/descargar fotografía del servicio (PNG/JPEG)
+ *     description: Redirige a la URL pública guardada en SERVICIO.foto (ej. /uploads/servicios/foto_xxx.jpeg).
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       302:
+ *         description: Imagen del servicio
+ *       404:
+ *         description: Servicio o fotografía no encontrada
+ *   post:
+ *     tags: [Servicio]
+ *     summary: Subir fotografía del servicio (PNG/JPEG)
+ *     description: |
+ *       Guarda el archivo en el servidor y persiste en BD una URL relativa (no la ruta local del cliente).
+ *       Reemplaza la foto anterior si existía.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [foto]
+ *             properties:
+ *               foto:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Fotografía subida
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: 'Fotografía subida' }
+ *                 url: { type: string, example: '/uploads/servicios/foto_1710000000-123.jpeg' }
+ *       400:
+ *         description: Archivo no enviado o formato no permitido
+ *       404:
+ *         description: Servicio no encontrado
+ */
+router.get('/:id/foto', c.getFoto);
+router.post('/:id/foto', uploadServicioFoto.single('foto'), c.uploadFoto);
 
 /**
  * @openapi

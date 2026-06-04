@@ -78,10 +78,19 @@ const uploadInformeEvidencia = multer({
     limits: { fileSize: 5 * 1024 * 1024 },
 });
 
+const serviciosDir = createDir('servicios');
+
+const uploadServicioFoto = multer({
+    storage: createStorage(serviciosDir, 'foto'),
+    fileFilter: informeImageFilter,
+    limits: { fileSize: 5 * 1024 * 1024 },
+});
+
 module.exports = {
     uploadCotizacion: uploadCotizacion,
     uploadPDF: uploadPDF,
     uploadImage: uploadImage,
     uploadInformeEvidencia,
+    uploadServicioFoto,
 };
 

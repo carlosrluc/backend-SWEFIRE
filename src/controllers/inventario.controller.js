@@ -13,6 +13,7 @@ exports.getAll = async (req, res) => {
             `SELECT I.*, F.nombre_comercial as Fabricante_Nombre 
              FROM INVENTARIO I 
              LEFT JOIN FABRICANTE F ON I.ID_Fabricante = F.ID_Fabricante 
+             ORDER BY I.Id_Objeto DESC
              LIMIT ? OFFSET ?`,
             [limit, offset]
         );
@@ -128,7 +129,7 @@ exports.remove = async (req, res) => {
 
 // ── INVENTARIO_USO ────────────────────────────────────────────────────────────
 exports.getUsos = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM INVENTARIO_USO WHERE Id_Objeto = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM INVENTARIO_USO WHERE Id_Objeto = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 

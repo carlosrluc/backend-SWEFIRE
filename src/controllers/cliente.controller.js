@@ -9,7 +9,7 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const rows = await db.query(
-            'SELECT * FROM CLIENTE LIMIT ? OFFSET ?',
+            'SELECT * FROM CLIENTE ORDER BY DNI_O_RUC DESC LIMIT ? OFFSET ?',
             [limit, offset]
         );
 
@@ -69,7 +69,7 @@ exports.remove = async (req, res) => {
 
 // ── CLIENTE_CONTACTO ──────────────────────────────────────────────────────────
 exports.getContactos = async (req, res) => {
-    try { res.json(await db.query('SELECT CC.*, P.Nombre as Contacto_Nombre, P.Apellido as Contacto_Apellido FROM CLIENTE_CONTACTO CC LEFT JOIN PERFIL P ON CC.DNI_perfil = P.DNI WHERE CC.DNI_O_RUC = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT CC.*, P.Nombre as Contacto_Nombre, P.Apellido as Contacto_Apellido FROM CLIENTE_CONTACTO CC LEFT JOIN PERFIL P ON CC.DNI_perfil = P.DNI WHERE CC.DNI_O_RUC = ? ORDER BY CC.id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -108,7 +108,7 @@ exports.deleteContacto = async (req, res) => {
 
 // ── CLIENTE_TELEFONO_MOVIL ────────────────────────────────────────────────────
 exports.getTelefonosMovil = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM CLIENTE_TELEFONO_MOVIL WHERE DNI_O_RUC = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM CLIENTE_TELEFONO_MOVIL WHERE DNI_O_RUC = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -135,7 +135,7 @@ exports.deleteTelefonoMovil = async (req, res) => {
 
 // ── CLIENTE_CORREO ────────────────────────────────────────────────────────────
 exports.getCorreos = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM CLIENTE_CORREO WHERE DNI_O_RUC = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM CLIENTE_CORREO WHERE DNI_O_RUC = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -162,7 +162,7 @@ exports.deleteCorreo = async (req, res) => {
 
 // ── CLIENTE_TELEFONO_FIJO ─────────────────────────────────────────────────────
 exports.getTelefonosFijo = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM CLIENTE_TELEFONO_FIJO WHERE DNI_O_RUC = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM CLIENTE_TELEFONO_FIJO WHERE DNI_O_RUC = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -189,7 +189,7 @@ exports.deleteTelefonoFijo = async (req, res) => {
 
 // ── RELACIONES (SOLICITUD, COTIZACION, PROYECTO, INCIDENCIA) ──────────────────
 exports.getSolicitudes = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM SOLICITUD WHERE Id_Cliente = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM SOLICITUD WHERE Id_Cliente = ? ORDER BY ID DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -216,7 +216,7 @@ exports.getCotizaciones = async (req, res) => {
         const countResult = await db.query(countQuery, filterArgs);
         const total = countResult[0].total;
 
-        const query = `SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC ${whereSql} LIMIT ? OFFSET ?`;
+        const query = `SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC ${whereSql} ORDER BY C_C.ID DESC LIMIT ? OFFSET ?`;
         const rows = await db.query(query, [...filterArgs, limit, offset]);
 
         res.json({
@@ -228,11 +228,11 @@ exports.getCotizaciones = async (req, res) => {
 };
 
 exports.getProyectos = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM PROYECTO WHERE Id_Cliente = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM PROYECTO WHERE Id_Cliente = ? ORDER BY id_Proyecto DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getIncidencias = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM INCIDENCIA WHERE empresa_involucrada = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM INCIDENCIA WHERE empresa_involucrada = ? ORDER BY id_incidencia DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };

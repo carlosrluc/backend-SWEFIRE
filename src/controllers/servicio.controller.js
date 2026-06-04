@@ -1,4 +1,14 @@
 const db = require('../config/db');
+const fs = require('fs');
+const path = require('path');
+
+const unlinkFotoIfExists = (fotoUrl) => {
+    if (!fotoUrl) return;
+    const abs = path.join(__dirname, '../../', fotoUrl);
+    if (fs.existsSync(abs)) {
+        try { fs.unlinkSync(abs); } catch (_) {}
+    }
+};
 
 // ── SERVICIO ──────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
@@ -60,15 +70,53 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
     try {
-        const result = await db.query('DELETE FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        const rows = await db.query('SELECT foto FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
+        if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
+
+        unlinkFotoIfExists(rows[0].foto);
+
+        await db.query('DELETE FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
         res.json({ message: 'Servicio eliminado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// ── SERVICIO.foto (PNG/JPEG, URL relativa en BD) ──────────────────────────────
+exports.uploadFoto = async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+
+        const rows = await db.query('SELECT foto FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
+        if (!rows.length) {
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Servicio no encontrado' });
+        }
+
+        unlinkFotoIfExists(rows[0].foto);
+
+        const relativeUrl = `/uploads/servicios/${req.file.filename}`;
+        await db.query('UPDATE SERVICIO SET foto = ? WHERE ID_Servicio = ?', [
+            relativeUrl, req.params.id,
+        ]);
+
+        res.status(200).json({ message: 'Fotografía subida', url: relativeUrl });
+    } catch (e) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+        res.status(500).json({ error: e.message });
+    }
+};
+
+exports.getFoto = async (req, res) => {
+    try {
+        const rows = await db.query('SELECT foto FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
+        if (!rows.length) return res.status(404).json({ error: 'Servicio no encontrado' });
+        if (!rows[0].foto) return res.status(404).json({ error: 'Fotografía no encontrada' });
+        res.redirect(rows[0].foto);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 // ── SERVICIO_PERSONAL_REQUERIDO ───────────────────────────────────────────────
 exports.getPersonal = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM SERVICIO_PERSONAL_REQUERIDO WHERE ID_Servicio = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM SERVICIO_PERSONAL_REQUERIDO WHERE ID_Servicio = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -118,7 +166,7 @@ const inventarioRequeridoSelect = `
 exports.getInventarioRequerido = async (req, res) => {
     try {
         const rows = await db.query(
-            `${inventarioRequeridoSelect} WHERE sir.ID_Servicio = ? ORDER BY i.nombre_objeto`,
+            `${inventarioRequeridoSelect} WHERE sir.ID_Servicio = ? ORDER BY sir.Id_Objeto DESC`,
             [req.params.id],
         );
         res.json(rows);

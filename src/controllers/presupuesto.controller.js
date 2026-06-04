@@ -15,6 +15,7 @@ exports.getByCotizacion = async (req, res) => {
             query += ' AND tipo = ?';
             params.push(tipo);
         }
+        query += ' ORDER BY ID DESC';
         
         const rows = await db.query(query, params);
         
@@ -46,6 +47,7 @@ exports.getByCotizacionReal = async (req, res) => {
             query += ' AND tipo = ?';
             params.push(tipo);
         }
+        query += ' ORDER BY ID DESC';
         
         const rows = await db.query(query, params);
         

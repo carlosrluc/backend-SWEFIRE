@@ -70,6 +70,7 @@ exports.getAll = async (req, res) => {
             LEFT JOIN COTIZACION_COMERCIAL CC ON P.id_cotizacion = CC.ID 
             LEFT JOIN TRABAJO T ON P.ID_Trabajo = T.Id_trabajo 
             ${whereString}
+            ORDER BY P.id_Proyecto DESC
             LIMIT ? OFFSET ?`;
 
         const rows = await db.query(queryStr, [...queryParams, limit, offset]);
@@ -113,7 +114,7 @@ exports.getActiveAndCompleted = async (req, res) => {
                     WHEN 'Completado' THEN 2 
                     ELSE 3 
                 END ASC,
-                P.fecha_fin DESC
+                P.id_Proyecto DESC
         `;
 
         const rows = await db.query(queryStr);
@@ -263,7 +264,7 @@ exports.remove = async (req, res) => {
 
 // ── PROYECTO_CAMION ───────────────────────────────────────────────────────────
 exports.getCamiones = async (req, res) => {
-    try { res.json(await db.query('SELECT PC.*, C.nombre as Camion_Nombre FROM PROYECTO_CAMION PC LEFT JOIN CAMION C ON PC.Placa = C.Placa WHERE PC.id_Proyecto = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT PC.*, C.nombre as Camion_Nombre FROM PROYECTO_CAMION PC LEFT JOIN CAMION C ON PC.Placa = C.Placa WHERE PC.id_Proyecto = ? ORDER BY PC.id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createCamion = async (req, res) => {
@@ -299,7 +300,7 @@ exports.updateCamion = async (req, res) => {
 
 // ── PROYECTO_DOCUMENTACION ────────────────────────────────────────────────────
 exports.getDocumentacion = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM PROYECTO_DOCUMENTACION WHERE id_Proyecto = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM PROYECTO_DOCUMENTACION WHERE id_Proyecto = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createDocumentacion = async (req, res) => {
@@ -453,7 +454,7 @@ exports.exportInventarioPorServicio = async (req, res) => {
 
 // ── PROYECTO_INVENTARIO ───────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT PI.*, I.nombre_objeto as Objeto_Nombre FROM PROYECTO_INVENTARIO PI LEFT JOIN INVENTARIO I ON PI.Id_Objeto = I.Id_Objeto WHERE PI.id_Proyecto = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT PI.*, I.nombre_objeto as Objeto_Nombre FROM PROYECTO_INVENTARIO PI LEFT JOIN INVENTARIO I ON PI.Id_Objeto = I.Id_Objeto WHERE PI.id_Proyecto = ? ORDER BY PI.id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 exports.createInventario = async (req, res) => {

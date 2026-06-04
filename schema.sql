@@ -63,6 +63,7 @@ CREATE TABLE "SERVICIO" (
   "condicional_precio" text COLLATE utf8mb4_unicode_ci,
   "observaciones" text COLLATE utf8mb4_unicode_ci,
   "Estado" enum('Activo','Desactivado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "foto" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("ID_Servicio")
 );
 
@@ -964,5 +965,24 @@ SET @sql_nombre_inc = IF(
   'SELECT ''nombre_incidencia ya existe'' AS info'
 );
 PREPARE stmt FROM @sql_nombre_inc;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- MIGRACIÓN: SERVICIO.foto (URL relativa de imagen PNG/JPEG)
+-- ─────────────────────────────────────────────────────────────────────────────
+
+SET @col_exists = (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+  WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'SERVICIO'
+    AND COLUMN_NAME = 'foto'
+);
+SET @sql_servicio_foto = IF(
+  @col_exists = 0,
+  'ALTER TABLE `SERVICIO` ADD COLUMN `foto` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL',
+  'SELECT ''foto ya existe'' AS info'
+);
+PREPARE stmt FROM @sql_servicio_foto;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;

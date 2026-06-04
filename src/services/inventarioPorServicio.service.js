@@ -23,24 +23,26 @@ function mapFilasToItems(filas) {
         }
     }
 
-    return Array.from(mapa.values()).map((item) => {
-        const esParaInventario = item.estancia === 'para inventario';
-        const faltante = esParaInventario
-            ? Math.max(0, item.cantidad_requerida - item.cantidad_en_inventario)
-            : 0;
-        const costo = faltante > 0 ? faltante * item.precio_compra : 0;
-        return {
-            id_inventario: item.id_inventario,
-            nombre_objeto: item.nombre_objeto,
-            estancia: item.estancia,
-            cantidad_requerida: item.cantidad_requerida,
-            cantidad_en_inventario: item.cantidad_en_inventario,
-            precio_compra: item.precio_compra,
-            servicios: item.servicios,
-            faltante,
-            costo: Math.round(costo * 100) / 100,
-        };
-    });
+    return Array.from(mapa.values())
+        .map((item) => {
+            const esParaInventario = item.estancia === 'para inventario';
+            const faltante = esParaInventario
+                ? Math.max(0, item.cantidad_requerida - item.cantidad_en_inventario)
+                : 0;
+            const costo = faltante > 0 ? faltante * item.precio_compra : 0;
+            return {
+                id_inventario: item.id_inventario,
+                nombre_objeto: item.nombre_objeto,
+                estancia: item.estancia,
+                cantidad_requerida: item.cantidad_requerida,
+                cantidad_en_inventario: item.cantidad_en_inventario,
+                precio_compra: item.precio_compra,
+                servicios: item.servicios,
+                faltante,
+                costo: Math.round(costo * 100) / 100,
+            };
+        })
+        .sort((a, b) => b.id_inventario - a.id_inventario);
 }
 
 async function aggregateInventarioPorProyecto(executor, idProyecto) {
@@ -70,7 +72,7 @@ async function aggregateInventarioPorProyecto(executor, idProyecto) {
          INNER JOIN SERVICIO_INVENTARIO_REQUERIDO sir ON sir.ID_Servicio = s.ID_Servicio
          INNER JOIN INVENTARIO i ON i.Id_Objeto = sir.Id_Objeto
          WHERE p.id_Proyecto = ?
-         ORDER BY sir.estancia, i.nombre_objeto, s.nombre`,
+         ORDER BY i.Id_Objeto DESC`,
         [idProyecto],
     );
 
@@ -80,7 +82,7 @@ async function aggregateInventarioPorProyecto(executor, idProyecto) {
          INNER JOIN COTIZACION_SERVICIO cs ON cs.ID_Cotizacion = p.id_cotizacion
          INNER JOIN SERVICIO s ON s.ID_Servicio = cs.ID_Servicio
          WHERE p.id_Proyecto = ?
-         ORDER BY s.nombre`,
+         ORDER BY s.ID_Servicio DESC`,
         [idProyecto],
     );
 
@@ -108,7 +110,7 @@ async function aggregateInventarioPorCotizacion(executor, idCotizacion) {
          INNER JOIN SERVICIO_INVENTARIO_REQUERIDO sir ON sir.ID_Servicio = s.ID_Servicio
          INNER JOIN INVENTARIO i ON i.Id_Objeto = sir.Id_Objeto
          WHERE cs.ID_Cotizacion = ?
-         ORDER BY sir.estancia, i.nombre_objeto, s.nombre`,
+         ORDER BY i.Id_Objeto DESC`,
         [idCotizacion],
     );
 
@@ -117,7 +119,7 @@ async function aggregateInventarioPorCotizacion(executor, idCotizacion) {
          FROM COTIZACION_SERVICIO cs
          INNER JOIN SERVICIO s ON s.ID_Servicio = cs.ID_Servicio
          WHERE cs.ID_Cotizacion = ?
-         ORDER BY s.nombre`,
+         ORDER BY s.ID_Servicio DESC`,
         [idCotizacion],
     );
 

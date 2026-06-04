@@ -36,6 +36,7 @@ exports.getAll = async (req, res) => {
             `SELECT C.*, F.nombre_comercial as Fabricante_Nombre 
              FROM CAMION C 
              LEFT JOIN FABRICANTE F ON C.ID_Fabricante = F.ID_Fabricante 
+             ORDER BY C.Placa DESC
              LIMIT ? OFFSET ?`,
             [limit, offset]
         );
@@ -277,7 +278,7 @@ exports.getTarjetaPropiedad = (req, res) => handleFileGet(req, res, 'CAMION', 'P
 
 // ── CAMION_MANTENIMIENTO ──────────────────────────────────────────────────────
 exports.getMantenimientos = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM CAMION_MANTENIMIENTO WHERE Placa = ?', [req.params.placa])); }
+    try { res.json(await db.query('SELECT * FROM CAMION_MANTENIMIENTO WHERE Placa = ? ORDER BY id DESC', [req.params.placa])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -307,7 +308,7 @@ exports.deleteMantenimiento = async (req, res) => {
 
 // ── CAMION_INVENTARIO ─────────────────────────────────────────────────────────
 exports.getCamionInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT CI.*, I.nombre_objeto as Objeto_Nombre FROM CAMION_INVENTARIO CI LEFT JOIN INVENTARIO I ON CI.Id_Objeto = I.Id_Objeto WHERE CI.Placa = ?', [req.params.placa])); }
+    try { res.json(await db.query('SELECT CI.*, I.nombre_objeto as Objeto_Nombre FROM CAMION_INVENTARIO CI LEFT JOIN INVENTARIO I ON CI.Id_Objeto = I.Id_Objeto WHERE CI.Placa = ? ORDER BY CI.id DESC', [req.params.placa])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 

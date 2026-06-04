@@ -8,7 +8,7 @@ exports.getAll = async (req, res) => {
         const offset = (page - 1) * limit;
 
         const rows = await db.query(
-            'SELECT * FROM FABRICANTE LIMIT ? OFFSET ?',
+            'SELECT * FROM FABRICANTE ORDER BY ID_Fabricante DESC LIMIT ? OFFSET ?',
             [limit, offset]
         );
 
@@ -68,7 +68,7 @@ exports.remove = async (req, res) => {
 
 // ── FABRICANTE_CONTACTO ───────────────────────────────────────────────────────
 exports.getContactos = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM FABRICANTE_CONTACTO WHERE ID_Fabricante = ?', [req.params.id])); }
+    try { res.json(await db.query('SELECT * FROM FABRICANTE_CONTACTO WHERE ID_Fabricante = ? ORDER BY id DESC', [req.params.id])); }
     catch (e) { res.status(500).json({ error: e.message }); }
 };
 
