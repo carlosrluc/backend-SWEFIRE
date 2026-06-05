@@ -1237,11 +1237,15 @@ exports.uploadOrdenCompra = async (req, res) => {
             
             if (projCheck.length === 0) {
                 // Obtener datos de la cotización
-                const cotData = await db.query('SELECT DNI_O_RUC, id_solicitud, nombre FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
+                const cotData = await db.query(
+                    'SELECT DNI_O_RUC, id_solicitud, nombre, observacion FROM COTIZACION_COMERCIAL WHERE ID = ?',
+                    [cotizacionId],
+                );
                 if (cotData.length > 0) {
                     const clienteId = cotData[0].DNI_O_RUC;
                     const idSolicitud = cotData[0].id_solicitud;
                     const nombreCot = cotData[0].nombre;
+                    const observaciones = cotData[0].observacion ?? null;
                     let ubicacion = null;
                     let descripcionServicio = `Proyecto autogenerado a partir de la cotización: ${nombreCot}`;
 
@@ -1262,14 +1266,11 @@ exports.uploadOrdenCompra = async (req, res) => {
                     );
                     const idTrabajo = trabajoResult.insertId;
 
-                    // URL de redireccionamiento para descargar el PDF desde el front
-                    const urlDescargaPdf = `/api/cotizaciones/${cotizacionId}/orden-compra`;
-
                     // 2. Crear el Proyecto
                     const projResult = await db.query(
-                        `INSERT INTO PROYECTO (descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion, orden_servicio, estado, fecha_inicio, fecha_fin) 
-                         VALUES (?, ?, ?, ?, ?, ?, 'No iniciado', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY))`,
-                        [descripcionServicio, idTrabajo, clienteId, ubicacion, cotizacionId, urlDescargaPdf]
+                        `INSERT INTO PROYECTO (descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion, orden_servicio, observaciones, estado, fecha_inicio, fecha_fin) 
+                         VALUES (?, ?, ?, ?, ?, ?, ?, 'No iniciado', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY))`,
+                        [descripcionServicio, idTrabajo, clienteId, ubicacion, cotizacionId, relativeUrl, observaciones]
                     );
                     const idProyecto = projResult.insertId;
 
@@ -1315,6 +1316,12 @@ exports.uploadOrdenCompra = async (req, res) => {
                         }
                     }
                 }
+            } else {
+                const cotObs = await db.query('SELECT observacion FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
+                await db.query(
+                    'UPDATE PROYECTO SET orden_servicio = ?, observaciones = ? WHERE id_cotizacion = ?',
+                    [relativeUrl, cotObs[0]?.observacion ?? null, cotizacionId],
+                );
             }
         } catch (err) {
             console.error("Error al autogenerar el proyecto:", err);
