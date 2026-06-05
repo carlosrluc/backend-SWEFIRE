@@ -15,6 +15,7 @@ const {
     calcularPrecioTotal,
     buildUpsertQuotationResponse,
 } = require('../services/cotizacionDto.service');
+const { mergeSolicitudIntoCotizacionCreate } = require('../services/solicitudCotizacionImport.service');
 
 function toDateTimeInicio(fecha) {
     if (!fecha) return null;
@@ -594,22 +595,33 @@ exports.getDetallesFranco = async (req, res) => {
 
 exports.create = async (req, res) => {
     const normalized = normalizeCotizacionPayload(req.body);
+    const id_solicitud = req.body.id_solicitud ?? normalized.id_solicitud;
+
+    const { merged, solicitudFound } = await mergeSolicitudIntoCotizacionCreate(
+        db, id_solicitud, normalized, req.body,
+    );
+    if (id_solicitud && !solicitudFound) {
+        return res.status(404).json({ error: 'Solicitud no encontrada' });
+    }
+
     const {
-        id_solicitud,
         DNI_O_RUC,
         version,
         comentario_cliente,
         Tasa_Cambio,
         estado,
-    } = { ...req.body, ...normalized };
+    } = { ...req.body, ...merged };
 
-    const productos = normalized.productos;
-    const serviciosList = normalized.servicios ?? [];
-    const camionesList = normalized.camiones ?? [];
-    const costoRecojo = normalized.costoRecojo;
-    const cond = normalized.condiciones;
-    const tasaCambio = normalized.tasaCambio;
-    const nombre = normalized.nombre;
+    const productos = merged.productos ?? [];
+    const serviciosList = merged.servicios ?? [];
+    const camionesList = merged.camiones ?? [];
+    const costoRecojo = merged.costoRecojo;
+    const cond = merged.condiciones;
+    const tasaCambio = merged.tasaCambio;
+    const nombre = merged.nombre;
+    const direccionRecojo = merged.direccion_recojo
+        ?? costoRecojo?.direccion_recojo
+        ?? null;
 
     try {
         const precioTotal = calcularPrecioTotal({
@@ -642,10 +654,10 @@ exports.create = async (req, res) => {
                 cond?.condiciones || null,
                 tasaCambio?.tasaCompra || null,
                 tasaCambio?.tasaVenta || null,
-                normalized.etapas ?? null,
-                normalized.duracion_etapa ?? null,
-                normalized.etapas_detalle ?? null,
-                normalized.direccion_recojo ?? costoRecojo?.direccion_recojo ?? null,
+                merged.etapas ?? null,
+                merged.duracion_etapa ?? null,
+                merged.etapas_detalle ?? null,
+                direccionRecojo,
             ],
         );
 
@@ -679,9 +691,9 @@ exports.create = async (req, res) => {
             await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID = ?`, [id_solicitud]);
         }
 
-        if (normalized.phasesProvided) {
-            await syncCotizacionEtapasFromPhases(db, newId, normalized.phases ?? { items: [] });
-        } else if (normalized.etapas_detalle) {
+        if (merged.phasesProvided) {
+            await syncCotizacionEtapasFromPhases(db, newId, merged.phases ?? { items: [] });
+        } else if (merged.etapas_detalle) {
             await ensureCotizacionEtapasFromJson(db, newId);
         }
 
@@ -690,6 +702,7 @@ exports.create = async (req, res) => {
             ID: newId,
             precio_total: precioTotal,
             servicios_insertados: serviciosInsertados.map((s) => ({ id: s.id, index: s.index })),
+            importado_desde_solicitud: Boolean(id_solicitud && solicitudFound),
         });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };

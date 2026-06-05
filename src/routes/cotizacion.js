@@ -156,7 +156,10 @@ const { uploadCotizacion } = require('../middlewares/upload.middleware');
  *     description: |
  *       Acepta el payload del frontend (`name`, `inventory`, `services`, `trucks`, etc.)
  *       y también el formato legacy (`nombre`, `productos`, `servicios`, `camiones`, etc.).
- *       Ambos pueden mezclarse; el formato nuevo tiene prioridad en alias equivalentes.
+ *       Si se envía `id_solicitud`, importa automáticamente servicios (`SOLICITUD_SERVICIO` →
+ *       `COTIZACION_SERVICIO`), productos (`SOLICITUD_INVENTARIO` → `COTIZACION_INVENTARIO`),
+ *       datos comunes de la solicitud (cliente, nombre, observaciones) y `ubicacion` →
+ *       `direccion_recojo`. Los valores enviados en el body tienen prioridad sobre la solicitud.
  *     requestBody:
  *       required: true
  *       content:
