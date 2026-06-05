@@ -120,7 +120,14 @@ function isPublicApiRoute(req) {
     const path = req.path.endsWith('/') && req.path.length > 1
         ? req.path.slice(0, -1)
         : req.path;
-    return PUBLIC_API_ROUTES.some((r) => r.method === req.method && r.path === path);
+    if (PUBLIC_API_ROUTES.some((r) => r.method === req.method && r.path === path)) {
+        return true;
+    }
+    // Fotografías de SERVICIO.foto — acceso sin Bearer (retroactivo vía redirect a /uploads/servicios/...)
+    if (req.method === 'GET' && /^\/servicios\/\d+\/foto$/.test(path)) {
+        return true;
+    }
+    return false;
 }
 
 app.use('/api', (req, res, next) => {

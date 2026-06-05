@@ -191,9 +191,12 @@ router.delete('/:id', c.remove);
  * @openapi
  * /api/servicios/{id}/foto:
  *   get:
- *     tags: [Servicio]
+ *     tags: [Servicio - Público, Servicio]
  *     summary: Ver/descargar fotografía del servicio (PNG/JPEG)
- *     description: Redirige a la URL pública guardada en SERVICIO.foto (ej. /uploads/servicios/foto_xxx.jpeg).
+ *     description: |
+ *       **Ruta pública** (no requiere Bearer).
+ *       Redirige a la URL guardada en `SERVICIO.foto` (ej. `/uploads/servicios/foto_xxx.jpeg`).
+ *     security: []
  *     parameters:
  *       - in: path
  *         name: id
