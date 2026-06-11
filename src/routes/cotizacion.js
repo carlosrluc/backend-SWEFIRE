@@ -224,6 +224,43 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
 router.get('/:id', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getById);
 router.put('/:id', auth, permit(['cliente', 'trabajtaller', 'gerente', 'adminproy']), c.update);
 router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/aprobar:
+ *   put:
+ *     tags: [Cotización]
+ *     summary: Aprobar cotización y generar proyecto
+ *     description: |
+ *       Crea un proyecto, trabajo, etapas/actividades y migra inventario,
+ *       camiones y personal desde la cotización. Marca la cotización como aprobada.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Proyecto creado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Proyecto creado correctamente
+ *                 id_proyecto:
+ *                   type: integer
+ *                 id_trabajo:
+ *                   type: integer
+ *       401:
+ *         description: La cotización ya fue aprobada
+ *       401:
+ *         descripion: El cliente aun no adjunta la orden de compra.
+ *       404:
+ *         description: Cotización no encontrada
+ */
+router.put('/:id/aprobar', auth, permit(['adminproy']), c.approve)
 
 /**
  * @openapi
@@ -769,10 +806,10 @@ router.post('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.se
  *         description: Orden de compra subida correctamente
  */
 router.get('/:id/orden-compra', auth, c.getOrdenCompra);
-router.post('/:id/orden-compra', 
-    auth, 
+router.post('/:id/orden-compra',
+    auth,
     permit(['cliente', 'gerente', 'adminproy']),
-    uploadCotizacion.single('orden_compra'), 
+    uploadCotizacion.single('orden_compra'),
     requireFile,
     c.uploadOrdenCompra
 );
