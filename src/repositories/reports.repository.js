@@ -11,7 +11,11 @@ const ReportRepository = {
             i.hora,
             i.fecha,
             i.nombre,
-            i2.nombre_incidencia AS ocurrencia,
+            P.Proyecto_Nombre,
+            PER.Nombre AS Autor_Nombre,
+            PER.Apellido AS Autor_Apellido,
+            i2.nombre_incidencia AS nombre_incidencia,
+            i2.estado AS estado_incidencia,
             i.evidencia AS evidencia,
             pe.nombre AS etapa,
             pa.nombre AS actividad,
@@ -19,11 +23,13 @@ const ReportRepository = {
             i.id_proyecto_actividad AS id_actividad,
             i.id_proyecto_etapa AS id_etapa
             FROM INFORME i
-            JOIN INCIDENCIA i2 
+            JOIN PROYECTO P ON P.id_Proyecto = i.id_Proyecto
+            JOIN PERFIL PER ON PER.DNI = i.DNI_autor
+            LEFT JOIN INCIDENCIA i2 
             ON i.id_incidencia =i2.id_incidencia 
-            JOIN PROYECTO_ACTIVIDAD pa 
+            LEFT JOIN PROYECTO_ACTIVIDAD pa 
             ON i.id_proyecto_actividad = pa.id 
-            JOIN PROYECTO_ETAPA pe 
+            LEFT JOIN PROYECTO_ETAPA pe 
             ON i.id_proyecto_etapa = pe.id 
         `;
 
@@ -31,11 +37,13 @@ const ReportRepository = {
         SELECT 
             COUNT(*) AS total
             FROM INFORME i
-            JOIN INCIDENCIA i2 
+            JOIN PROYECTO P ON P.id_Proyecto = i.id_Proyecto
+            JOIN PERFIL PER ON PER.DNI = i.DNI_autor
+            LEFT JOIN INCIDENCIA i2 
             ON i.id_incidencia =i2.id_incidencia 
-            JOIN PROYECTO_ACTIVIDAD pa 
+            LEFT JOIN PROYECTO_ACTIVIDAD pa 
             ON i.id_proyecto_actividad = pa.id 
-            JOIN PROYECTO_ETAPA pe 
+            LEFT JOIN PROYECTO_ETAPA pe 
             ON i.id_proyecto_etapa = pe.id 
         `;
 
@@ -72,7 +80,7 @@ const ReportRepository = {
         const total = countRes.value[0].total;
 
 
-        return({
+        return ({
             data: rows,
             pagination: {
                 total,
@@ -81,6 +89,45 @@ const ReportRepository = {
                 totalPages: Math.ceil(total / limit)
             }
         });
+    },
+    async getByID(projectID, reportID) {
+        const queryResult = await db.query(`
+            SELECT
+            i.id,
+            i.nombre,
+            P.Proyecto_Nombre,
+            PER.Nombre AS Autor_Nombre,
+            PER.Apellido AS Autor_Apellido,
+            i.descripcion,
+            i.evidencia,
+            i.fecha,
+            i.hora,
+            i.ubicacion,
+            i.DNI_autor,
+            i.fecha_registro,
+            i2.nombre_incidencia AS nombre_incidencia,
+            i2.estado AS estado_incidencia,
+            i.evidencia AS evidencia,
+            pe.nombre AS etapa,
+            pa.nombre AS actividad,
+            i2.id_incidencia,
+            i.id_proyecto_actividad AS id_actividad,
+            i.id_proyecto_etapa AS id_etapa
+            FROM INFORME i
+            JOIN PROYECTO P ON P.id_Proyecto = i.id_Proyecto
+            JOIN PERFIL PER ON PER.DNI = i.DNI_autor
+            LEFT JOIN INCIDENCIA i2 
+            ON i.id_incidencia =i2.id_incidencia 
+            LEFT JOIN PROYECTO_ACTIVIDAD pa 
+            ON i.id_proyecto_actividad = pa.id 
+            LEFT JOIN PROYECTO_ETAPA pe 
+            ON i.id_proyecto_etapa = pe.id
+            WHERE i.id_Proyecto = (?) AND i.id = (?)
+        `, [projectID, reportID])
+
+
+            
+        return queryResult[0]
     }
 }
 

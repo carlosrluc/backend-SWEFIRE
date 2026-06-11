@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { validarEtapaActividadProyecto, recalcFechasEtapasDesdeInformes } = require('../services/proyectoEtapas.service');
 const catchAsync = require('../utils/catchAsync');
-const { getAll } = require('../repositories/reports.repository');
+const { getAll, getByID } = require('../repositories/reports.repository');
 
 const SELECT_INFORME = `
     SELECT I.*,
@@ -99,18 +99,13 @@ exports.getInformes = catchAsync(async (req, res) => {
     return res.status(200).json(result);
 });
 
-exports.getInformeById = async (req, res) => {
-    try {
-        const rows = await db.query(
-            `${SELECT_INFORME} WHERE I.id = ? AND I.id_Proyecto = ?`,
-            [req.params.iid, req.params.id]
-        );
-        if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-        res.json(mapInforme(rows[0]));
-    } catch (e) {
-        res.status(500).json({ error: e.message });
+exports.getInformeById = catchAsync(async (req, res) => {
+    const report = await getByID(req.params.id, req.params.iid)
+    if (report === undefined) {
+        return res.status(404).json({ error: 'Informe no encontrado' });
     }
-};
+    res.status(200).json(report);
+});
 
 exports.createInforme = async (req, res) => {
     const id_Proyecto = Number(req.params.id);
