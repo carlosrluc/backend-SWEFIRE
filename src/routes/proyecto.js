@@ -517,20 +517,45 @@ router.get(
  *         required: true
  *         schema: { type: integer }
  *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
+ *       - in: query
  *         name: nombre
  *         schema: { type: string }
  *         description: Filtrar por nombre del informe (parcial)
- *       - in: query
- *         name: id_incidencia
- *         schema: { type: integer }
- *         description: Filtrar por incidencia relacionada
- *       - in: query
- *         name: relacion
- *         schema: { type: string, enum: [ninguna] }
- *         description: Usar "ninguna" para sucesos sin incidencia vinculada
  *     responses:
  *       200:
- *         description: Lista de informes (incluye Autor_Nombre, Autor_Apellido y autor_nombre)
+ *         description: Lista de informes con paginación
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       hora: { type: string, example: "14:30:00" }
+ *                       fecha: { type: string, format: date, example: "2026-06-03" }
+ *                       nombre: { type: string, example: "Instalación de rociadores" }
+ *                       ocurrencia: { type: string, nullable: true, example: "Robo de extintor" }
+ *                       evidencia: { type: string, nullable: true, example: "/uploads/informes/foto.jpg" }
+ *                       etapa: { type: string, nullable: true, example: "Instalación" }
+ *                       actividad: { type: string, nullable: true, example: "Colocar soportes" }
+ *                       id_incidencia: { type: integer, nullable: true, example: 5 }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total: { type: integer, example: 42 }
+ *                     page: { type: integer, example: 1 }
+ *                     limit: { type: integer, example: 10 }
+ *                     totalPages: { type: integer, example: 5 }
  *   post:
  *     tags: [Proyecto - Informes]
  *     summary: Registrar un suceso en el informe del proyecto

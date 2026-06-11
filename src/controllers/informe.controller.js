@@ -2,6 +2,8 @@ const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 const { validarEtapaActividadProyecto, recalcFechasEtapasDesdeInformes } = require('../services/proyectoEtapas.service');
+const catchAsync = require('../utils/catchAsync');
+const { getAll } = require('../repositories/reports.repository');
 
 const SELECT_INFORME = `
     SELECT I.*,
@@ -87,37 +89,15 @@ const obtenerNombreProyectoDefault = async (id_Proyecto) => {
     return rows[0].Proyecto_Nombre || 'Informe';
 };
 
-exports.getInformes = async (req, res) => {
-    try {
-        const id_Proyecto = Number(req.params.id);
-        const { nombre, id_incidencia, relacion } = req.query;
-
-        const where = ['I.id_Proyecto = ?'];
-        const params = [id_Proyecto];
-
-        if (nombre) {
-            where.push('I.nombre LIKE ?');
-            params.push(`%${nombre}%`);
-        }
-        if (id_incidencia) {
-            where.push('I.id_incidencia = ?');
-            params.push(Number(id_incidencia));
-        } else if (relacion === 'ninguna') {
-            where.push('I.id_incidencia IS NULL');
-        }
-
-        const rows = await db.query(
-            `${SELECT_INFORME}
-             WHERE ${where.join(' AND ')}
-             ORDER BY I.id DESC`,
-            params
-        );
-
-        res.json(rows.map(mapInforme));
-    } catch (e) {
-        res.status(500).json({ error: e.message });
-    }
-};
+exports.getInformes = catchAsync(async (req, res) => {
+    const id_Proyecto = Number(req.params.id);
+    const result = await getAll(id_Proyecto, {
+        page: parseInt(req.query.page) || 1,
+        limit: parseInt(req.query.limit) || 10,
+        nombre: req.query.nombre
+    })
+    return res.status(200).json(result);
+});
 
 exports.getInformeById = async (req, res) => {
     try {
@@ -259,7 +239,7 @@ exports.deleteInforme = async (req, res) => {
         if (evidencia) {
             const abs = path.join(__dirname, '../../', evidencia);
             if (fs.existsSync(abs)) {
-                try { fs.unlinkSync(abs); } catch (_) {}
+                try { fs.unlinkSync(abs); } catch (_) { }
             }
         }
 
@@ -288,7 +268,7 @@ exports.uploadEvidencia = async (req, res) => {
         if (oldUrl) {
             const oldAbs = path.join(__dirname, '../../', oldUrl);
             if (fs.existsSync(oldAbs)) {
-                try { fs.unlinkSync(oldAbs); } catch (_) {}
+                try { fs.unlinkSync(oldAbs); } catch (_) { }
             }
         }
 
