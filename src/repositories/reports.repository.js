@@ -15,7 +15,9 @@ const ReportRepository = {
             i.evidencia AS evidencia,
             pe.nombre AS etapa,
             pa.nombre AS actividad,
-            i2.id_incidencia
+            i2.id_incidencia,
+            i.id_proyecto_actividad AS id_actividad,
+            i.id_proyecto_etapa AS id_etapa
             FROM INFORME i
             JOIN INCIDENCIA i2 
             ON i.id_incidencia =i2.id_incidencia 

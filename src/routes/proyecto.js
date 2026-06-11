@@ -549,6 +549,8 @@ router.get(
  *                       etapa: { type: string, nullable: true, example: "Instalación" }
  *                       actividad: { type: string, nullable: true, example: "Colocar soportes" }
  *                       id_incidencia: { type: integer, nullable: true, example: 5 }
+ *                       id_actividad: { type: integer, nullable: true, example: 12 }
+ *                       id_etapa: { type: integer, nullable: true, example: 7 }
  *                 pagination:
  *                   type: object
  *                   properties:
