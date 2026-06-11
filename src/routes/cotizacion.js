@@ -253,10 +253,10 @@ router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
  *                   type: integer
  *                 id_trabajo:
  *                   type: integer
- *       401:
+ *       400:
+ *         description: El cliente aún no adjunta la orden de compra
+ *       409:
  *         description: La cotización ya fue aprobada
- *       401:
- *         descripion: El cliente aun no adjunta la orden de compra.
  *       404:
  *         description: Cotización no encontrada
  */
