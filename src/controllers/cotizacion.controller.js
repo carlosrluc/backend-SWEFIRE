@@ -16,6 +16,22 @@ const {
     buildUpsertQuotationResponse,
 } = require('../services/cotizacionDto.service');
 const { mergeSolicitudIntoCotizacionCreate } = require('../services/solicitudCotizacionImport.service');
+const {
+    archiveCotizacionSnapshot,
+    assertCotizacionVigente,
+    DESACTUALIZADO_VIGENTE,
+} = require('../services/cotizacionVersion.service');
+
+async function ensureCotizacionVigente(cotizacionId, res) {
+    const ok = await assertCotizacionVigente(db, cotizacionId);
+    if (!ok) {
+        res.status(404).json({ error: 'Cotización no encontrada' });
+        return false;
+    }
+    return true;
+}
+
+const COTIZACION_VIGENTE_SQL = `desactualizado = '${DESACTUALIZADO_VIGENTE}'`;
 const approveQuotation = require('./approveQuotation.prototype');
 
 function toDateTimeInicio(fecha) {
@@ -176,6 +192,8 @@ exports.formatQuotation = (row, rol) => {
         // Atributos originales no mencionados en el JSON
         id_solicitud: row.id_solicitud,
         DNI_O_RUC: row.DNI_O_RUC,
+        Id_incidencia: row.Id_incidencia ?? null,
+        desactualizado: row.desactualizado ?? DESACTUALIZADO_VIGENTE,
         Tasa_Cambio: row.Tasa_Cambio
     };
 
@@ -199,7 +217,7 @@ exports.getAll = async (req, res) => {
         let countArgs = [];
 
         const { estado, nombre } = req.query;
-        let whereClauses = [];
+        let whereClauses = [`C_C.${COTIZACION_VIGENTE_SQL}`];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
             const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
@@ -246,7 +264,7 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        let query = 'SELECT S.*, C.nombre_comercial as Cliente_Nombre FROM SOLICITUD S LEFT JOIN CLIENTE C ON S.Id_Cliente = C.DNI_O_RUC WHERE S.ID = ?';
+        let query = `SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC WHERE C_C.ID = ? AND C_C.${COTIZACION_VIGENTE_SQL}`;
         let args = [req.params.id];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -254,26 +272,13 @@ exports.getById = async (req, res) => {
             const clientIds = contactos.map(c => c.DNI_O_RUC);
             clientIds.push(req.user.dni_perfil);
 
-            query += ` AND S.Id_Cliente IN (${clientIds.map(() => '?').join(',')})`;
-            args.push(...clientIds);
+            query += ` AND (C_C.DNI_O_RUC IN (${clientIds.map(() => '?').join(',')}) OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${clientIds.map(() => '?').join(',')})))`;
+            args.push(...clientIds, ...clientIds);
         }
 
         const rows = await db.query(query, args);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-        const solicitud = rows[0];
-        // Obtener datos de subtablas relacionadas
-        const [medios, servicios, inventario] = await Promise.all([
-            db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id]),
-            db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id]),
-            db.query('SELECT SI.*, I.nombre_objeto as Objeto_Nombre FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [req.params.id])
-        ]);
-        // Devolver la solicitud con sus sub‑arrays
-        res.json({
-            ...solicitud,
-            medios,
-            servicios,
-            inventario
-        });
+        res.json(exports.formatQuotation(rows[0], req.user ? req.user.rolNormalizado : null));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -289,14 +294,14 @@ exports.getDetalles = async (req, res) => {
 
             const placeholders = clientIds.map(() => '?').join(',');
             const check = await db.query(
-                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL} AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
                 [cotizacionId, ...clientIds, ...clientIds]
             );
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para ver esta cotización' });
         }
 
         // Obtener datos base de la cotización comercial
-        const baseQuery = 'SELECT comentario_cliente, fecha_emision, fecha_vigencia, observacion FROM COTIZACION_COMERCIAL WHERE ID = ?';
+        const baseQuery = `SELECT comentario_cliente, fecha_emision, fecha_vigencia, observacion FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`;
         const baseResult = await db.query(baseQuery, [cotizacionId]);
         if (!baseResult.length) return res.status(404).json({ error: 'Cotización no encontrada' });
 
@@ -380,14 +385,14 @@ exports.getDetallesFranco = async (req, res) => {
             clientIds.push(req.user.dni_perfil);
             const placeholders = clientIds.map(() => '?').join(',');
             const check = await db.query(
-                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL} AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
                 [cotizacionId, ...clientIds, ...clientIds]
             );
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para ver esta cotización' });
         }
 
         const { estado: estadoFiltro, nombre: nombreFiltro } = req.query;
-        let baseQuery = 'SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ?';
+        let baseQuery = `SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`;
         const baseArgs = [cotizacionId];
         if (estadoFiltro) {
             baseQuery += ' AND estado = ?';
@@ -624,6 +629,8 @@ exports.create = async (req, res) => {
         ?? costoRecojo?.direccion_recojo
         ?? null;
 
+    const Id_incidencia = req.body.Id_incidencia ?? normalized.Id_incidencia ?? null;
+
     try {
         const precioTotal = calcularPrecioTotal({
             productos,
@@ -635,13 +642,14 @@ exports.create = async (req, res) => {
         const estadoCot = 'Pendiente';
         const result = await db.query(
             `INSERT INTO COTIZACION_COMERCIAL
-                (version, nombre, id_solicitud, DNI_O_RUC, precio_total, estado,
+                (version, desactualizado, nombre, id_solicitud, DNI_O_RUC, precio_total, estado,
                  comentario_cliente, fecha_emision, fecha_vigencia, observacion,
                  Tasa_Cambio, condiciones, tacaCompra, tasaVenta,
-                 etapas, duracion_etapa, etapas_detalle, direccion_recojo)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                 etapas, duracion_etapa, etapas_detalle, direccion_recojo, Id_incidencia)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
                 version || 1,
+                DESACTUALIZADO_VIGENTE,
                 nombre || null,
                 id_solicitud || null,
                 DNI_O_RUC || null,
@@ -659,6 +667,7 @@ exports.create = async (req, res) => {
                 merged.duracion_etapa ?? null,
                 merged.etapas_detalle ?? null,
                 direccionRecojo,
+                Id_incidencia,
             ],
         );
 
@@ -714,13 +723,21 @@ exports.update = async (req, res) => {
     const {
         id_solicitud,
         id_camion,
-        version,
         nombre,
         DNI_O_RUC,
         estado,
         comentario_cliente,
         Tasa_Cambio,
     } = { ...req.body, ...normalized };
+    const Id_incidencia = req.body.Id_incidencia ?? normalized.Id_incidencia;
+
+    const conn = await db.getConnection();
+    const exec = {
+        query: async (sql, params) => {
+            const [rows] = await conn.query(sql, params);
+            return rows;
+        },
+    };
 
     try {
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -730,11 +747,28 @@ exports.update = async (req, res) => {
 
             const placeholders = clientIds.map(() => '?').join(',');
             const check = await db.query(
-                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL} AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
                 [cotizacionId, ...clientIds, ...clientIds],
             );
-            if (!check.length) return res.status(403).json({ error: 'No tienes permiso para editar esta cotización' });
+            if (!check.length) {
+                conn.release();
+                return res.status(403).json({ error: 'No tienes permiso para editar esta cotización' });
+            }
         }
+
+        await conn.beginTransaction();
+
+        const currentRows = await exec.query(
+            `SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`,
+            [cotizacionId],
+        );
+        if (!currentRows || !currentRows.length) {
+            await conn.rollback();
+            conn.release();
+            return res.status(404).json({ error: 'Cotización no encontrada' });
+        }
+
+        const archiveInfo = await archiveCotizacionSnapshot(exec, cotizacionId, currentRows[0]);
 
         const tieneDatosPrecio = ['productos', 'servicios', 'camiones', 'costoRecojo'].some(
             (k) => normalized[k] !== undefined,
@@ -750,7 +784,10 @@ exports.update = async (req, res) => {
 
         const cond = normalized.condiciones;
         const tasaCambio = normalized.tasaCambio;
-        const updateFields = {};
+        const updateFields = {
+            version: archiveInfo.nextVersion,
+            desactualizado: DESACTUALIZADO_VIGENTE,
+        };
         if (precioTotal !== undefined) updateFields.precio_total = precioTotal;
         if (id_solicitud !== undefined) updateFields.id_solicitud = id_solicitud;
         if (tasaCambio?.tasaCompra !== undefined) updateFields.tacaCompra = tasaCambio.tasaCompra;
@@ -760,7 +797,6 @@ exports.update = async (req, res) => {
         if (cond?.condiciones !== undefined) updateFields.condiciones = cond.condiciones;
         if (cond?.observaciones !== undefined) updateFields.observacion = cond.observaciones;
         if (nombre !== undefined) updateFields.nombre = nombre;
-        if (version !== undefined) updateFields.version = version;
         if (DNI_O_RUC !== undefined) updateFields.DNI_O_RUC = DNI_O_RUC;
         if (estado !== undefined) updateFields.estado = estado;
         if (comentario_cliente !== undefined) updateFields.comentario_cliente = comentario_cliente;
@@ -769,43 +805,37 @@ exports.update = async (req, res) => {
         if (normalized.duracion_etapa !== undefined) updateFields.duracion_etapa = normalized.duracion_etapa;
         if (normalized.etapas_detalle !== undefined) updateFields.etapas_detalle = normalized.etapas_detalle;
         if (normalized.direccion_recojo !== undefined) updateFields.direccion_recojo = normalized.direccion_recojo;
+        if (Id_incidencia !== undefined) updateFields.Id_incidencia = Id_incidencia;
 
-        if (Object.keys(updateFields).length) {
-            const setClauses = Object.keys(updateFields).map((k) => `${k}=?`).join(',');
-            const setValues = Object.values(updateFields);
-            const result = await db.query(
-                `UPDATE COTIZACION_COMERCIAL SET ${setClauses} WHERE ID=?`,
-                [...setValues, cotizacionId],
-            );
-            if (result.affectedRows === 0) return res.status(404).json({ error: 'Cotización no encontrada' });
-        } else {
-            const exists = await db.query('SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
-            if (!exists.length) return res.status(404).json({ error: 'Cotización no encontrada' });
-        }
+        const setClauses = Object.keys(updateFields).map((k) => `${k}=?`).join(',');
+        await exec.query(
+            `UPDATE COTIZACION_COMERCIAL SET ${setClauses} WHERE ID=?`,
+            [...Object.values(updateFields), cotizacionId],
+        );
 
         if (normalized.productos !== undefined) {
-            await db.query('DELETE FROM COTIZACION_INVENTARIO WHERE ID_Cotizacion = ?', [cotizacionId]);
+            await exec.query('DELETE FROM COTIZACION_INVENTARIO WHERE ID_Cotizacion = ?', [cotizacionId]);
             if (normalized.productos.length) {
-                await insertarInventarioCotizacion(db, cotizacionId, normalized.productos);
+                await insertarInventarioCotizacion(exec, cotizacionId, normalized.productos);
             }
         }
 
         let serviciosInsertados = null;
         if (normalized.servicios !== undefined) {
-            await db.query('DELETE FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
-            await db.query(
+            await exec.query('DELETE FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
+            await exec.query(
                 'DELETE FROM COTIZACION_SERVICIO WHERE ID_Cotizacion = ? AND ID_Servicio != 7',
                 [cotizacionId],
             );
             serviciosInsertados = normalized.servicios.length
-                ? await insertarServiciosCotizacion(db, cotizacionId, normalized.servicios)
+                ? await insertarServiciosCotizacion(exec, cotizacionId, normalized.servicios)
                 : [];
         }
 
         if (normalized.camiones !== undefined) {
             if (serviciosInsertados === null) {
-                await db.query('DELETE FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
-                const existingSvc = await db.query(
+                await exec.query('DELETE FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
+                const existingSvc = await exec.query(
                     `SELECT id, fecha_inicio, fecha_finalizacion
                      FROM COTIZACION_SERVICIO
                      WHERE ID_Cotizacion = ? AND ID_Servicio != 7
@@ -821,16 +851,18 @@ exports.update = async (req, res) => {
             }
             if (normalized.camiones.length) {
                 if (!serviciosInsertados?.length) {
+                    await conn.rollback();
+                    conn.release();
                     return res.status(400).json({
                         error: 'Se requiere al menos un servicio para asociar camiones',
                     });
                 }
-                await insertarCamionesCotizacion(db, cotizacionId, normalized.camiones, serviciosInsertados);
+                await insertarCamionesCotizacion(exec, cotizacionId, normalized.camiones, serviciosInsertados);
             }
         } else if (id_camion !== undefined) {
-            await db.query('DELETE FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
+            await exec.query('DELETE FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
             if (id_camion) {
-                await db.query(
+                await exec.query(
                     'INSERT INTO COTIZACION_CAMION (ID_Cotizacion, Placa) VALUES (?,?)',
                     [cotizacionId, id_camion],
                 );
@@ -838,40 +870,54 @@ exports.update = async (req, res) => {
         }
 
         if (normalized.phasesProvided) {
-            await syncCotizacionEtapasFromPhases(db, cotizacionId, normalized.phases ?? { items: [] });
+            await syncCotizacionEtapasFromPhases(exec, cotizacionId, normalized.phases ?? { items: [] });
         } else if (normalized.etapas_detalle !== undefined) {
-            await ensureCotizacionEtapasFromJson(db, cotizacionId);
+            await ensureCotizacionEtapasFromJson(exec, cotizacionId);
         }
 
         if (normalized.costoRecojo !== undefined) {
-            await db.query(
+            await exec.query(
                 'DELETE FROM COTIZACION_SERVICIO WHERE ID_Cotizacion = ? AND ID_Servicio = 7',
                 [cotizacionId],
             );
             if (normalized.costoRecojo?.costo) {
-                await db.query(
+                await exec.query(
                     'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion, ID_Servicio, precio_comercial, fecha_inicio) VALUES (?,7,?,?)',
                     [cotizacionId, normalized.costoRecojo.costo, normalized.costoRecojo.fechaRecojo || null],
                 );
             }
         }
 
-        await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
-        await db.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
+        await exec.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL AND ${COTIZACION_VIGENTE_SQL})`);
+        await exec.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL AND ${COTIZACION_VIGENTE_SQL})`);
+
+        await conn.commit();
+        conn.release();
 
         res.json({
             message: 'Cotización actualizada',
             precio_total: precioTotal,
+            version: archiveInfo.nextVersion,
+            version_archivada: archiveInfo.archivedVersion,
+            id_cotizacion_archivada: archiveInfo.archiveId,
         });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) {
+        try { await conn.rollback(); } catch (_) {}
+        conn.release();
+        if (e.statusCode === 404) return res.status(404).json({ error: e.message });
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.remove = async (req, res) => {
     try {
-        const result = await db.query('DELETE FROM COTIZACION_COMERCIAL WHERE ID = ?', [req.params.id]);
+        const result = await db.query(
+            `DELETE FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`,
+            [req.params.id],
+        );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
 
-        await db.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL)`);
+        await db.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL AND ${COTIZACION_VIGENTE_SQL})`);
 
         res.json({ message: 'Cotización eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -882,13 +928,16 @@ exports.approve = approveQuotation
 
 // ── COTIZACION_SERVICIO ───────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
-    try { res.json(await db.query('SELECT CS.*, S.nombre as Servicio_Nombre FROM COTIZACION_SERVICIO CS LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio WHERE CS.ID_Cotizacion = ? ORDER BY CS.id DESC', [req.params.id])); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        if (!(await ensureCotizacionVigente(req.params.id, res))) return;
+        res.json(await db.query('SELECT CS.*, S.nombre as Servicio_Nombre FROM COTIZACION_SERVICIO CS LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio WHERE CS.ID_Cotizacion = ? ORDER BY CS.id DESC', [req.params.id]));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.createServicio = async (req, res) => {
     const s = normalizeServiceItem(req.body);
     try {
+        if (!(await ensureCotizacionVigente(req.params.id, res))) return;
         const result = await db.query(
             'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion,ID_Servicio,fecha_inicio,fecha_finalizacion,jornada,precio_comercial) VALUES (?,?,?,?,?,?)',
             [req.params.id, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial],
@@ -922,6 +971,7 @@ exports.deleteServicio = async (req, res) => {
 // ── COTIZACION_CAMION ─────────────────────────────────────────────────────────
 exports.getCamiones = async (req, res) => {
     try {
+        if (!(await ensureCotizacionVigente(req.params.id, res))) return;
         res.json(await db.query(
             `SELECT CC.*, C.nombre as Camion_Nombre,
                     CS.fecha_inicio AS servicio_fecha_inicio,
@@ -992,6 +1042,7 @@ exports.deleteCamion = async (req, res) => {
 // ── Inventario agregado por servicios de la cotización (COTIZACION_SERVICIO) ──
 exports.getInventarioPorServicio = async (req, res) => {
     try {
+        if (!(await ensureCotizacionVigente(req.params.id, res))) return;
         const idCotizacion = Number(req.params.id);
         const { cotizacion, items, servicios } = await aggregateInventarioPorCotizacion(db, idCotizacion);
 
@@ -1026,8 +1077,10 @@ exports.getInventarioPorServicio = async (req, res) => {
 
 // ── COTIZACION_INVENTARIO ─────────────────────────────────────────────────────
 exports.getInventario = async (req, res) => {
-    try { res.json(await db.query('SELECT CI.*, I.nombre_objeto as Objeto_Nombre FROM COTIZACION_INVENTARIO CI LEFT JOIN INVENTARIO I ON CI.ID_Inventario = I.Id_Objeto WHERE CI.ID_Cotizacion = ? ORDER BY CI.id DESC', [req.params.id])); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        if (!(await ensureCotizacionVigente(req.params.id, res))) return;
+        res.json(await db.query('SELECT CI.*, I.nombre_objeto as Objeto_Nombre FROM COTIZACION_INVENTARIO CI LEFT JOIN INVENTARIO I ON CI.ID_Inventario = I.Id_Objeto WHERE CI.ID_Cotizacion = ? ORDER BY CI.id DESC', [req.params.id]));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.createInventario = async (req, res) => {
@@ -1092,8 +1145,10 @@ exports.deleteInventario = async (req, res) => {
 
 // ── COTIZACION_PERSONAL ───────────────────────────────────────────────────────
 exports.getPersonal = async (req, res) => {
-    try { res.json(await db.query('SELECT CP.*, P.Nombre as Personal_Nombre, P.Apellido as Personal_Apellido FROM COTIZACION_PERSONAL CP LEFT JOIN USUARIO U ON CP.ID_Usuario = U.idusuario LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI WHERE CP.ID_Cotizacion = ? ORDER BY CP.id DESC', [req.params.id])); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        if (!(await ensureCotizacionVigente(req.params.id, res))) return;
+        res.json(await db.query('SELECT CP.*, P.Nombre as Personal_Nombre, P.Apellido as Personal_Apellido FROM COTIZACION_PERSONAL CP LEFT JOIN USUARIO U ON CP.ID_Usuario = U.idusuario LEFT JOIN PERFIL P ON U.dni_perfil = P.DNI WHERE CP.ID_Cotizacion = ? ORDER BY CP.id DESC', [req.params.id]));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.createPersonal = async (req, res) => {
@@ -1133,6 +1188,7 @@ exports.deletePersonal = async (req, res) => {
 exports.getChatHistory = async (req, res) => {
     try {
         const cotizacionId = req.params.id;
+        if (!(await ensureCotizacionVigente(cotizacionId, res))) return;
 
         // Validar permisos si es cliente
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -1142,7 +1198,7 @@ exports.getChatHistory = async (req, res) => {
 
             const placeholders = clientIds.map(() => '?').join(',');
             const check = await db.query(
-                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL} AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
                 [cotizacionId, ...clientIds, ...clientIds]
             );
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para ver este chat' });
@@ -1167,6 +1223,7 @@ exports.sendChatMessage = async (req, res) => {
         if (!mensaje) {
             return res.status(400).json({ error: 'El mensaje es requerido' });
         }
+        if (!(await ensureCotizacionVigente(cotizacionId, res))) return;
 
         // Validar permisos si es cliente
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -1176,7 +1233,7 @@ exports.sendChatMessage = async (req, res) => {
 
             const placeholders = clientIds.map(() => '?').join(',');
             const check = await db.query(
-                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
+                `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL} AND (DNI_O_RUC IN (${placeholders}) OR id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`,
                 [cotizacionId, ...clientIds, ...clientIds]
             );
             if (!check.length) return res.status(403).json({ error: 'No tienes permiso para enviar mensajes en este chat' });
@@ -1246,7 +1303,10 @@ exports.uploadOrdenCompra = catchAsync(async (req, res) => {
 
 exports.getOrdenCompra = async (req, res) => {
     try {
-        const rows = await db.query('SELECT Orden_compra FROM COTIZACION_COMERCIAL WHERE ID = ?', [req.params.id]);
+        const rows = await db.query(
+            `SELECT Orden_compra FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`,
+            [req.params.id],
+        );
         if (!rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
 
         const fileUrl = rows[0].Orden_compra;

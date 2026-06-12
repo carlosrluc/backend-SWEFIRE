@@ -6,7 +6,7 @@ const QuotationRepository = {
         const quotationRows = await db.query(`
             SELECT * 
             FROM COTIZACION_COMERCIAL cc 
-            WHERE cc.ID = (?)
+            WHERE cc.ID = (?) AND cc.desactualizado = 'NO'
         `, [quotationID])
         return quotationRows[0]
     },
@@ -17,7 +17,7 @@ const QuotationRepository = {
         await db.query(`
             UPDATE COTIZACION_COMERCIAL 
             SET Orden_compra = (?) 
-            WHERE ID = (?)
+            WHERE ID = (?) AND desactualizado = 'NO'
         `, [RelativePurchaseOrderFileUrl, QuotationID]);
 
         return RelativePurchaseOrderFileUrl;

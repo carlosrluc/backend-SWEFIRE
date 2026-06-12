@@ -91,7 +91,7 @@ async function aggregateInventarioPorProyecto(executor, idProyecto) {
 
 async function aggregateInventarioPorCotizacion(executor, idCotizacion) {
     const cotRows = await executor.query(
-        'SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ?',
+        "SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND desactualizado = 'NO'",
         [idCotizacion],
     );
     if (!cotRows.length) return { cotizacion: null, items: [], servicios: [] };

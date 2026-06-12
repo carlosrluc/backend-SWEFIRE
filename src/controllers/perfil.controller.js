@@ -597,7 +597,7 @@ exports.getCotizacionesPorPerfil = async (req, res) => {
         const offset = (page - 1) * limit;
         const { estado, nombre } = req.query;
 
-        const filterClauses = [];
+        const filterClauses = ["C.desactualizado = 'NO'"];
         const filterArgs = [];
         if (estado) {
             filterClauses.push('C.estado = ?');

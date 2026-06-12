@@ -177,6 +177,7 @@ function normalizeCotizacionPayload(body = {}) {
         phases: phasesData?.phases,
         phasesProvided: body.phases !== undefined || body.etapas_detalle !== undefined,
         direccion_recojo: costoRecojo?.direccion_recojo ?? body.direccion_recojo ?? null,
+        Id_incidencia: body.Id_incidencia ?? null,
     };
 }
 
