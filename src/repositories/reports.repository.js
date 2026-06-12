@@ -8,20 +8,30 @@ const ReportRepository = {
         const whereClauses = [`i.id_Proyecto = (?)`];
         let mainQuery = `
         SELECT 
-            i.hora,
-            i.fecha,
+            i.id,
             i.nombre,
+            i.fecha,
+            i.hora,
+            i.descripcion,
+            i.ubicacion,
+            i.evidencia,
+            i.DNI_autor,
+            i.fecha_registro,
+            i.id_incidencia,
+            i.id_proyecto_etapa,
+            i.id_proyecto_actividad,
+            i.id_Proyecto,
             P.Proyecto_Nombre,
             PER.Nombre AS Autor_Nombre,
             PER.Apellido AS Autor_Apellido,
             i2.nombre_incidencia AS nombre_incidencia,
             i2.estado AS estado_incidencia,
-            i.evidencia AS evidencia,
-            pe.nombre AS etapa,
-            pa.nombre AS actividad,
-            i2.id_incidencia,
-            i.id_proyecto_actividad AS id_actividad,
-            i.id_proyecto_etapa AS id_etapa
+            pe.codigo AS Etapa_Codigo,
+            pe.nombre AS Etapa_Nombre,
+            pe.estado AS Etapa_Estado,
+            pa.codigo AS Actividad_Codigo,
+            pa.nombre AS Actividad_Nombre,
+            pa.estado AS Actividad_Estado
             FROM INFORME i
             JOIN PROYECTO P ON P.id_Proyecto = i.id_Proyecto
             JOIN PERFIL PER ON PER.DNI = i.DNI_autor
@@ -95,24 +105,28 @@ const ReportRepository = {
             SELECT
             i.id,
             i.nombre,
+            i.fecha,
+            i.hora,
+            i.descripcion,
+            i.ubicacion,
+            i.evidencia,
+            i.DNI_autor,
+            i.fecha_registro,
+            i.id_incidencia,
+            i.id_proyecto_etapa,
+            i.id_proyecto_actividad,
+            i.id_Proyecto,
             P.Proyecto_Nombre,
             PER.Nombre AS Autor_Nombre,
             PER.Apellido AS Autor_Apellido,
-            i.descripcion,
-            i.evidencia,
-            i.fecha,
-            i.hora,
-            i.ubicacion,
-            i.DNI_autor,
-            i.fecha_registro,
             i2.nombre_incidencia AS nombre_incidencia,
             i2.estado AS estado_incidencia,
-            i.evidencia AS evidencia,
-            pe.nombre AS etapa,
-            pa.nombre AS actividad,
-            i2.id_incidencia,
-            i.id_proyecto_actividad AS id_actividad,
-            i.id_proyecto_etapa AS id_etapa
+            pe.codigo AS Etapa_Codigo,
+            pe.nombre AS Etapa_Nombre,
+            pe.estado AS Etapa_Estado,
+            pa.codigo AS Actividad_Codigo,
+            pa.nombre AS Actividad_Nombre,
+            pa.estado AS Actividad_Estado
             FROM INFORME i
             JOIN PROYECTO P ON P.id_Proyecto = i.id_Proyecto
             JOIN PERFIL PER ON PER.DNI = i.DNI_autor

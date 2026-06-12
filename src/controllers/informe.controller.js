@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { validarEtapaActividadProyecto, recalcFechasEtapasDesdeInformes } = require('../services/proyectoEtapas.service');
 const catchAsync = require('../utils/catchAsync');
-const { getAll, getByID } = require('../repositories/reports.repository');
+const { getAll } = require('../repositories/reports.repository');
 
 const SELECT_INFORME = `
     SELECT I.*,
@@ -95,16 +95,22 @@ exports.getInformes = catchAsync(async (req, res) => {
         page: parseInt(req.query.page) || 1,
         limit: parseInt(req.query.limit) || 10,
         nombre: req.query.nombre
-    })
-    return res.status(200).json(result);
+    });
+    return res.status(200).json({
+        ...result,
+        data: result.data.map(mapInforme),
+    });
 });
 
 exports.getInformeById = catchAsync(async (req, res) => {
-    const report = await getByID(req.params.id, req.params.iid)
-    if (report === undefined) {
+    const rows = await db.query(
+        `${SELECT_INFORME} WHERE I.id = ? AND I.id_Proyecto = ?`,
+        [req.params.iid, req.params.id],
+    );
+    if (!rows.length) {
         return res.status(404).json({ error: 'Informe no encontrado' });
     }
-    res.status(200).json(report);
+    res.status(200).json(mapInforme(rows[0]));
 });
 
 exports.createInforme = async (req, res) => {
