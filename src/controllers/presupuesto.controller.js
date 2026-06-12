@@ -39,6 +39,7 @@ exports.getByCotizacionReal = async (req, res) => {
     try {
         const idCotizacion = req.params.id;
         const tipo = req.query.tipo;
+        const idIncidencia = req.query.ID_Incidencia || req.query.id_incidencia;
         
         let query = 'SELECT * FROM PRESUPUESTO WHERE ID_Cotizacion = ?';
         const params = [idCotizacion];
@@ -46,6 +47,10 @@ exports.getByCotizacionReal = async (req, res) => {
         if (tipo) {
             query += ' AND tipo = ?';
             params.push(tipo);
+        }
+        if (idIncidencia !== undefined && idIncidencia !== null && idIncidencia !== '') {
+            query += ' AND ID_Incidencia = ?';
+            params.push(idIncidencia);
         }
         query += ' ORDER BY ID DESC';
         

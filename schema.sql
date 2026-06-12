@@ -29,8 +29,8 @@ CREATE TABLE "FABRICANTE" (
 
 CREATE TABLE "PERFIL" (
   "DNI" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "Nombre" varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "Apellido" varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "Nombre" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "Apellido" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   "Genero" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "RUC" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_nacimiento" date DEFAULT NULL,
@@ -207,9 +207,31 @@ CREATE TABLE "INVENTARIO" (
   "mant_fecha_caducidad" date DEFAULT NULL,
   "mant_responsable" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "mant_contacto" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "merma_perdida" int NOT NULL DEFAULT '0',
   PRIMARY KEY ("Id_Objeto"),
   KEY "INVENTARIO_ibfk_1" ("ID_Fabricante"),
   CONSTRAINT "INVENTARIO_ibfk_1" FOREIGN KEY ("ID_Fabricante") REFERENCES "FABRICANTE" ("ID_Fabricante") ON DELETE RESTRICT ON UPDATE RESTRICT
+);
+
+
+-- swefire_db.INVENTARIO_MOVIMIENTO definition
+
+CREATE TABLE "INVENTARIO_MOVIMIENTO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "Id_Objeto" int NOT NULL,
+  "cantidad" int NOT NULL,
+  "tipo_movimiento" enum('salida_taller_a_camion','salida_taller_a_proyecto','salida_camion_a_proyecto','retorno_proyecto_a_camion','retorno_camion_a_taller','retorno_proyecto_a_taller','incremento_manual','decrecimiento_manual') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "origen_tipo" enum('taller','camion','proyecto') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "origen_id" varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "destino_tipo" enum('taller','camion','proyecto') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "destino_id" varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "referencia_tabla" varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "referencia_id" int DEFAULT NULL,
+  "razon" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  "fecha" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "INVENTARIO_MOVIMIENTO_ibfk_1" ("Id_Objeto"),
+  CONSTRAINT "INVENTARIO_MOVIMIENTO_ibfk_1" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
 );
 
 
@@ -281,6 +303,20 @@ CREATE TABLE "PERFIL_EDUCACION" (
 );
 
 
+-- swefire_db.SERVICIO_INVENTARIO_REQUERIDO definition
+
+CREATE TABLE "SERVICIO_INVENTARIO_REQUERIDO" (
+  "ID_Servicio" int NOT NULL,
+  "Id_Objeto" int NOT NULL,
+  "cantidad" int NOT NULL DEFAULT '1',
+  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY ("ID_Servicio","Id_Objeto"),
+  KEY "SERVICIO_INVENTARIO_REQ_idx_objeto" ("Id_Objeto"),
+  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
+);
+
+
 -- swefire_db.SERVICIO_PERSONAL_REQUERIDO definition
 
 CREATE TABLE "SERVICIO_PERSONAL_REQUERIDO" (
@@ -293,21 +329,6 @@ CREATE TABLE "SERVICIO_PERSONAL_REQUERIDO" (
   PRIMARY KEY ("id"),
   KEY "ID_Servicio" ("ID_Servicio"),
   CONSTRAINT "SERVICIO_PERSONAL_REQUERIDO_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE
-);
-
-
--- swefire_db.SERVICIO_INVENTARIO_REQUERIDO definition
--- Materiales de referencia por servicio (no descuenta stock hasta asignar a proyecto)
-
-CREATE TABLE "SERVICIO_INVENTARIO_REQUERIDO" (
-  "ID_Servicio" int NOT NULL,
-  "Id_Objeto" int NOT NULL,
-  "cantidad" int NOT NULL DEFAULT 1,
-  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'para inventario',
-  PRIMARY KEY ("ID_Servicio", "Id_Objeto"),
-  KEY "SERVICIO_INVENTARIO_REQ_idx_objeto" ("Id_Objeto"),
-  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
-  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
 );
 
 
@@ -328,6 +349,21 @@ CREATE TABLE "SOLICITUD" (
   PRIMARY KEY ("ID"),
   KEY "Id_Cliente" ("Id_Cliente"),
   CONSTRAINT "SOLICITUD_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE CASCADE
+);
+
+
+-- swefire_db.SOLICITUD_CAMION definition
+
+CREATE TABLE "SOLICITUD_CAMION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Solicitud" int NOT NULL,
+  "id_camion" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "numero_dias" int NOT NULL,
+  PRIMARY KEY ("id"),
+  KEY "ID_Solicitud" ("ID_Solicitud"),
+  KEY "id_camion" ("id_camion"),
+  CONSTRAINT "SOLICITUD_CAMION_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE,
+  CONSTRAINT "SOLICITUD_CAMION_ibfk_2" FOREIGN KEY ("id_camion") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE
 );
 
 
@@ -378,20 +414,6 @@ CREATE TABLE "SOLICITUD_SERVICIO" (
 );
 
 
--- swefire_db.SOLICITUD_CAMION definition
-
-CREATE TABLE "SOLICITUD_CAMION" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "ID_Solicitud" int NOT NULL,
-  "id_camion" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "numero_dias" int NOT NULL,
-  PRIMARY KEY ("id"),
-  KEY "ID_Solicitud" ("ID_Solicitud"),
-  KEY "id_camion" ("id_camion"),
-  CONSTRAINT "SOLICITUD_CAMION_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE,
-  CONSTRAINT "SOLICITUD_CAMION_ibfk_2" FOREIGN KEY ("id_camion") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE
-);
-
 -- swefire_db.USUARIO definition
 
 CREATE TABLE "USUARIO" (
@@ -426,6 +448,24 @@ CREATE TABLE "CAMION_INVENTARIO" (
 );
 
 
+-- swefire_db.CAMION_INVENTARIO_RETENCION definition
+
+CREATE TABLE "CAMION_INVENTARIO_RETENCION" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "Placa" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "Id_Objeto" int NOT NULL,
+  "cantidad" int NOT NULL,
+  "estado_origen" enum('En mantenimiento','Descalificado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "fecha" datetime DEFAULT CURRENT_TIMESTAMP,
+  "restaurado" enum('si','no') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no',
+  PRIMARY KEY ("id"),
+  KEY "CAMION_INVENTARIO_RETENCION_ibfk_1" ("Placa"),
+  KEY "CAMION_INVENTARIO_RETENCION_ibfk_2" ("Id_Objeto"),
+  CONSTRAINT "CAMION_INVENTARIO_RETENCION_ibfk_1" FOREIGN KEY ("Placa") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE,
+  CONSTRAINT "CAMION_INVENTARIO_RETENCION_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
+);
+
+
 -- swefire_db.COTIZACION_COMERCIAL definition
 
 CREATE TABLE "COTIZACION_COMERCIAL" (
@@ -448,7 +488,7 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
   "duracion_etapa" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "etapas" int DEFAULT NULL,
   "etapas_detalle" json DEFAULT NULL,
-  "direccion_recojo" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "direccion_recojo" varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("ID"),
   KEY "COTIZACION_COMERCIAL_ibfk_2" ("DNI_O_RUC"),
   KEY "COTIZACION_COMERCIAL_ibfk_1" ("id_solicitud"),
@@ -462,33 +502,15 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
 CREATE TABLE "COTIZACION_ETAPA" (
   "id" int NOT NULL AUTO_INCREMENT,
   "ID_Cotizacion" int NOT NULL,
-  "referencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "descripcion" text COLLATE utf8mb4_unicode_ci,
-  "duracion" int NOT NULL DEFAULT 0,
-  "orden" int NOT NULL DEFAULT 1,
+  "referencia" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  "duracion" int NOT NULL DEFAULT '0',
+  "orden" int NOT NULL DEFAULT '1',
   PRIMARY KEY ("id"),
   UNIQUE KEY "uk_cotizacion_etapa_referencia" ("ID_Cotizacion","referencia"),
   KEY "idx_cotizacion_etapa_cotizacion" ("ID_Cotizacion"),
   CONSTRAINT "COTIZACION_ETAPA_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
-);
-
-
--- swefire_db.COTIZACION_ACTIVIDAD definition
-
-CREATE TABLE "COTIZACION_ACTIVIDAD" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "id_cotizacion_etapa" int NOT NULL,
-  "ID_Cotizacion" int NOT NULL,
-  "referencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "orden" int NOT NULL DEFAULT 1,
-  PRIMARY KEY ("id"),
-  UNIQUE KEY "uk_cotizacion_act_referencia" ("ID_Cotizacion","referencia"),
-  KEY "idx_cotizacion_act_etapa" ("id_cotizacion_etapa"),
-  KEY "idx_cotizacion_act_cotizacion" ("ID_Cotizacion"),
-  CONSTRAINT "COTIZACION_ACTIVIDAD_ibfk_1" FOREIGN KEY ("id_cotizacion_etapa") REFERENCES "COTIZACION_ETAPA" ("id") ON DELETE CASCADE,
-  CONSTRAINT "COTIZACION_ACTIVIDAD_ibfk_2" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
 );
 
 
@@ -577,6 +599,24 @@ CREATE TABLE "PRESUPUESTO" (
 );
 
 
+-- swefire_db.COTIZACION_ACTIVIDAD definition
+
+CREATE TABLE "COTIZACION_ACTIVIDAD" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_cotizacion_etapa" int NOT NULL,
+  "ID_Cotizacion" int NOT NULL,
+  "referencia" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "orden" int NOT NULL DEFAULT '1',
+  PRIMARY KEY ("id"),
+  UNIQUE KEY "uk_cotizacion_act_referencia" ("ID_Cotizacion","referencia"),
+  KEY "idx_cotizacion_act_etapa" ("id_cotizacion_etapa"),
+  KEY "idx_cotizacion_act_cotizacion" ("ID_Cotizacion"),
+  CONSTRAINT "COTIZACION_ACTIVIDAD_ibfk_1" FOREIGN KEY ("id_cotizacion_etapa") REFERENCES "COTIZACION_ETAPA" ("id") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_ACTIVIDAD_ibfk_2" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
+);
+
+
 -- swefire_db.COTIZACION_CAMION definition
 
 CREATE TABLE "COTIZACION_CAMION" (
@@ -593,7 +633,7 @@ CREATE TABLE "COTIZACION_CAMION" (
   KEY "COTIZACION_CAMION_idx_uso" ("uso"),
   CONSTRAINT "COTIZACION_CAMION_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE,
   CONSTRAINT "COTIZACION_CAMION_ibfk_2" FOREIGN KEY ("Placa") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE,
-  CONSTRAINT "COTIZACION_CAMION_ibfk_uso" FOREIGN KEY ("uso") REFERENCES "COTIZACION_SERVICIO" ("id") ON DELETE SET NULL ON UPDATE RESTRICT
+  CONSTRAINT "COTIZACION_CAMION_ibfk_uso" FOREIGN KEY ("uso") REFERENCES "COTIZACION_SERVICIO" ("id") ON DELETE SET NULL
 );
 
 
@@ -618,12 +658,12 @@ CREATE TABLE "COTIZACION_CHAT_MENSAJE" (
 
 CREATE TABLE "INCIDENCIA" (
   "id_incidencia" int NOT NULL AUTO_INCREMENT,
-  "nombre_incidencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "id_proyecto" int DEFAULT NULL,
   "empresa_involucrada" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "cotizacion_remuneracion" int DEFAULT NULL,
   "comentario" text COLLATE utf8mb4_unicode_ci,
   "estado" enum('Sin enviar','Cotizacion sin respuesta','Cotizacion disputada','Pago por recibir','Pago realizado','Material recuperado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre_incidencia" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id_incidencia"),
   KEY "id_proyecto" ("id_proyecto"),
   KEY "empresa_involucrada" ("empresa_involucrada"),
@@ -634,16 +674,33 @@ CREATE TABLE "INCIDENCIA" (
 );
 
 
+-- swefire_db.INCIDENCIA_CAMIONES definition
+
+CREATE TABLE "INCIDENCIA_CAMIONES" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_incidencia" int NOT NULL,
+  "id_proyecto_camion" int DEFAULT NULL,
+  "ocurrencia_camion" enum('averia','perdida','robo','por mantener','otro','ninguna') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "fecha_ocurrencia" datetime DEFAULT NULL,
+  "ultima_ubicacion" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  "comentario" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  "precio_remunerar" decimal(10,2) DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "id_incidencia" ("id_incidencia"),
+  KEY "id_proyecto_camion" ("id_proyecto_camion"),
+  CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_1_copy" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_3_copy" FOREIGN KEY ("id_proyecto_camion") REFERENCES "PROYECTO_CAMION" ("id") ON DELETE SET NULL ON UPDATE RESTRICT
+);
+
+
 -- swefire_db.INCIDENCIA_OBJETOS definition
 
 CREATE TABLE "INCIDENCIA_OBJETOS" (
   "id" int NOT NULL AUTO_INCREMENT,
   "id_incidencia" int NOT NULL,
   "id_proyecto_inventario" int DEFAULT NULL,
-  "id_proyecto_camion" int DEFAULT NULL,
   "ocurrencia_inventario" enum('averia','perdida','robo','por mantener','otro') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "ocurrencia_camion" enum('averia','perdida','robo','por mantener','otro','ninguna') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "fecha_perdida" datetime DEFAULT NULL,
+  "fecha_ocurrencia" datetime DEFAULT NULL,
   "cantidad" int DEFAULT NULL,
   "ultima_ubicacion" text COLLATE utf8mb4_unicode_ci,
   "comentario" text COLLATE utf8mb4_unicode_ci,
@@ -651,10 +708,38 @@ CREATE TABLE "INCIDENCIA_OBJETOS" (
   PRIMARY KEY ("id"),
   KEY "id_incidencia" ("id_incidencia"),
   KEY "id_proyecto_inventario" ("id_proyecto_inventario"),
-  KEY "id_proyecto_camion" ("id_proyecto_camion"),
   CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_1" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE CASCADE,
-  CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_2" FOREIGN KEY ("id_proyecto_inventario") REFERENCES "PROYECTO_INVENTARIO" ("id") ON DELETE SET NULL,
-  CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_3" FOREIGN KEY ("id_proyecto_camion") REFERENCES "PROYECTO_CAMION" ("id") ON DELETE SET NULL
+  CONSTRAINT "INCIDENCIA_OBJETOS_ibfk_2" FOREIGN KEY ("id_proyecto_inventario") REFERENCES "PROYECTO_INVENTARIO" ("id") ON DELETE SET NULL
+);
+
+
+-- swefire_db.INFORME definition
+
+CREATE TABLE "INFORME" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "nombre" varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "fecha" date DEFAULT NULL,
+  "hora" time NOT NULL,
+  "DNI_autor" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  "evidencia" varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ubicacion" varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "id_incidencia" int DEFAULT NULL,
+  "id_proyecto_etapa" int DEFAULT NULL,
+  "id_proyecto_actividad" int DEFAULT NULL,
+  "id_Proyecto" int NOT NULL,
+  "fecha_registro" datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY ("id"),
+  KEY "INFORME_idx_proyecto" ("id_Proyecto"),
+  KEY "INFORME_idx_incidencia" ("id_incidencia"),
+  KEY "INFORME_idx_autor" ("DNI_autor"),
+  KEY "INFORME_ibfk_etapa" ("id_proyecto_etapa"),
+  KEY "INFORME_ibfk_actividad" ("id_proyecto_actividad"),
+  CONSTRAINT "INFORME_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
+  CONSTRAINT "INFORME_ibfk_2" FOREIGN KEY ("DNI_autor") REFERENCES "PERFIL" ("DNI") ON DELETE RESTRICT,
+  CONSTRAINT "INFORME_ibfk_3" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE SET NULL,
+  CONSTRAINT "INFORME_ibfk_actividad" FOREIGN KEY ("id_proyecto_actividad") REFERENCES "PROYECTO_ACTIVIDAD" ("id") ON DELETE SET NULL,
+  CONSTRAINT "INFORME_ibfk_etapa" FOREIGN KEY ("id_proyecto_etapa") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE SET NULL
 );
 
 
@@ -662,17 +747,17 @@ CREATE TABLE "INCIDENCIA_OBJETOS" (
 
 CREATE TABLE "INVOLUCRADO" (
   "id" int NOT NULL AUTO_INCREMENT,
-  "dni_involucrado" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "id_trabajo" int NOT NULL,
+  "dni_involucrado" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "id_incidencia" int NOT NULL,
-  "version_de_hechos" text COLLATE utf8mb4_unicode_ci,
+  "descargo" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   "comentario" text COLLATE utf8mb4_unicode_ci,
+  "nombre" varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "Perfil_Registrado" tinyint(1) DEFAULT NULL,
+  "cargo" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "dni_involucrado" ("dni_involucrado"),
-  KEY "id_trabajo" ("id_trabajo"),
   KEY "id_incidencia" ("id_incidencia"),
   CONSTRAINT "INVOLUCRADO_ibfk_1" FOREIGN KEY ("dni_involucrado") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE,
-  CONSTRAINT "INVOLUCRADO_ibfk_2" FOREIGN KEY ("id_trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE CASCADE,
   CONSTRAINT "INVOLUCRADO_ibfk_3" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE CASCADE
 );
 
@@ -701,32 +786,13 @@ CREATE TABLE "PROYECTO" (
   KEY "fk_proyecto_trabajo" ("ID_Trabajo"),
   KEY "PROYECTO_ibfk_2" ("id_cotizacion"),
   KEY "PROYECTO_ibfk_1" ("Id_Cliente"),
+  KEY "PROYECTO_ibfk_etapa_actual" ("etapa_actual_id"),
+  KEY "PROYECTO_ibfk_actividad_actual" ("actividad_actual_id"),
   CONSTRAINT "fk_proyecto_trabajo" FOREIGN KEY ("ID_Trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT "PROYECTO_ibfk_1" FOREIGN KEY ("Id_Cliente") REFERENCES "CLIENTE" ("DNI_O_RUC") ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT "PROYECTO_ibfk_2" FOREIGN KEY ("id_cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE RESTRICT ON UPDATE RESTRICT
-);
-
-
--- swefire_db.PROYECTO_ETAPA definition
-
-CREATE TABLE "PROYECTO_ETAPA" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "id_Proyecto" int NOT NULL,
-  "tipo" enum('pendiente','cotizacion','terminado') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cotizacion',
-  "id_cotizacion_etapa" int DEFAULT NULL,
-  "codigo" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "descripcion" text COLLATE utf8mb4_unicode_ci,
-  "duracion" int NOT NULL DEFAULT 0,
-  "orden" int NOT NULL DEFAULT 1,
-  "estado" enum('no comenzado','en progreso','completada') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no comenzado',
-  "fecha_inicio" datetime DEFAULT NULL,
-  "fecha_fin" datetime DEFAULT NULL,
-  PRIMARY KEY ("id"),
-  KEY "idx_proyecto_etapa_proyecto" ("id_Proyecto"),
-  KEY "idx_proyecto_etapa_cot_etapa" ("id_cotizacion_etapa"),
-  CONSTRAINT "PROYECTO_ETAPA_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
-  CONSTRAINT "PROYECTO_ETAPA_ibfk_cot_etapa" FOREIGN KEY ("id_cotizacion_etapa") REFERENCES "COTIZACION_ETAPA" ("id") ON DELETE SET NULL
+  CONSTRAINT "PROYECTO_ibfk_2" FOREIGN KEY ("id_cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT "PROYECTO_ibfk_actividad_actual" FOREIGN KEY ("actividad_actual_id") REFERENCES "PROYECTO_ACTIVIDAD" ("id") ON DELETE SET NULL,
+  CONSTRAINT "PROYECTO_ibfk_etapa_actual" FOREIGN KEY ("etapa_actual_id") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE SET NULL
 );
 
 
@@ -737,27 +803,20 @@ CREATE TABLE "PROYECTO_ACTIVIDAD" (
   "id_proyecto_etapa" int NOT NULL,
   "id_Proyecto" int NOT NULL,
   "id_cotizacion_actividad" int DEFAULT NULL,
-  "codigo" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "orden" int NOT NULL DEFAULT 1,
-  "estado" enum('no comenzado','en progreso','completada') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no comenzado',
+  "codigo" varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "orden" int NOT NULL DEFAULT '1',
+  "estado" enum('no comenzado','en progreso','completada') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no comenzado',
   "fecha_inicio" datetime DEFAULT NULL,
   "fecha_fin" datetime DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "idx_proyecto_act_etapa" ("id_proyecto_etapa"),
   KEY "idx_proyecto_act_proyecto" ("id_Proyecto"),
-  KEY "idx_proyecto_act_cot_act" ("id_cotizacion_actividad"),
+  KEY "PROYECTO_ACTIVIDAD_ibfk_cot_act" ("id_cotizacion_actividad"),
   CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_1" FOREIGN KEY ("id_proyecto_etapa") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE CASCADE,
   CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_2" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
   CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_cot_act" FOREIGN KEY ("id_cotizacion_actividad") REFERENCES "COTIZACION_ACTIVIDAD" ("id") ON DELETE SET NULL
 );
-
-
-ALTER TABLE "PROYECTO"
-  ADD CONSTRAINT "PROYECTO_ibfk_etapa_actual"
-    FOREIGN KEY ("etapa_actual_id") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE SET NULL,
-  ADD CONSTRAINT "PROYECTO_ibfk_actividad_actual"
-    FOREIGN KEY ("actividad_actual_id") REFERENCES "PROYECTO_ACTIVIDAD" ("id") ON DELETE SET NULL;
 
 
 -- swefire_db.PROYECTO_CAMION definition
@@ -793,6 +852,29 @@ CREATE TABLE "PROYECTO_DOCUMENTACION" (
 );
 
 
+-- swefire_db.PROYECTO_ETAPA definition
+
+CREATE TABLE "PROYECTO_ETAPA" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_Proyecto" int NOT NULL,
+  "tipo" enum('pendiente','cotizacion','terminado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cotizacion',
+  "id_cotizacion_etapa" int DEFAULT NULL,
+  "codigo" varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "nombre" varchar(150) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  "duracion" int NOT NULL DEFAULT '0',
+  "orden" int NOT NULL DEFAULT '1',
+  "estado" enum('no comenzado','en progreso','completada') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no comenzado',
+  "fecha_inicio" datetime DEFAULT NULL,
+  "fecha_fin" datetime DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "idx_proyecto_etapa_proyecto" ("id_Proyecto"),
+  KEY "PROYECTO_ETAPA_ibfk_cot_etapa" ("id_cotizacion_etapa"),
+  CONSTRAINT "PROYECTO_ETAPA_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_ETAPA_ibfk_cot_etapa" FOREIGN KEY ("id_cotizacion_etapa") REFERENCES "COTIZACION_ETAPA" ("id") ON DELETE SET NULL
+);
+
+
 -- swefire_db.PROYECTO_INVENTARIO definition
 
 CREATE TABLE "PROYECTO_INVENTARIO" (
@@ -805,12 +887,17 @@ CREATE TABLE "PROYECTO_INVENTARIO" (
   "fecha_retorno" date DEFAULT NULL,
   "metodo_traslado" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "razon" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci DEFAULT 'para inventario',
+  "devolucion_pendiente" int NOT NULL DEFAULT '0',
+  "id_proyecto_camion" int DEFAULT NULL,
+  "fecha_devolucion_efectiva" datetime DEFAULT NULL,
+  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "id_Proyecto" ("id_Proyecto"),
   KEY "Id_Objeto" ("Id_Objeto"),
+  KEY "PROYECTO_INVENTARIO_idx_id_proyecto_camion" ("id_proyecto_camion"),
   CONSTRAINT "PROYECTO_INVENTARIO_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
-  CONSTRAINT "PROYECTO_INVENTARIO_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
+  CONSTRAINT "PROYECTO_INVENTARIO_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_INVENTARIO_ibfk_3" FOREIGN KEY ("id_proyecto_camion") REFERENCES "PROYECTO_CAMION" ("id") ON DELETE SET NULL ON UPDATE RESTRICT
 );
 
 
@@ -861,248 +948,3 @@ CREATE TABLE "TRABAJO_RRHH" (
   CONSTRAINT "TRABAJO_RRHH_ibfk_1" FOREIGN KEY ("Id_trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE CASCADE,
   CONSTRAINT "TRABAJO_RRHH_ibfk_2" FOREIGN KEY ("DNI_Trabajador") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
 );
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: Monitoreo de ubicación / movimientos de inventario
--- Nota: esto NO elimina columnas existentes; solo agrega/crea.
--- ─────────────────────────────────────────────────────────────────────────────
-
--- 1) Merma en inventario (pérdidas por incidencias no recuperables)
-ALTER TABLE "INVENTARIO"
-  ADD COLUMN "merma_perdida" int NOT NULL DEFAULT 0;
-
--- 2) Lotes de inventario por proyecto (múltiples envíos del mismo objeto)
-ALTER TABLE "PROYECTO_INVENTARIO"
-  ADD COLUMN "devolucion_pendiente" int NOT NULL DEFAULT 0,
-  ADD COLUMN "id_proyecto_camion" int DEFAULT NULL,
-  ADD COLUMN "fecha_devolucion_efectiva" datetime DEFAULT NULL;
-
-ALTER TABLE "PROYECTO_INVENTARIO"
-  ADD KEY "PROYECTO_INVENTARIO_idx_id_proyecto_camion" ("id_proyecto_camion"),
-  ADD CONSTRAINT "PROYECTO_INVENTARIO_ibfk_3"
-    FOREIGN KEY ("id_proyecto_camion") REFERENCES "PROYECTO_CAMION" ("id")
-    ON DELETE SET NULL ON UPDATE RESTRICT;
-
--- 3) Tabla de auditoría de movimientos (autogenerada por el backend)
-CREATE TABLE IF NOT EXISTS "INVENTARIO_MOVIMIENTO" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "Id_Objeto" int NOT NULL,
-  "cantidad" int NOT NULL,
-  "tipo_movimiento" enum(
-    'salida_taller_a_camion',
-    'salida_taller_a_proyecto',
-    'salida_camion_a_proyecto',
-    'retorno_proyecto_a_camion',
-    'retorno_camion_a_taller',
-    'retorno_proyecto_a_taller',
-    'incremento_manual',
-    'decrecimiento_manual'
-  ) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "origen_tipo" enum('taller','camion','proyecto') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "origen_id" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "destino_tipo" enum('taller','camion','proyecto') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "destino_id" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "referencia_tabla" varchar(60) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "referencia_id" int DEFAULT NULL,
-  "razon" text COLLATE utf8mb4_unicode_ci,
-  "fecha" datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY ("id"),
-  KEY "INVENTARIO_MOVIMIENTO_ibfk_1" ("Id_Objeto"),
-  CONSTRAINT "INVENTARIO_MOVIMIENTO_ibfk_1"
-    FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto")
-    ON DELETE CASCADE
-);
-
--- 4) Retención para devolver inventario a camión al salir de mantenimiento/descalificado
-CREATE TABLE IF NOT EXISTS "CAMION_INVENTARIO_RETENCION" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "Placa" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "Id_Objeto" int NOT NULL,
-  "cantidad" int NOT NULL,
-  "estado_origen" enum('En mantenimiento','Descalificado') COLLATE utf8mb4_unicode_ci NOT NULL,
-  "fecha" datetime DEFAULT CURRENT_TIMESTAMP,
-  "restaurado" enum('si','no') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'no',
-  PRIMARY KEY ("id"),
-  KEY "CAMION_INVENTARIO_RETENCION_ibfk_1" ("Placa"),
-  KEY "CAMION_INVENTARIO_RETENCION_ibfk_2" ("Id_Objeto"),
-  CONSTRAINT "CAMION_INVENTARIO_RETENCION_ibfk_1"
-    FOREIGN KEY ("Placa") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE,
-  CONSTRAINT "CAMION_INVENTARIO_RETENCION_ibfk_2"
-    FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
-);
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: Informes / sucesos de proyecto
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "INFORME" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "nombre" varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "fecha" date DEFAULT NULL,
-  "hora" time NOT NULL,
-  "DNI_autor" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "descripcion" text COLLATE utf8mb4_unicode_ci,
-  "evidencia" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "ubicacion" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "id_incidencia" int DEFAULT NULL,
-  "id_proyecto_etapa" int DEFAULT NULL,
-  "id_proyecto_actividad" int DEFAULT NULL,
-  "id_Proyecto" int NOT NULL,
-  "fecha_registro" datetime DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY ("id"),
-  KEY "INFORME_idx_proyecto" ("id_Proyecto"),
-  KEY "INFORME_idx_incidencia" ("id_incidencia"),
-  KEY "INFORME_idx_autor" ("DNI_autor"),
-  CONSTRAINT "INFORME_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
-  CONSTRAINT "INFORME_ibfk_2" FOREIGN KEY ("DNI_autor") REFERENCES "PERFIL" ("DNI") ON DELETE RESTRICT,
-  CONSTRAINT "INFORME_ibfk_3" FOREIGN KEY ("id_incidencia") REFERENCES "INCIDENCIA" ("id_incidencia") ON DELETE SET NULL,
-  CONSTRAINT "INFORME_ibfk_etapa" FOREIGN KEY ("id_proyecto_etapa") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE SET NULL,
-  CONSTRAINT "INFORME_ibfk_actividad" FOREIGN KEY ("id_proyecto_actividad") REFERENCES "PROYECTO_ACTIVIDAD" ("id") ON DELETE SET NULL
-);
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: Camiones solicitados en una solicitud (alquiler por días)
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "SOLICITUD_CAMION" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "ID_Solicitud" int NOT NULL,
-  "id_camion" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "numero_dias" int NOT NULL,
-  PRIMARY KEY ("id"),
-  KEY "ID_Solicitud" ("ID_Solicitud"),
-  KEY "id_camion" ("id_camion"),
-  CONSTRAINT "SOLICITUD_CAMION_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE,
-  CONSTRAINT "SOLICITUD_CAMION_ibfk_2" FOREIGN KEY ("id_camion") REFERENCES "CAMION" ("Placa") ON DELETE CASCADE
-);
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: COTIZACION_CAMION.uso FK a COTIZACION_SERVICIO, sin ID_Piloto
--- ─────────────────────────────────────────────────────────────────────────────
-
-ALTER TABLE "COTIZACION_CAMION" DROP FOREIGN KEY IF EXISTS "COTIZACION_CAMION_ibfk_3";
-ALTER TABLE "COTIZACION_CAMION" DROP COLUMN IF EXISTS "ID_Piloto";
-ALTER TABLE "COTIZACION_CAMION" MODIFY "uso" int DEFAULT NULL;
-ALTER TABLE "COTIZACION_CAMION" ADD KEY IF NOT EXISTS "COTIZACION_CAMION_idx_uso" ("uso");
-ALTER TABLE "COTIZACION_CAMION" ADD CONSTRAINT IF NOT EXISTS "COTIZACION_CAMION_ibfk_uso"
-  FOREIGN KEY ("uso") REFERENCES "COTIZACION_SERVICIO" ("id") ON DELETE SET NULL ON UPDATE RESTRICT;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: inventario requerido por servicio (referencia, no descuenta taller)
--- ─────────────────────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS "SERVICIO_INVENTARIO_REQUERIDO" (
-  "ID_Servicio" int NOT NULL,
-  "Id_Objeto" int NOT NULL,
-  "cantidad" int NOT NULL DEFAULT 1,
-  "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'para inventario',
-  PRIMARY KEY ("ID_Servicio", "Id_Objeto"),
-  KEY "SERVICIO_INVENTARIO_REQ_idx_objeto" ("Id_Objeto"),
-  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
-  CONSTRAINT "SERVICIO_INVENTARIO_REQ_ibfk_2" FOREIGN KEY ("Id_Objeto") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
-);
-
--- Si la tabla ya existía sin estancia:
-ALTER TABLE "SERVICIO_INVENTARIO_REQUERIDO"
-  ADD COLUMN IF NOT EXISTS "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'para inventario';
-
-ALTER TABLE "PROYECTO_INVENTARIO"
-  ADD COLUMN IF NOT EXISTS "estancia" enum('para proyecto','para inventario') COLLATE utf8mb4_unicode_ci DEFAULT 'para inventario';
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: cotización — fases (JSON) y dirección de recojo
--- Compatible MySQL / MariaDB (sin ADD COLUMN IF NOT EXISTS)
--- ─────────────────────────────────────────────────────────────────────────────
-
--- etapas_detalle (JSON en MariaDB 10.2+ / MySQL 5.7+; si falla el tipo JSON use LONGTEXT)
-SET @col_exists = (
-  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'COTIZACION_COMERCIAL'
-    AND COLUMN_NAME = 'etapas_detalle'
-);
-SET @sql_etapas = IF(
-  @col_exists = 0,
-  'ALTER TABLE `COTIZACION_COMERCIAL` ADD COLUMN `etapas_detalle` JSON DEFAULT NULL',
-  'SELECT ''etapas_detalle ya existe'' AS info'
-);
-PREPARE stmt FROM @sql_etapas;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
-SET @col_exists = (
-  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'COTIZACION_COMERCIAL'
-    AND COLUMN_NAME = 'direccion_recojo'
-);
-SET @sql_recojo = IF(
-  @col_exists = 0,
-  'ALTER TABLE `COTIZACION_COMERCIAL` ADD COLUMN `direccion_recojo` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL',
-  'SELECT ''direccion_recojo ya existe'' AS info'
-);
-PREPARE stmt FROM @sql_recojo;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: INCIDENCIA.nombre_incidencia
--- ─────────────────────────────────────────────────────────────────────────────
-
-SET @col_exists = (
-  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'INCIDENCIA'
-    AND COLUMN_NAME = 'nombre_incidencia'
-);
-SET @sql_nombre_inc = IF(
-  @col_exists = 0,
-  'ALTER TABLE `INCIDENCIA` ADD COLUMN `nombre_incidencia` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL AFTER `id_incidencia`',
-  'SELECT ''nombre_incidencia ya existe'' AS info'
-);
-PREPARE stmt FROM @sql_nombre_inc;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: SERVICIO.foto (URL relativa de imagen PNG/JPEG)
--- ─────────────────────────────────────────────────────────────────────────────
-
-SET @col_exists = (
-  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'SERVICIO'
-    AND COLUMN_NAME = 'foto'
-);
-SET @sql_servicio_foto = IF(
-  @col_exists = 0,
-  'ALTER TABLE `SERVICIO` ADD COLUMN `foto` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL',
-  'SELECT ''foto ya existe'' AS info'
-);
-PREPARE stmt FROM @sql_servicio_foto;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: PROYECTO etapas/actividades + INFORME vínculo
--- (ejecutar sql/migrate_proyecto_etapas.sql en BD existente)
--- ─────────────────────────────────────────────────────────────────────────────
-
--- ─────────────────────────────────────────────────────────────────────────────
--- MIGRACIÓN: INFORME.fecha (día de ocurrencia del suceso, distinto de fecha_registro)
--- ─────────────────────────────────────────────────────────────────────────────
-
-SET @col_exists = (
-  SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-  WHERE TABLE_SCHEMA = DATABASE()
-    AND TABLE_NAME = 'INFORME'
-    AND COLUMN_NAME = 'fecha'
-);
-SET @sql_informe_fecha = IF(
-  @col_exists = 0,
-  'ALTER TABLE `INFORME` ADD COLUMN `fecha` date DEFAULT NULL AFTER `nombre`',
-  'SELECT ''fecha ya existe'' AS info'
-);
-PREPARE stmt FROM @sql_informe_fecha;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;

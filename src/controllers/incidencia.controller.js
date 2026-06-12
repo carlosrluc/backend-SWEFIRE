@@ -214,9 +214,8 @@ exports.deleteObjeto = async (req, res) => {
 exports.getInvolucrados = async (req, res) => {
     try {
         const rows = await db.query(
-            `SELECT I.*, T.comentario as Trabajo_Comentario, P.Nombre as Involucrado_Nombre, P.Apellido as Involucrado_Apellido 
+            `SELECT I.*, P.Nombre as Involucrado_Nombre, P.Apellido as Involucrado_Apellido 
              FROM INVOLUCRADO I 
-             LEFT JOIN TRABAJO T ON I.id_trabajo = T.Id_trabajo 
              LEFT JOIN PERFIL P ON I.dni_involucrado = P.DNI 
              WHERE I.id_incidencia = ?
              ORDER BY I.id DESC`, 
@@ -227,11 +226,19 @@ exports.getInvolucrados = async (req, res) => {
 };
 
 exports.createInvolucrado = async (req, res) => {
-    const { dni_involucrado, id_trabajo, version_de_hechos, comentario } = req.body;
+    const { dni_involucrado, descargo, comentario, nombre, Perfil_Registrado, cargo } = req.body;
     try {
         const result = await db.query(
-            'INSERT INTO INVOLUCRADO (dni_involucrado, id_trabajo, id_incidencia, version_de_hechos, comentario) VALUES (?,?,?,?,?)',
-            [dni_involucrado, id_trabajo, req.params.id, version_de_hechos, comentario]
+            'INSERT INTO INVOLUCRADO (dni_involucrado, id_incidencia, descargo, comentario, nombre, Perfil_Registrado, cargo) VALUES (?,?,?,?,?,?,?)',
+            [
+                dni_involucrado || null,
+                req.params.id,
+                descargo || null,
+                comentario || null,
+                nombre || null,
+                Perfil_Registrado !== undefined ? Perfil_Registrado : null,
+                cargo || null
+            ]
         );
         res.status(201).json({ message: 'Involucrado creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }

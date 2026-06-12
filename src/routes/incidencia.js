@@ -290,12 +290,13 @@ router.delete('/:id/objetos/:oid', auth, permit(['gerente', 'adminproy']), c.del
  *         application/json:
  *           schema:
  *             type: object
- *             required: [dni_involucrado, id_trabajo]
  *             properties:
  *               dni_involucrado: { type: string }
- *               id_trabajo: { type: integer }
- *               version_de_hechos: { type: string }
+ *               descargo: { type: string }
  *               comentario: { type: string }
+ *               nombre: { type: string }
+ *               Perfil_Registrado: { type: boolean }
+ *               cargo: { type: string }
  *     responses:
  *       201:
  *         description: Involucrado agregado

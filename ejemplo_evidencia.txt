@@ -1,0 +1,137 @@
+================================================================================
+GUÍA PARA SUBIR Y MOSTRAR EVIDENCIA (FOTOS) EN EL FRONTEND
+================================================================================
+
+--------------------------------------------------------------------------------
+PARTE 1: SUBIR UNA FOTO (POST /api/proyectos/{idproyecto}/informes/{id_informe}/evidencia)
+--------------------------------------------------------------------------------
+Para subir una imagen (archivo físico) desde el navegador a la API, debes enviar
+la petición codificada como "multipart/form-data" utilizando el objeto FormData
+en JavaScript.
+
+Ejemplo en JavaScript/React:
+
+```javascript
+async function subirEvidencia(idProyecto, idInforme, archivoFoto, token) {
+  try {
+    // 1. Instanciamos FormData
+    const formData = new FormData();
+    
+    // 2. Adjuntamos la foto. El nombre del campo ('evidencia') debe coincidir 
+    // con el que espera el middleware de subida (como multer) en el backend.
+    formData.append('evidencia', archivoFoto);
+
+    // 3. Enviamos la petición POST
+    const response = await fetch(`http://localhost:3000/api/proyectos/${idProyecto}/informes/${idInforme}/evidencia`, {
+      method: 'POST',
+      headers: {
+        // IMPORTANTE: Al enviar FormData, NO debes configurar la cabecera 'Content-Type'.
+        // El navegador la configurará automáticamente con el boundary correspondiente.
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Error al subir la evidencia");
+    }
+
+    const data = await response.json();
+    console.log("Evidencia subida correctamente:", data);
+    alert("¡Evidencia subida con éxito!");
+    
+    // El backend retornará probablemente el path guardado, por ejemplo:
+    // data.evidencia = "/uploads/informes/foto_1780548384345-440328970.png"
+    return data.evidencia;
+
+  } catch (error) {
+    console.error("Error en la subida:", error);
+    alert(error.message);
+  }
+}
+
+// Ejemplo de uso con un input de tipo file en React:
+/*
+function ComponenteSubir() {
+  const [archivo, setArchivo] = useState(null);
+
+  const manejarCambio = (e) => {
+    setArchivo(e.target.files[0]);
+  };
+
+  const manejarEnvio = () => {
+    if (archivo) {
+      subirEvidencia(1, 12, archivo, "tu_token_jwt");
+    }
+  };
+
+  return (
+    <div>
+      <input type="file" accept="image/*" onChange={manejarCambio} />
+      <button onClick={manejarEnvio}>Subir Foto</button>
+    </div>
+  );
+}
+*/
+
+
+--------------------------------------------------------------------------------
+PARTE 2: MOSTRAR LA FOTO GUARDADA EN EL ATRIBUTO "evidencia"
+--------------------------------------------------------------------------------
+En la base de datos se guarda un fragmento de la ruta, por ejemplo:
+`"/uploads/informes/foto_1780548384345-440328970.png"`
+
+Para mostrar esta imagen en el frontend, debes concatenarla con la URL base de tu
+servidor backend (la cual suele venir de una variable de entorno de tu frontend,
+por ejemplo, `process.env.REACT_APP_API_URL` o `import.meta.env.VITE_API_URL`).
+
+### Caso A: Si la carpeta de uploads es pública y estática (Sin protección JWT)
+Si las fotos de evidencias se exponen públicamente en el servidor Express como
+archivos estáticos, puedes usarlas directamente en una etiqueta <img>:
+
+```javascript
+// Variable de entorno que apunta al host del backend
+const API_BASE_URL = "http://localhost:3000"; // O process.env.REACT_APP_API_URL
+
+// Ruta guardada en la base de datos (atributo "evidencia")
+const rutaEvidencia = "/uploads/informes/foto_1780548384345-440328970.png";
+
+// Concatenación para la ruta absoluta del recurso estático
+const urlCompleta = `${API_BASE_URL}${rutaEvidencia}`;
+
+// Renderizado en React:
+// <img src={urlCompleta} alt="Evidencia del Informe" style={{ width: '300px' }} />
+```
+
+### Caso B: Si necesitas token JWT para ver la imagen
+Si la ruta `/uploads/informes/...` está protegida por un middleware de autenticación,
+debes hacer un `fetch` para descargar la imagen como Blob, generar una URL temporal 
+del objeto local y pasarla al atributo `src`:
+
+```javascript
+async function obtenerUrlSeguraDeEvidencia(rutaEvidencia, token) {
+  const API_BASE_URL = "http://localhost:3000"; // O process.env.REACT_APP_API_URL
+  const urlCompleta = `${API_BASE_URL}${rutaEvidencia}`;
+
+  try {
+    const response = await fetch(urlCompleta, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) throw new Error("No se pudo obtener la imagen");
+
+    const blob = await response.blob();
+    const objectUrl = window.URL.createObjectURL(blob);
+    
+    return objectUrl; // Este URL temporal de navegador (blob:http...) se pasa al <img src={...}>
+  } catch (error) {
+    console.error("Error al cargar imagen protegida:", error);
+    return null;
+  }
+}
+```
+================================================================================

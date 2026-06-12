@@ -72,6 +72,11 @@ router.get('/cotizacion/:id', c.getByCotizacion);
  *         name: tipo
  *         required: false
  *         schema: { type: string, enum: ['Material Directo','Mano de Obra','Servicios','Gastos Administrativos','Costos Indirectos'] }
+ *       - in: query
+ *         name: ID_Incidencia
+ *         required: false
+ *         schema: { type: integer }
+ *         description: Filtrar por ID de la incidencia
  *     responses:
  *       200:
  *         description: Lista de items de presupuesto con costo real
