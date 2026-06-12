@@ -43,19 +43,19 @@ const imageFilter = (req, file, cb) => {
 };
 
 // Multer instances
-const uploadCotizacion = multer({ 
+const uploadCotizacion = multer({
     storage: createStorage(cotizacionesDir, 'orden_compra'),
     fileFilter: pdfFilter,
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-const uploadPDF = multer({ 
+const uploadPDF = multer({
     storage: createStorage(pdfsDir, 'doc'),
     fileFilter: pdfFilter,
     limits: { fileSize: 10 * 1024 * 1024 } // 10MB
 });
 
-const uploadImage = multer({ 
+const uploadImage = multer({
     storage: createStorage(imagesDir, 'img'),
     fileFilter: imageFilter,
     limits: { fileSize: 5 * 1024 * 1024 } // 5MB
@@ -86,11 +86,17 @@ const uploadServicioFoto = multer({
     limits: { fileSize: 5 * 1024 * 1024 },
 });
 
+const requireFile = (req, res, next) => {
+    if (!req.file) return res.status(400).json({ error: 'No se subió ningún archivo' });
+    next();
+};
+
 module.exports = {
-    uploadCotizacion: uploadCotizacion,
-    uploadPDF: uploadPDF,
-    uploadImage: uploadImage,
+    uploadCotizacion,
+    uploadPDF,
+    uploadImage,
     uploadInformeEvidencia,
     uploadServicioFoto,
+    requireFile
 };
 

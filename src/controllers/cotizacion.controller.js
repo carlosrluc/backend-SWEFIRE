@@ -16,6 +16,7 @@ const {
     buildUpsertQuotationResponse,
 } = require('../services/cotizacionDto.service');
 const { mergeSolicitudIntoCotizacionCreate } = require('../services/solicitudCotizacionImport.service');
+const approveQuotation = require('./approveQuotation.prototype');
 
 function toDateTimeInicio(fecha) {
     if (!fecha) return null;
@@ -707,7 +708,6 @@ exports.create = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
-
 exports.update = async (req, res) => {
     const normalized = normalizeCotizacionPayload(req.body);
     const cotizacionId = req.params.id;
@@ -876,6 +876,9 @@ exports.remove = async (req, res) => {
         res.json({ message: 'Cotización eliminada' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+// TODO: verificar funcionamiento y mover a SP todo comando transaccional
+exports.approve = approveQuotation
 
 // ── COTIZACION_SERVICIO ───────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
@@ -1146,7 +1149,7 @@ exports.getChatHistory = async (req, res) => {
         }
 
         const messages = await db.query(
-            'SELECT * FROM COTIZACION_CHAT_MENSAJE WHERE id_cotizacion = ? ORDER BY fecha_hora ASC', 
+            'SELECT * FROM COTIZACION_CHAT_MENSAJE WHERE id_cotizacion = ? ORDER BY fecha_hora ASC',
             [cotizacionId]
         );
 
@@ -1212,140 +1215,34 @@ exports.sendChatMessage = async (req, res) => {
 // ── ORDEN DE COMPRA (PDF) ───────────────────────────────────────────────────────
 const path = require('path');
 const fs = require('fs');
+const catchAsync = require('../utils/catchAsync');
+const { getQuotationByID, upsertPurchaseOrderFileURL } = require('../repositories/quotation.repository');
+const deleteFile = require('../utils/deleteFile');
+const { QuotationStatus } = require('../enums/quotation.enums');
 
-exports.uploadOrdenCompra = async (req, res) => {
-    try {
-        const cotizacionId = req.params.id;
-        if (!req.file) {
-            return res.status(400).json({ error: 'No se subió ningún archivo' });
-        }
-
-        // Obtener la cotización actual para ver si ya tenía un PDF y borrarlo
-        const rows = await db.query('SELECT Orden_compra FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
-        if (!rows.length) {
-            // Si la cotización no existe, borrar el archivo recién subido
-            fs.unlinkSync(req.file.path);
-            return res.status(404).json({ error: 'Cotización no encontrada' });
-        }
-
-        const oldUrl = rows[0].Orden_compra;
-        if (oldUrl) {
-            // Borrar el archivo viejo (la BD guarda URL relativa, lo convertimos a ruta absoluta)
-            const oldAbsPath = path.join(__dirname, '../../', oldUrl);
-            try {
-                if (fs.existsSync(oldAbsPath)) fs.unlinkSync(oldAbsPath);
-            } catch (err) {
-                console.error("No se pudo borrar el PDF antiguo:", err);
-            }
-        }
-
-        // Guardar URL relativa en la base de datos (ej: /uploads/cotizaciones/orden_compra_xxx.pdf)
-        const relativeUrl = `/uploads/cotizaciones/${req.file.filename}`;
-        await db.query('UPDATE COTIZACION_COMERCIAL SET Orden_compra = ? WHERE ID = ?', [relativeUrl, cotizacionId]);
-
-        // === AUTO-CREACIÓN DEL PROYECTO ===
-        try {
-            // Verificar si ya existe un proyecto para esta cotización
-            const projCheck = await db.query('SELECT id_Proyecto FROM PROYECTO WHERE id_cotizacion = ?', [cotizacionId]);
-            
-            if (projCheck.length === 0) {
-                // Obtener datos de la cotización
-                const cotData = await db.query(
-                    'SELECT DNI_O_RUC, id_solicitud, nombre, observacion FROM COTIZACION_COMERCIAL WHERE ID = ?',
-                    [cotizacionId],
-                );
-                if (cotData.length > 0) {
-                    const clienteId = cotData[0].DNI_O_RUC;
-                    const idSolicitud = cotData[0].id_solicitud;
-                    const nombreCot = cotData[0].nombre;
-                    const observaciones = cotData[0].observacion ?? null;
-                    let ubicacion = null;
-                    let descripcionServicio = `Proyecto autogenerado a partir de la cotización: ${nombreCot}`;
-
-                    if (idSolicitud) {
-                        const solData = await db.query('SELECT ubicacion, descripcion FROM SOLICITUD WHERE ID = ?', [idSolicitud]);
-                        if (solData.length) {
-                            ubicacion = solData[0].ubicacion;
-                            if (solData[0].descripcion) {
-                                descripcionServicio = solData[0].descripcion;
-                            }
-                        }
-                    }
-
-                    // 1. Crear el Trabajo base
-                    const trabajoResult = await db.query(
-                        'INSERT INTO TRABAJO (comentario) VALUES (?)',
-                        [`Trabajo autogenerado para ${nombreCot}`]
-                    );
-                    const idTrabajo = trabajoResult.insertId;
-
-                    // 2. Crear el Proyecto
-                    const projResult = await db.query(
-                        `INSERT INTO PROYECTO (descripcion_servicio, ID_Trabajo, Id_Cliente, ubicacion, id_cotizacion, orden_servicio, observaciones, estado, fecha_inicio, fecha_fin) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, 'No iniciado', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 7 DAY))`,
-                        [descripcionServicio, idTrabajo, clienteId, ubicacion, cotizacionId, relativeUrl, observaciones]
-                    );
-                    const idProyecto = projResult.insertId;
-
-                    await syncProyectoEtapasFromCotizacion(db, idProyecto, cotizacionId);
-
-                    // Actualizar Id_Proyecto en Trabajo
-                    await db.query('UPDATE TRABAJO SET Id_Proyecto = ? WHERE Id_trabajo = ?', [idProyecto, idTrabajo]);
-
-                    // 3. Migrar Inventario (COTIZACION_INVENTARIO -> PROYECTO_INVENTARIO)
-                    const inventarios = await db.query('SELECT ID_Inventario, cantidad, observaciones AS razon FROM COTIZACION_INVENTARIO WHERE ID_Cotizacion = ?', [cotizacionId]);
-                    for (const inv of inventarios) {
-                        await db.query(
-                            'INSERT INTO PROYECTO_INVENTARIO (id_Proyecto, Id_Objeto, cantidad_objeto, razon, estado) VALUES (?, ?, ?, ?, ?)',
-                            [idProyecto, inv.ID_Inventario, inv.cantidad, inv.razon, 'aceptable']
-                        );
-                    }
-
-                    // 4. Migrar Camiones (COTIZACION_CAMION -> PROYECTO_CAMION)
-                    const camiones = await db.query(
-                        `SELECT cc.Placa, cc.fecha_hora_entrada, cc.fecha_hora_salida, cc.uso, cs.ID_Servicio
-                         FROM COTIZACION_CAMION cc
-                         LEFT JOIN COTIZACION_SERVICIO cs ON cc.uso = cs.id
-                         WHERE cc.ID_Cotizacion = ?`,
-                        [cotizacionId],
-                    );
-                    for (const cam of camiones) {
-                        await db.query(
-                            'INSERT INTO PROYECTO_CAMION (id_Proyecto, Placa, fecha_hora_entrada, fecha_hora_salida, personal_manejando, razon, estado) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                            [idProyecto, cam.Placa, cam.fecha_hora_entrada, cam.fecha_hora_salida, null, cam.uso, 'aceptable'],
-                        );
-                    }
-
-                    // 5. Migrar Personal (COTIZACION_PERSONAL -> TRABAJO_JORNADA)
-                    const personal = await db.query('SELECT ID_Usuario, fecha_entrada, fecha_salida FROM COTIZACION_PERSONAL WHERE ID_Cotizacion = ?', [cotizacionId]);
-                    for (const pers of personal) {
-                        const user = await db.query('SELECT dni_perfil FROM USUARIO WHERE idusuario = ?', [pers.ID_Usuario]);
-                        if (user.length > 0) {
-                            const dni = user[0].dni_perfil;
-                            await db.query(
-                                'INSERT INTO TRABAJO_JORNADA (Id_trabajo, DNI_Trabajador, dia) VALUES (?, ?, ?)',
-                                [idTrabajo, dni, pers.fecha_entrada || new Date()]
-                            );
-                        }
-                    }
-                }
-            } else {
-                const cotObs = await db.query('SELECT observacion FROM COTIZACION_COMERCIAL WHERE ID = ?', [cotizacionId]);
-                await db.query(
-                    'UPDATE PROYECTO SET orden_servicio = ?, observaciones = ? WHERE id_cotizacion = ?',
-                    [relativeUrl, cotObs[0]?.observacion ?? null, cotizacionId],
-                );
-            }
-        } catch (err) {
-            console.error("Error al autogenerar el proyecto:", err);
-        }
-        // ==================================
-
-        res.json({ message: 'Orden de compra subida correctamente. Proyecto sincronizado.', url: relativeUrl });
-    } catch (e) {
-        res.status(500).json({ error: e.message });
+exports.uploadOrdenCompra = catchAsync(async (req, res) => {
+    const QuotationID = req.params.id;
+    if (!QuotationID) {
+        return res.status(400).json({ error: 'quotationID no recibido.' });
     }
-};
+    const quotation = await getQuotationByID(QuotationID);
+    if (!quotation) {
+        // Si la cotización no existe, borrar el archivo recién subido
+        fs.unlinkSync(req.file.path);
+        return res.status(404).json({ error: 'Cotización no encontrada' });
+    }
+
+    if (quotation.estado !== QuotationStatus.PENDING) {
+        return res.status(401).json({ error: `Solo se pueden subir ordenes de compra para cotizaciones con el estado: ${QuotationStatus.PENDING}` });
+    }
+
+    // Borrar PDF viejo de orden de compra
+    const OldRelativePurchaseOrderFileUrl = quotation.Orden_compra;
+    deleteFile(OldRelativePurchaseOrderFileUrl);
+    // Actualizar nueva URL relativa en la base de datos
+    const NewRelativeUrl = await upsertPurchaseOrderFileURL(req.file.filename, QuotationID);
+    res.status(200).json({ message: 'Orden de compra subida correctamente.', url: NewRelativeUrl });
+})
 
 exports.getOrdenCompra = async (req, res) => {
     try {

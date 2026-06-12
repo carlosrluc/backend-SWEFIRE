@@ -1,3 +1,5 @@
+const path = require('path')
+global.__basedir = path.join(__dirname, '..');
 const app = require('./app');
 require('dotenv').config();
 const http = require('http');

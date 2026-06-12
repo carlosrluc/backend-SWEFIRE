@@ -517,20 +517,51 @@ router.get(
  *         required: true
  *         schema: { type: integer }
  *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *         description: Número de página
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 10 }
+ *         description: Cantidad de resultados por página
+ *       - in: query
  *         name: nombre
  *         schema: { type: string }
  *         description: Filtrar por nombre del informe (parcial)
- *       - in: query
- *         name: id_incidencia
- *         schema: { type: integer }
- *         description: Filtrar por incidencia relacionada
- *       - in: query
- *         name: relacion
- *         schema: { type: string, enum: [ninguna] }
- *         description: Usar "ninguna" para sucesos sin incidencia vinculada
  *     responses:
  *       200:
- *         description: Lista de informes (incluye Autor_Nombre, Autor_Apellido y autor_nombre)
+ *         description: Lista de informes con paginación
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       hora: { type: string, example: "14:30:00" }
+ *                       fecha: { type: string, format: date, example: "2026-06-03" }
+ *                       nombre: { type: string, example: "Instalación de rociadores" }
+ *                       Proyecto_Nombre: { type: string, example: "Proyecto Rociadores Norte" }
+ *                       Autor_Nombre: { type: string, example: "Juan" }
+ *                       Autor_Apellido: { type: string, example: "Pérez" }
+ *                       nombre_incidencia: { type: string, nullable: true, example: "Robo de extintor" }
+ *                       estado_incidencia: { type: string, nullable: true, example: "Pago por recibir" }
+ *                       evidencia: { type: string, nullable: true, example: "/uploads/informes/foto.jpg" }
+ *                       etapa: { type: string, nullable: true, example: "Instalación" }
+ *                       actividad: { type: string, nullable: true, example: "Colocar soportes" }
+ *                       id_incidencia: { type: integer, nullable: true, example: 5 }
+ *                       id_actividad: { type: integer, nullable: true, example: 12 }
+ *                       id_etapa: { type: integer, nullable: true, example: 7 }
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total: { type: integer, example: 42 }
+ *                     page: { type: integer, example: 1 }
+ *                     limit: { type: integer, example: 10 }
+ *                     totalPages: { type: integer, example: 5 }
  *   post:
  *     tags: [Proyecto - Informes]
  *     summary: Registrar un suceso en el informe del proyecto
@@ -582,6 +613,32 @@ router.post('/:id/informes', auth, permit(['supervisorcampo', 'trabajcampo', 'ab
  *     responses:
  *       200:
  *         description: Informe encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: integer, example: 15 }
+ *                 nombre: { type: string, example: "Instalación de rociadores" }
+ *                 Proyecto_Nombre: { type: string, example: "Proyecto Rociadores Norte" }
+ *                 Autor_Nombre: { type: string, example: "Juan" }
+ *                 Autor_Apellido: { type: string, example: "Pérez" }
+ *                 descripcion: { type: string, example: "Se instalaron los rociadores en el techo" }
+ *                 evidencia: { type: string, nullable: true, example: "/uploads/informes/foto.jpg" }
+ *                 fecha: { type: string, format: date, example: "2026-06-03" }
+ *                 hora: { type: string, example: "14:30:00" }
+ *                 ubicacion: { type: string, example: "Recepcion de la planta" }
+ *                 DNI_autor: { type: string, example: "12345678" }
+ *                 fecha_registro: { type: string, format: date-time, example: "2026-06-03T16:00:00.000Z" }
+ *                 nombre_incidencia: { type: string, nullable: true, example: "Robo de extintor" }
+ *                 estado_incidencia: { type: string, nullable: true, example: "Pago por recibir" }
+ *                 etapa: { type: string, nullable: true, example: "Instalación" }
+ *                 actividad: { type: string, nullable: true, example: "Colocar soportes" }
+ *                 id_incidencia: { type: integer, nullable: true, example: 5 }
+ *                 id_actividad: { type: integer, nullable: true, example: 12 }
+ *                 id_etapa: { type: integer, nullable: true, example: 7 }
+ *       404:
+ *         description: Informe no encontrado
  *   put:
  *     tags: [Proyecto - Informes]
  *     summary: Actualizar suceso del informe
