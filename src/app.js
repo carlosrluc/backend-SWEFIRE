@@ -35,6 +35,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 app.use('/public', express.static(path.join(__dirname, '..', 'public')));
 
+// Fotos de SERVICIO.foto — públicas bajo /api/uploads/servicios/ (sin Bearer).
+// La BD guarda rutas tipo /uploads/servicios/foto_xxx.png; el frontend suele anteponer /api.
+app.use(
+    '/api/uploads/servicios',
+    express.static(path.join(__dirname, '..', 'uploads', 'servicios')),
+);
+
 // ── Swagger ───────────────────────────────────────────────────────────────────
 const swaggerOptions = {
     definition: {
@@ -125,6 +132,10 @@ function isPublicApiRoute(req) {
     }
     // Fotografías de SERVICIO.foto — acceso sin Bearer (retroactivo vía redirect a /uploads/servicios/...)
     if (req.method === 'GET' && /^\/servicios\/\d+\/foto$/.test(path)) {
+        return true;
+    }
+    // Archivos estáticos de SERVICIO.foto bajo /api/uploads/servicios/...
+    if (req.method === 'GET' && /^\/uploads\/servicios\/.+/.test(path)) {
         return true;
     }
     return false;
