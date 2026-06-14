@@ -332,6 +332,58 @@ CREATE TABLE "SERVICIO_PERSONAL_REQUERIDO" (
 );
 
 
+-- swefire_db.SERVICIO_ETAPA definition
+
+CREATE TABLE "SERVICIO_ETAPA" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Servicio" int NOT NULL,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "descripcion" text COLLATE utf8mb4_unicode_ci,
+  "duracion" int NOT NULL DEFAULT '0',
+  "orden" int NOT NULL DEFAULT '1',
+  PRIMARY KEY ("id"),
+  KEY "idx_servicio_etapa_servicio" ("ID_Servicio"),
+  CONSTRAINT "SERVICIO_ETAPA_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE
+);
+
+
+-- swefire_db.SERVICIO_SUBSERVICIO definition
+
+CREATE TABLE "SERVICIO_SUBSERVICIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Servicio" int NOT NULL,
+  "ID_Servicio_subservicio" int NOT NULL,
+  "id_servicio_etapa" int NOT NULL,
+  PRIMARY KEY ("id"),
+  KEY "idx_servicio_subservicio_principal" ("ID_Servicio"),
+  KEY "idx_servicio_subservicio_sub" ("ID_Servicio_subservicio"),
+  KEY "idx_servicio_subservicio_etapa" ("id_servicio_etapa"),
+  CONSTRAINT "SERVICIO_SUBSERVICIO_ibfk_1" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "SERVICIO_SUBSERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio_subservicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "SERVICIO_SUBSERVICIO_ibfk_3" FOREIGN KEY ("id_servicio_etapa") REFERENCES "SERVICIO_ETAPA" ("id") ON DELETE CASCADE
+);
+
+
+-- swefire_db.SERVICIO_ACTIVIDAD definition
+
+CREATE TABLE "SERVICIO_ACTIVIDAD" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_servicio_etapa" int NOT NULL,
+  "ID_Servicio" int NOT NULL,
+  "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
+  "orden" int NOT NULL DEFAULT '1',
+  "origen" enum('manual','subservicio') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'manual',
+  "id_servicio_subservicio" int DEFAULT NULL,
+  PRIMARY KEY ("id"),
+  KEY "idx_servicio_act_etapa" ("id_servicio_etapa"),
+  KEY "idx_servicio_act_servicio" ("ID_Servicio"),
+  KEY "idx_servicio_act_subservicio" ("id_servicio_subservicio"),
+  CONSTRAINT "SERVICIO_ACTIVIDAD_ibfk_1" FOREIGN KEY ("id_servicio_etapa") REFERENCES "SERVICIO_ETAPA" ("id") ON DELETE CASCADE,
+  CONSTRAINT "SERVICIO_ACTIVIDAD_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "SERVICIO_ACTIVIDAD_ibfk_3" FOREIGN KEY ("id_servicio_subservicio") REFERENCES "SERVICIO_SUBSERVICIO" ("id") ON DELETE CASCADE
+);
+
+
 -- swefire_db.SOLICITUD definition
 
 CREATE TABLE "SOLICITUD" (
@@ -406,6 +458,8 @@ CREATE TABLE "SOLICITUD_SERVICIO" (
   "fecha_inicio_servicio" date DEFAULT NULL,
   "horario_servicio" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "fecha_fin_servicio" date DEFAULT NULL,
+  "Principal" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
+  "indicaciones" text COLLATE utf8mb4_unicode_ci,
   PRIMARY KEY ("id"),
   KEY "ID_Solicitud" ("ID_Solicitud"),
   KEY "ID_Servicio" ("ID_Servicio"),
@@ -567,6 +621,8 @@ CREATE TABLE "COTIZACION_SERVICIO" (
   "fecha_inicio" date DEFAULT NULL,
   "fecha_finalizacion" date DEFAULT NULL,
   "jornada" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "Principal" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
+  "indicaciones" text COLLATE utf8mb4_unicode_ci,
   "precio_comercial" decimal(12,2) DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "ID_Cotizacion" ("ID_Cotizacion"),
@@ -820,6 +876,29 @@ CREATE TABLE "PROYECTO_ACTIVIDAD" (
   CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_1" FOREIGN KEY ("id_proyecto_etapa") REFERENCES "PROYECTO_ETAPA" ("id") ON DELETE CASCADE,
   CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_2" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
   CONSTRAINT "PROYECTO_ACTIVIDAD_ibfk_cot_act" FOREIGN KEY ("id_cotizacion_actividad") REFERENCES "COTIZACION_ACTIVIDAD" ("id") ON DELETE SET NULL
+);
+
+
+-- swefire_db.PROYECTO_SERVICIO definition
+
+CREATE TABLE "PROYECTO_SERVICIO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "id_Proyecto" int NOT NULL,
+  "ID_Servicio" int NOT NULL,
+  "id_cotizacion_servicio" int DEFAULT NULL,
+  "fecha_inicio" date DEFAULT NULL,
+  "fecha_finalizacion" date DEFAULT NULL,
+  "jornada" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "precio_comercial" decimal(12,2) DEFAULT NULL,
+  "Principal" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
+  "indicaciones" text COLLATE utf8mb4_unicode_ci,
+  PRIMARY KEY ("id"),
+  KEY "idx_proyecto_servicio_proyecto" ("id_Proyecto"),
+  KEY "idx_proyecto_servicio_servicio" ("ID_Servicio"),
+  KEY "idx_proyecto_servicio_cot_svc" ("id_cotizacion_servicio"),
+  CONSTRAINT "PROYECTO_SERVICIO_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_SERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "PROYECTO_SERVICIO_ibfk_3" FOREIGN KEY ("id_cotizacion_servicio") REFERENCES "COTIZACION_SERVICIO" ("id") ON DELETE SET NULL
 );
 
 

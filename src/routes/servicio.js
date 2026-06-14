@@ -133,6 +133,25 @@ router.get('/publicos', c.getPublico);
 
 /**
  * @openapi
+ * /api/servicios/{id}/principal:
+ *   get:
+ *     tags: [Servicio]
+ *     summary: Plantilla del servicio como principal (etapas, actividades y subservicios recomendados)
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Plantilla para armar POST de solicitud
+ *       404:
+ *         description: Servicio no encontrado
+ */
+router.get('/:id/principal', c.getPrincipal);
+
+/**
+ * @openapi
  * /api/servicios/{id}:
  *   get:
  *     tags: [Servicio]
@@ -547,5 +566,21 @@ router.post('/:id/inventario-requerido', c.createInventarioRequerido);
 router.get('/:id/inventario-requerido/:idObjeto', c.getInventarioRequeridoByObjeto);
 router.put('/:id/inventario-requerido/:idObjeto', c.updateInventarioRequerido);
 router.delete('/:id/inventario-requerido/:idObjeto', c.deleteInventarioRequerido);
+
+// ── Etapas, actividades y subservicios del flujo por defecto ─────────────────
+router.get('/:id/etapas', c.getEtapas);
+router.post('/:id/etapas', c.createEtapa);
+router.put('/:id/etapas/:eid', c.updateEtapa);
+router.delete('/:id/etapas/:eid', c.deleteEtapa);
+
+router.get('/:id/etapas/:eid/actividades', c.getActividades);
+router.post('/:id/etapas/:eid/actividades', c.createActividad);
+router.put('/:id/etapas/:eid/actividades/:aid', c.updateActividad);
+router.delete('/:id/etapas/:eid/actividades/:aid', c.deleteActividad);
+
+router.get('/:id/subservicios', c.getSubservicios);
+router.post('/:id/subservicios', c.createSubservicio);
+router.put('/:id/subservicios/:sid', c.updateSubservicio);
+router.delete('/:id/subservicios/:sid', c.deleteSubservicio);
 
 module.exports = router;

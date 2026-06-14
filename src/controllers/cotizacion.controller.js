@@ -15,7 +15,14 @@ const {
     calcularPrecioTotal,
     buildUpsertQuotationResponse,
 } = require('../services/cotizacionDto.service');
-const { mergeSolicitudIntoCotizacionCreate } = require('../services/solicitudCotizacionImport.service');
+const { mergeSolicitudIntoCotizacionCreate, loadSolicitudDataForCotizacion } = require('../services/solicitudCotizacionImport.service');
+const {
+    toPrincipalEnum,
+    countOccurrences,
+    importServicioFlujoToCotizacion,
+    assertSinglePrincipal,
+    principalToBoolean,
+} = require('../services/servicioFlujo.service');
 const {
     archiveCotizacionSnapshot,
     assertCotizacionVigente,
@@ -137,15 +144,22 @@ async function insertarInventarioCotizacion(dbConn, cotizacionId, productos) {
 
 async function insertarServiciosCotizacion(dbConn, cotizacionId, serviciosList) {
     const serviciosInsertados = [];
-    for (let i = 0; i < serviciosList.length; i++) {
-        const s = normalizeServiceItem(serviciosList[i]);
+    const normalizados = serviciosList.map((raw) => ({
+        ...normalizeServiceItem(raw),
+        Principal: toPrincipalEnum(raw.Principal),
+    }));
+
+    await assertSinglePrincipal(normalizados, 'la cotización');
+
+    for (let i = 0; i < normalizados.length; i++) {
+        const s = normalizados[i];
         if (!s.ID_Servicio) {
             throw new Error(`servicios[${i}].id / ID_Servicio es requerido`);
         }
         const ins = await dbConn.query(
             `INSERT INTO COTIZACION_SERVICIO
-                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial)
-             VALUES (?,?,?,?,?,?)`,
+                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones)
+             VALUES (?,?,?,?,?,?,?,?)`,
             [
                 cotizacionId,
                 s.ID_Servicio,
@@ -153,16 +167,47 @@ async function insertarServiciosCotizacion(dbConn, cotizacionId, serviciosList) 
                 s.fecha_finalizacion || null,
                 s.jornada || null,
                 s.precio_comercial ?? null,
+                s.Principal,
+                s.indicaciones ?? null,
             ],
         );
         serviciosInsertados.push({
             id: ins.insertId,
             index: i,
+            ID_Servicio: s.ID_Servicio,
+            Principal: s.Principal,
             fecha_inicio: s.fecha_inicio,
             fecha_finalizacion: s.fecha_finalizacion,
         });
     }
     return serviciosInsertados;
+}
+
+async function aplicarFlujoDesdeSolicitud(dbConn, cotizacionId, idSolicitud, serviciosList, phasesProvided) {
+    if (phasesProvided) return { applied: false, reason: 'phases_provided' };
+
+    const solicitudData = await loadSolicitudDataForCotizacion(dbConn, idSolicitud);
+    if (!solicitudData) return { applied: false, reason: 'no_solicitud' };
+
+    if (solicitudData.servicioPrincipal) {
+        const secundarioCounts = countOccurrences(solicitudData.serviciosSecundariosIds);
+        return importServicioFlujoToCotizacion(
+            dbConn,
+            cotizacionId,
+            solicitudData.servicioPrincipal.ID_Servicio,
+            { secundarioCounts },
+        );
+    }
+
+    const cotPrincipal = (serviciosList || []).find((s) => toPrincipalEnum(s.Principal) === 'YES');
+    if (cotPrincipal) {
+        const idServicio = cotPrincipal.ID_Servicio ?? cotPrincipal.idServicio ?? cotPrincipal.id;
+        return importServicioFlujoToCotizacion(dbConn, cotizacionId, idServicio, {
+            onlyManualActivities: true,
+        });
+    }
+
+    return { applied: false, reason: 'no_principal' };
 }
 
 exports.formatQuotation = (row, rol) => {
@@ -603,10 +648,14 @@ exports.create = async (req, res) => {
     const normalized = normalizeCotizacionPayload(req.body);
     const id_solicitud = req.body.id_solicitud ?? normalized.id_solicitud;
 
+    if (!id_solicitud) {
+        return res.status(400).json({ error: 'id_solicitud es requerido para crear una cotización' });
+    }
+
     const { merged, solicitudFound } = await mergeSolicitudIntoCotizacionCreate(
         db, id_solicitud, normalized, req.body,
     );
-    if (id_solicitud && !solicitudFound) {
+    if (!solicitudFound) {
         return res.status(404).json({ error: 'Solicitud no encontrada' });
     }
 
@@ -619,7 +668,7 @@ exports.create = async (req, res) => {
     } = { ...req.body, ...merged };
 
     const productos = merged.productos ?? [];
-    const serviciosList = merged.servicios ?? [];
+    let serviciosList = merged.servicios ?? [];
     const camionesList = merged.camiones ?? [];
     const costoRecojo = merged.costoRecojo;
     const cond = merged.condiciones;
@@ -630,6 +679,22 @@ exports.create = async (req, res) => {
         ?? null;
 
     const Id_incidencia = req.body.Id_incidencia ?? normalized.Id_incidencia ?? null;
+
+    const solicitudParaFlujo = await loadSolicitudDataForCotizacion(db, id_solicitud);
+    if (solicitudParaFlujo?.servicioPrincipal) {
+        const principalId = solicitudParaFlujo.servicioPrincipal.ID_Servicio;
+        const indicacionesMap = new Map(
+            (solicitudParaFlujo.servicios || []).map((s) => [s.ID_Servicio, s.indicaciones]),
+        );
+        serviciosList = serviciosList.map((s) => {
+            const norm = normalizeServiceItem(s);
+            return {
+                ...norm,
+                Principal: norm.ID_Servicio === principalId ? 'YES' : 'NO',
+                indicaciones: indicacionesMap.get(norm.ID_Servicio) ?? norm.indicaciones,
+            };
+        });
+    }
 
     try {
         const precioTotal = calcularPrecioTotal({
@@ -651,7 +716,7 @@ exports.create = async (req, res) => {
                 version || 1,
                 DESACTUALIZADO_VIGENTE,
                 nombre || null,
-                id_solicitud || null,
+                id_solicitud,
                 DNI_O_RUC || null,
                 precioTotal,
                 estadoCot,
@@ -703,8 +768,13 @@ exports.create = async (req, res) => {
 
         if (merged.phasesProvided) {
             await syncCotizacionEtapasFromPhases(db, newId, merged.phases ?? { items: [] });
-        } else if (merged.etapas_detalle) {
-            await ensureCotizacionEtapasFromJson(db, newId);
+        } else {
+            const flujo = await aplicarFlujoDesdeSolicitud(
+                db, newId, id_solicitud, serviciosList, false,
+            );
+            if (!flujo.imported && merged.etapas_detalle) {
+                await ensureCotizacionEtapasFromJson(db, newId);
+            }
         }
 
         res.status(201).json({
@@ -712,9 +782,12 @@ exports.create = async (req, res) => {
             ID: newId,
             precio_total: precioTotal,
             servicios_insertados: serviciosInsertados.map((s) => ({ id: s.id, index: s.index })),
-            importado_desde_solicitud: Boolean(id_solicitud && solicitudFound),
+            importado_desde_solicitud: true,
         });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+    } catch (e) {
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.update = async (req, res) => {
@@ -871,6 +944,14 @@ exports.update = async (req, res) => {
 
         if (normalized.phasesProvided) {
             await syncCotizacionEtapasFromPhases(exec, cotizacionId, normalized.phases ?? { items: [] });
+        } else if (normalized.servicios !== undefined) {
+            const cotRow = currentRows[0];
+            const flujo = await aplicarFlujoDesdeSolicitud(
+                exec, cotizacionId, cotRow.id_solicitud, normalized.servicios, false,
+            );
+            if (!flujo.imported && normalized.etapas_detalle !== undefined) {
+                await ensureCotizacionEtapasFromJson(exec, cotizacionId);
+            }
         } else if (normalized.etapas_detalle !== undefined) {
             await ensureCotizacionEtapasFromJson(exec, cotizacionId);
         }
@@ -904,6 +985,7 @@ exports.update = async (req, res) => {
     } catch (e) {
         try { await conn.rollback(); } catch (_) {}
         conn.release();
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
         if (e.statusCode === 404) return res.status(404).json({ error: e.message });
         res.status(500).json({ error: e.message });
     }
@@ -930,7 +1012,11 @@ exports.approve = approveQuotation
 exports.getServicios = async (req, res) => {
     try {
         if (!(await ensureCotizacionVigente(req.params.id, res))) return;
-        res.json(await db.query('SELECT CS.*, S.nombre as Servicio_Nombre FROM COTIZACION_SERVICIO CS LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio WHERE CS.ID_Cotizacion = ? ORDER BY CS.id DESC', [req.params.id]));
+        const rows = await db.query(
+            'SELECT CS.*, S.nombre as Servicio_Nombre FROM COTIZACION_SERVICIO CS LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio WHERE CS.ID_Cotizacion = ? ORDER BY CS.id DESC',
+            [req.params.id],
+        );
+        res.json(rows.map((r) => ({ ...r, Principal: principalToBoolean(r.Principal) })));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -938,20 +1024,30 @@ exports.createServicio = async (req, res) => {
     const s = normalizeServiceItem(req.body);
     try {
         if (!(await ensureCotizacionVigente(req.params.id, res))) return;
+        if (req.body.Principal !== undefined) {
+            return res.status(400).json({ error: 'Principal se asigna al crear la cotización, no al agregar servicios sueltos' });
+        }
         const result = await db.query(
-            'INSERT INTO COTIZACION_SERVICIO (ID_Cotizacion,ID_Servicio,fecha_inicio,fecha_finalizacion,jornada,precio_comercial) VALUES (?,?,?,?,?,?)',
-            [req.params.id, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial],
+            `INSERT INTO COTIZACION_SERVICIO
+                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones)
+             VALUES (?,?,?,?,?,?,?,?)`,
+            [req.params.id, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, 'NO', s.indicaciones ?? null],
         );
         res.status(201).json({ message: 'Servicio en cotización creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.updateServicio = async (req, res) => {
+    if (req.body.Principal !== undefined) {
+        return res.status(400).json({ error: 'No se puede modificar Principal en servicios de cotización' });
+    }
     const s = normalizeServiceItem(req.body);
     try {
         const result = await db.query(
-            'UPDATE COTIZACION_SERVICIO SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=? WHERE id=? AND ID_Cotizacion=?',
-            [s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, req.params.sid, req.params.id],
+            `UPDATE COTIZACION_SERVICIO
+             SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=?, indicaciones=?
+             WHERE id=? AND ID_Cotizacion=?`,
+            [s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, s.indicaciones ?? null, req.params.sid, req.params.id],
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio en cotización actualizado' });

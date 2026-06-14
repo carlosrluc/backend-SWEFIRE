@@ -1,6 +1,11 @@
 const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
+const {
+    syncActividadFromSubservicio,
+    buildPrincipalTemplate,
+    getNextActividadOrden,
+} = require('../services/servicioFlujo.service');
 
 const unlinkFotoIfExists = (fotoUrl) => {
     if (!fotoUrl) return;
@@ -281,5 +286,228 @@ exports.deleteInventarioRequerido = async (req, res) => {
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Inventario requerido eliminado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// ── GET plantilla principal (catálogo) ────────────────────────────────────────
+exports.getPrincipal = async (req, res) => {
+    try {
+        const template = await buildPrincipalTemplate(db, req.params.id);
+        if (!template) return res.status(404).json({ error: 'Servicio no encontrado' });
+        res.json(template);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// ── SERVICIO_ETAPA ────────────────────────────────────────────────────────────
+exports.getEtapas = async (req, res) => {
+    try {
+        const rows = await db.query(
+            'SELECT * FROM SERVICIO_ETAPA WHERE ID_Servicio = ? ORDER BY orden ASC, id ASC',
+            [req.params.id],
+        );
+        res.json(rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.createEtapa = async (req, res) => {
+    const { nombre, descripcion, duracion, orden } = req.body;
+    if (!nombre) return res.status(400).json({ error: 'nombre es requerido' });
+    try {
+        const svc = await db.query('SELECT ID_Servicio FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
+        if (!svc.length) return res.status(404).json({ error: 'Servicio no encontrado' });
+
+        const result = await db.query(
+            `INSERT INTO SERVICIO_ETAPA (ID_Servicio, nombre, descripcion, duracion, orden)
+             VALUES (?,?,?,?,?)`,
+            [req.params.id, nombre, descripcion ?? null, duracion ?? 0, orden ?? 1],
+        );
+        res.status(201).json({ message: 'Etapa creada', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateEtapa = async (req, res) => {
+    const { nombre, descripcion, duracion, orden } = req.body;
+    try {
+        const result = await db.query(
+            `UPDATE SERVICIO_ETAPA SET nombre=?, descripcion=?, duracion=?, orden=?
+             WHERE id=? AND ID_Servicio=?`,
+            [nombre, descripcion, duracion, orden, req.params.eid, req.params.id],
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Etapa actualizada' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.deleteEtapa = async (req, res) => {
+    try {
+        const result = await db.query(
+            'DELETE FROM SERVICIO_ETAPA WHERE id=? AND ID_Servicio=?',
+            [req.params.eid, req.params.id],
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Etapa eliminada' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// ── SERVICIO_ACTIVIDAD ────────────────────────────────────────────────────────
+exports.getActividades = async (req, res) => {
+    try {
+        const rows = await db.query(
+            `SELECT * FROM SERVICIO_ACTIVIDAD
+             WHERE id_servicio_etapa = ? AND ID_Servicio = ?
+             ORDER BY orden ASC, id ASC`,
+            [req.params.eid, req.params.id],
+        );
+        res.json(rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.createActividad = async (req, res) => {
+    const { nombre, orden } = req.body;
+    if (!nombre) return res.status(400).json({ error: 'nombre es requerido' });
+    try {
+        const etapa = await db.query(
+            'SELECT id FROM SERVICIO_ETAPA WHERE id = ? AND ID_Servicio = ?',
+            [req.params.eid, req.params.id],
+        );
+        if (!etapa.length) return res.status(404).json({ error: 'Etapa no encontrada' });
+
+        const ordenFinal = orden ?? await getNextActividadOrden(db, req.params.eid);
+        const result = await db.query(
+            `INSERT INTO SERVICIO_ACTIVIDAD (id_servicio_etapa, ID_Servicio, nombre, orden, origen)
+             VALUES (?,?,?,?, 'manual')`,
+            [req.params.eid, req.params.id, nombre, ordenFinal],
+        );
+        res.status(201).json({ message: 'Actividad creada', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateActividad = async (req, res) => {
+    const { nombre, orden } = req.body;
+    try {
+        const actual = await db.query(
+            `SELECT origen FROM SERVICIO_ACTIVIDAD WHERE id=? AND id_servicio_etapa=? AND ID_Servicio=?`,
+            [req.params.aid, req.params.eid, req.params.id],
+        );
+        if (!actual.length) return res.status(404).json({ error: 'No encontrado' });
+        if (actual[0].origen === 'subservicio') {
+            return res.status(400).json({ error: 'Las actividades de subservicio se gestionan vía subservicios' });
+        }
+
+        const result = await db.query(
+            `UPDATE SERVICIO_ACTIVIDAD SET nombre=?, orden=?
+             WHERE id=? AND id_servicio_etapa=? AND ID_Servicio=?`,
+            [nombre, orden, req.params.aid, req.params.eid, req.params.id],
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Actividad actualizada' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.deleteActividad = async (req, res) => {
+    try {
+        const actual = await db.query(
+            `SELECT origen FROM SERVICIO_ACTIVIDAD WHERE id=? AND id_servicio_etapa=? AND ID_Servicio=?`,
+            [req.params.aid, req.params.eid, req.params.id],
+        );
+        if (!actual.length) return res.status(404).json({ error: 'No encontrado' });
+        if (actual[0].origen === 'subservicio') {
+            return res.status(400).json({ error: 'Las actividades de subservicio se gestionan vía subservicios' });
+        }
+
+        const result = await db.query(
+            'DELETE FROM SERVICIO_ACTIVIDAD WHERE id=? AND id_servicio_etapa=? AND ID_Servicio=?',
+            [req.params.aid, req.params.eid, req.params.id],
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Actividad eliminada' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+// ── SERVICIO_SUBSERVICIO ──────────────────────────────────────────────────────
+exports.getSubservicios = async (req, res) => {
+    try {
+        const rows = await db.query(
+            `SELECT ss.*, s.nombre AS nombre_subservicio,
+                    se.nombre AS nombre_etapa, se.orden AS orden_etapa
+             FROM SERVICIO_SUBSERVICIO ss
+             INNER JOIN SERVICIO s ON s.ID_Servicio = ss.ID_Servicio_subservicio
+             INNER JOIN SERVICIO_ETAPA se ON se.id = ss.id_servicio_etapa
+             WHERE ss.ID_Servicio = ?
+             ORDER BY ss.id ASC`,
+            [req.params.id],
+        );
+        res.json(rows);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.createSubservicio = async (req, res) => {
+    const { ID_Servicio_subservicio, id_servicio_etapa } = req.body;
+    if (!ID_Servicio_subservicio || !id_servicio_etapa) {
+        return res.status(400).json({ error: 'ID_Servicio_subservicio e id_servicio_etapa son requeridos' });
+    }
+    if (Number(ID_Servicio_subservicio) === Number(req.params.id)) {
+        return res.status(400).json({ error: 'Un servicio no puede ser subservicio de sí mismo' });
+    }
+    try {
+        const [svc, sub, etapa] = await Promise.all([
+            db.query('SELECT ID_Servicio FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]),
+            db.query('SELECT ID_Servicio FROM SERVICIO WHERE ID_Servicio = ?', [ID_Servicio_subservicio]),
+            db.query('SELECT id FROM SERVICIO_ETAPA WHERE id = ? AND ID_Servicio = ?', [id_servicio_etapa, req.params.id]),
+        ]);
+        if (!svc.length) return res.status(404).json({ error: 'Servicio principal no encontrado' });
+        if (!sub.length) return res.status(404).json({ error: 'Servicio subservicio no encontrado' });
+        if (!etapa.length) return res.status(404).json({ error: 'Etapa no pertenece al servicio principal' });
+
+        const result = await db.query(
+            `INSERT INTO SERVICIO_SUBSERVICIO (ID_Servicio, ID_Servicio_subservicio, id_servicio_etapa)
+             VALUES (?,?,?)`,
+            [req.params.id, ID_Servicio_subservicio, id_servicio_etapa],
+        );
+        await syncActividadFromSubservicio(db, result.insertId);
+        res.status(201).json({ message: 'Subservicio creado', id: result.insertId });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.updateSubservicio = async (req, res) => {
+    const { ID_Servicio_subservicio, id_servicio_etapa } = req.body;
+    try {
+        if (ID_Servicio_subservicio && Number(ID_Servicio_subservicio) === Number(req.params.id)) {
+            return res.status(400).json({ error: 'Un servicio no puede ser subservicio de sí mismo' });
+        }
+        const actual = await db.query(
+            'SELECT * FROM SERVICIO_SUBSERVICIO WHERE id=? AND ID_Servicio=?',
+            [req.params.sid, req.params.id],
+        );
+        if (!actual.length) return res.status(404).json({ error: 'No encontrado' });
+
+        if (id_servicio_etapa) {
+            const etapa = await db.query(
+                'SELECT id FROM SERVICIO_ETAPA WHERE id = ? AND ID_Servicio = ?',
+                [id_servicio_etapa, req.params.id],
+            );
+            if (!etapa.length) return res.status(404).json({ error: 'Etapa no pertenece al servicio principal' });
+        }
+
+        await db.query(
+            `UPDATE SERVICIO_SUBSERVICIO
+             SET ID_Servicio_subservicio=COALESCE(?, ID_Servicio_subservicio),
+                 id_servicio_etapa=COALESCE(?, id_servicio_etapa)
+             WHERE id=? AND ID_Servicio=?`,
+            [ID_Servicio_subservicio ?? null, id_servicio_etapa ?? null, req.params.sid, req.params.id],
+        );
+        await syncActividadFromSubservicio(db, req.params.sid);
+        res.json({ message: 'Subservicio actualizado' });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.deleteSubservicio = async (req, res) => {
+    try {
+        const result = await db.query(
+            'DELETE FROM SERVICIO_SUBSERVICIO WHERE id=? AND ID_Servicio=?',
+            [req.params.sid, req.params.id],
+        );
+        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
+        res.json({ message: 'Subservicio eliminado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };

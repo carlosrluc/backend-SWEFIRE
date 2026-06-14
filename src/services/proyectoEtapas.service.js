@@ -1,4 +1,5 @@
 const { loadCotizacionEtapasTree, ensureCotizacionEtapasFromJson } = require('./cotizacionEtapas.service');
+const { principalToBoolean } = require('./servicioFlujo.service');
 
 const ESTADOS_ETAPA = new Set(['no comenzado', 'en progreso', 'completada']);
 const TIPO_PENDIENTE = 'pendiente';
@@ -379,15 +380,31 @@ function buildActividadActual(proyecto, etapasTree) {
     return null;
 }
 
+async function loadProyectoServicios(executor, idProyecto) {
+    const rows = await executor.query(
+        `SELECT PS.*, S.nombre AS nombre_servicio
+         FROM PROYECTO_SERVICIO PS
+         LEFT JOIN SERVICIO S ON S.ID_Servicio = PS.ID_Servicio
+         WHERE PS.id_Proyecto = ?
+         ORDER BY PS.id ASC`,
+        [idProyecto],
+    );
+    return rows.map((r) => ({ ...r, Principal: principalToBoolean(r.Principal) }));
+}
+
 async function enrichProyecto(executor, proyecto) {
     if (!proyecto) return proyecto;
     await ensureProyectoEtapas(executor, proyecto.id_Proyecto, proyecto.id_cotizacion);
-    const etapas = await loadEtapasTree(executor, proyecto.id_Proyecto);
+    const [etapas, servicios] = await Promise.all([
+        loadEtapasTree(executor, proyecto.id_Proyecto),
+        loadProyectoServicios(executor, proyecto.id_Proyecto),
+    ]);
     return {
         ...proyecto,
         etapa_actual: buildEtapaActual(proyecto, etapas),
         actividad_actual: buildActividadActual(proyecto, etapas),
         etapas,
+        servicios,
     };
 }
 
@@ -398,6 +415,25 @@ async function enrichProyectos(executor, proyectos) {
         await ensureProyectoEtapas(executor, p.id_Proyecto, p.id_cotizacion);
     }
     const treeMap = await loadEtapasTreeByProyectoIds(executor, ids);
+    const serviciosMap = new Map();
+    if (ids.length) {
+        const placeholders = ids.map(() => '?').join(',');
+        const svcRows = await executor.query(
+            `SELECT PS.*, S.nombre AS nombre_servicio
+             FROM PROYECTO_SERVICIO PS
+             LEFT JOIN SERVICIO S ON S.ID_Servicio = PS.ID_Servicio
+             WHERE PS.id_Proyecto IN (${placeholders})
+             ORDER BY PS.id ASC`,
+            ids,
+        );
+        for (const row of svcRows) {
+            if (!serviciosMap.has(row.id_Proyecto)) serviciosMap.set(row.id_Proyecto, []);
+            serviciosMap.get(row.id_Proyecto).push({
+                ...row,
+                Principal: principalToBoolean(row.Principal),
+            });
+        }
+    }
     return proyectos.map((p) => {
         const etapas = treeMap.get(p.id_Proyecto) || [];
         return {
@@ -405,6 +441,7 @@ async function enrichProyectos(executor, proyectos) {
             etapa_actual: buildEtapaActual(p, etapas),
             actividad_actual: buildActividadActual(p, etapas),
             etapas,
+            servicios: serviciosMap.get(p.id_Proyecto) || [],
         };
     });
 }

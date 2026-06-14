@@ -32,6 +32,8 @@ function normalizeServiceItem(item) {
         fecha_finalizacion: toDateOnly(item.fecha_finalizacion ?? item.dueDate ?? item.endDate),
         jornada: item.jornada ?? item.schedule ?? null,
         precio_comercial: item.precio_comercial ?? item.unitPrice ?? item.precioComercial ?? null,
+        Principal: item.Principal,
+        indicaciones: item.indicaciones ?? null,
         _name: item.name ?? item.nombre ?? item.nombre_servicio ?? null,
     };
 }

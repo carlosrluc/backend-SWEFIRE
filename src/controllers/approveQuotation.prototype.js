@@ -66,7 +66,32 @@ const approveQuotation = catchAsync(async (req, res) => {
         );
     }
 
-    // 4. Migrar Camiones (COTIZACION_CAMION -> PROYECTO_CAMION)
+    // 4. Migrar Servicios (COTIZACION_SERVICIO -> PROYECTO_SERVICIO)
+    const serviciosCot = await db.query(
+        `SELECT id, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones
+         FROM COTIZACION_SERVICIO WHERE ID_Cotizacion = ? AND ID_Servicio != 7`,
+        [QuotationID],
+    );
+    for (const svc of serviciosCot) {
+        await db.query(
+            `INSERT INTO PROYECTO_SERVICIO
+                (id_Proyecto, ID_Servicio, id_cotizacion_servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+            [
+                idProyecto,
+                svc.ID_Servicio,
+                svc.id,
+                svc.fecha_inicio,
+                svc.fecha_finalizacion,
+                svc.jornada,
+                svc.precio_comercial,
+                svc.Principal,
+                svc.indicaciones,
+            ],
+        );
+    }
+
+    // 5. Migrar Camiones (COTIZACION_CAMION -> PROYECTO_CAMION)
     const camiones = await db.query(
         `SELECT cc.Placa, cc.fecha_hora_entrada, cc.fecha_hora_salida, cc.uso, cs.ID_Servicio
                          FROM COTIZACION_CAMION cc
@@ -80,7 +105,7 @@ const approveQuotation = catchAsync(async (req, res) => {
             [idProyecto, cam.Placa, cam.fecha_hora_entrada, cam.fecha_hora_salida, null, cam.uso, 'aceptable'],
         );
     }
-    // 5. Migrar Personal ( -> TRABAJO_JORNADA)
+    // 6. Migrar Personal ( -> TRABAJO_JORNADA)
     const personal = await db.query('SELECT ID_Usuario, fecha_entrada, fecha_salida FROM COTIZACION_PERSONAL WHERE ID_Cotizacion = ?', [QuotationID]);
     for (const pers of personal) {
         const user = await db.query('SELECT dni_perfil FROM USUARIO WHERE idusuario = ?', [pers.ID_Usuario]);

@@ -1,4 +1,5 @@
 const { normalizeInventoryItem, normalizeServiceItem } = require('./cotizacionDto.service');
+const { toPrincipalEnum } = require('./servicioFlujo.service');
 
 function buildObservacionFromSolicitud(solicitud) {
     const parts = [solicitud.ObsGenerales, solicitud.ObsEleccion].filter(Boolean);
@@ -28,8 +29,8 @@ async function loadSolicitudDataForCotizacion(executor, idSolicitud) {
 
     const [servicioRows, inventarioRows] = await Promise.all([
         executor.query(
-            `SELECT ss.ID_Servicio, ss.fecha_inicio_servicio, ss.fecha_fin_servicio, ss.horario_servicio,
-                    s.precio_regular
+            `SELECT ss.id, ss.ID_Servicio, ss.fecha_inicio_servicio, ss.fecha_fin_servicio, ss.horario_servicio,
+                    ss.Principal, ss.indicaciones, s.precio_regular
              FROM SOLICITUD_SERVICIO ss
              LEFT JOIN SERVICIO s ON ss.ID_Servicio = s.ID_Servicio
              WHERE ss.ID_Solicitud = ? AND ss.ID_Servicio != 7
@@ -53,7 +54,12 @@ async function loadSolicitudDataForCotizacion(executor, idSolicitud) {
         fecha_finalizacion: row.fecha_fin_servicio,
         jornada: row.horario_servicio,
         precio_comercial: row.precio_regular,
+        Principal: row.Principal,
+        indicaciones: row.indicaciones,
     }));
+
+    const servicioPrincipal = servicioRows.find((r) => toPrincipalEnum(r.Principal) === 'YES') || null;
+    const serviciosSecundarios = servicioRows.filter((r) => toPrincipalEnum(r.Principal) !== 'YES');
 
     const productos = inventarioRows.map((row) => normalizeInventoryItem({
         id: row.ID_Inventario,
@@ -71,6 +77,10 @@ async function loadSolicitudDataForCotizacion(executor, idSolicitud) {
         direccion_recojo: solicitud.ubicacion || null,
         servicios,
         productos,
+        servicioPrincipal: servicioPrincipal
+            ? { ID_Servicio: servicioPrincipal.ID_Servicio }
+            : null,
+        serviciosSecundariosIds: serviciosSecundarios.map((r) => r.ID_Servicio),
     };
 }
 

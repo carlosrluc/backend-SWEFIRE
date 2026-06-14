@@ -1,4 +1,9 @@
 const db = require('../config/db');
+const {
+    toPrincipalEnum,
+    principalToBoolean,
+    assertSinglePrincipal,
+} = require('../services/servicioFlujo.service');
 
 /** Acepta un objeto, un array, o { servicios: [...] } */
 const normalizarMatrizBody = (body, claveEnvoltorio) => {
@@ -7,6 +12,20 @@ const normalizarMatrizBody = (body, claveEnvoltorio) => {
     if (body && typeof body === 'object') return [body];
     return [];
 };
+
+async function obtenerServiciosSolicitud(idSolicitud) {
+    return db.query(
+        'SELECT id, Principal FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ?',
+        [idSolicitud],
+    );
+}
+
+function mapServicioResponse(row) {
+    return {
+        ...row,
+        Principal: principalToBoolean(row.Principal),
+    };
+}
 
 // ── SOLICITUD ─────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
@@ -65,7 +84,7 @@ exports.getAll = async (req, res) => {
                 db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [solicitud.ID]),
                 db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [solicitud.ID]),
             ]);
-            return { ...solicitud, medios, servicios, inventario, camiones };
+            return { ...solicitud, medios, servicios: servicios.map(mapServicioResponse), inventario, camiones };
         }));
 
         res.json({
@@ -117,7 +136,7 @@ exports.getByEstado = async (req, res) => {
                 db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [solicitud.ID]),
                 db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [solicitud.ID]),
             ]);
-            return { ...solicitud, medios, servicios, inventario, camiones };
+            return { ...solicitud, medios, servicios: servicios.map(mapServicioResponse), inventario, camiones };
         }));
 
         res.json({
@@ -155,7 +174,7 @@ exports.getById = async (req, res) => {
             db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [req.params.id]),
             db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [req.params.id]),
         ]);
-        res.json({ ...solicitud, medios, servicios, inventario, camiones });
+        res.json({ ...solicitud, medios, servicios: servicios.map(mapServicioResponse), inventario, camiones });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -266,8 +285,13 @@ exports.deleteMedio = async (req, res) => {
 
 // ── SOLICITUD_SERVICIO ────────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id])); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        const rows = await db.query(
+            'SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC',
+            [req.params.id],
+        );
+        res.json(rows.map(mapServicioResponse));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.createServicio = async (req, res) => {
@@ -277,24 +301,61 @@ exports.createServicio = async (req, res) => {
             return res.status(400).json({ error: 'Se requiere un servicio o un arreglo de servicios' });
         }
 
+        const existentes = await obtenerServiciosSolicitud(req.params.id);
+        const yaTienePrincipal = existentes.some((e) => e.Principal === 'YES');
+
+        const normalizados = items.map((item) => ({
+            ...item,
+            Principal: toPrincipalEnum(item.Principal),
+        }));
+
+        try {
+            await assertSinglePrincipal(normalizados, 'la solicitud');
+        } catch (err) {
+            return res.status(err.statusCode || 400).json({ error: err.message });
+        }
+
+        if (yaTienePrincipal && normalizados.some((i) => i.Principal === 'YES')) {
+            return res.status(400).json({ error: 'La solicitud ya tiene un servicio principal; no se puede asignar otro' });
+        }
+
         const insertados = [];
-        for (const item of items) {
-            const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio } = item;
+        for (const item of normalizados) {
+            const {
+                ID_Servicio,
+                fecha_inicio_servicio,
+                fecha_fin_servicio,
+                horario_servicio,
+                Principal,
+                indicaciones,
+            } = item;
             if (!ID_Servicio) {
                 return res.status(400).json({ error: 'Cada servicio debe incluir ID_Servicio' });
             }
             const result = await db.query(
-                'INSERT INTO SOLICITUD_SERVICIO (ID_Solicitud,ID_Servicio,fecha_inicio_servicio,fecha_fin_servicio,horario_servicio) VALUES (?,?,?,?,?)',
-                [req.params.id, ID_Servicio, fecha_inicio_servicio || null, fecha_fin_servicio || null, horario_servicio || null]
+                `INSERT INTO SOLICITUD_SERVICIO
+                    (ID_Solicitud, ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio, Principal, indicaciones)
+                 VALUES (?,?,?,?,?,?,?)`,
+                [
+                    req.params.id,
+                    ID_Servicio,
+                    fecha_inicio_servicio || null,
+                    fecha_fin_servicio || null,
+                    horario_servicio || null,
+                    Principal,
+                    indicaciones ?? null,
+                ],
             );
-            insertados.push({
+            insertados.push(mapServicioResponse({
                 id: result.insertId,
                 ID_Solicitud: Number(req.params.id),
                 ID_Servicio,
                 fecha_inicio_servicio,
                 fecha_fin_servicio,
                 horario_servicio,
-            });
+                Principal,
+                indicaciones: indicaciones ?? null,
+            }));
         }
 
         if (insertados.length === 1) {
@@ -305,11 +366,17 @@ exports.createServicio = async (req, res) => {
 };
 
 exports.updateServicio = async (req, res) => {
-    const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio } = req.body;
+    if (req.body.Principal !== undefined) {
+        return res.status(400).json({ error: 'No se puede modificar Principal después de crear la solicitud' });
+    }
+
+    const { ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio, indicaciones } = req.body;
     try {
         const result = await db.query(
-            'UPDATE SOLICITUD_SERVICIO SET ID_Servicio=?, fecha_inicio_servicio=?, fecha_fin_servicio=?, horario_servicio=? WHERE id=? AND ID_Solicitud=?',
-            [ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio, req.params.sid, req.params.id]
+            `UPDATE SOLICITUD_SERVICIO
+             SET ID_Servicio=?, fecha_inicio_servicio=?, fecha_fin_servicio=?, horario_servicio=?, indicaciones=?
+             WHERE id=? AND ID_Solicitud=?`,
+            [ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio, indicaciones ?? null, req.params.sid, req.params.id],
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio en solicitud actualizado' });
@@ -318,8 +385,18 @@ exports.updateServicio = async (req, res) => {
 
 exports.deleteServicio = async (req, res) => {
     try {
+        const actual = await db.query(
+            'SELECT Principal FROM SOLICITUD_SERVICIO WHERE id=? AND ID_Solicitud=?',
+            [req.params.sid, req.params.id],
+        );
+        if (!actual.length) return res.status(404).json({ error: 'No encontrado' });
+        if (actual[0].Principal === 'YES') {
+            return res.status(400).json({ error: 'No se puede eliminar el servicio principal de la solicitud' });
+        }
+
         const result = await db.query(
-            'DELETE FROM SOLICITUD_SERVICIO WHERE id=? AND ID_Solicitud=?', [req.params.sid, req.params.id]
+            'DELETE FROM SOLICITUD_SERVICIO WHERE id=? AND ID_Solicitud=?',
+            [req.params.sid, req.params.id],
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio en solicitud eliminado' });
