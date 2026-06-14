@@ -460,11 +460,14 @@ CREATE TABLE "SOLICITUD_SERVICIO" (
   "fecha_fin_servicio" date DEFAULT NULL,
   "Principal" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
   "indicaciones" text COLLATE utf8mb4_unicode_ci,
+  "id_servicio_subservicio" int DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "ID_Solicitud" ("ID_Solicitud"),
   KEY "ID_Servicio" ("ID_Servicio"),
+  KEY "idx_solicitud_svc_subservicio" ("id_servicio_subservicio"),
   CONSTRAINT "SOLICITUD_SERVICIO_ibfk_1" FOREIGN KEY ("ID_Solicitud") REFERENCES "SOLICITUD" ("ID") ON DELETE CASCADE,
-  CONSTRAINT "SOLICITUD_SERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE
+  CONSTRAINT "SOLICITUD_SERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "SOLICITUD_SERVICIO_ibfk_subservicio" FOREIGN KEY ("id_servicio_subservicio") REFERENCES "SERVICIO_SUBSERVICIO" ("id") ON DELETE SET NULL
 );
 
 
@@ -623,12 +626,15 @@ CREATE TABLE "COTIZACION_SERVICIO" (
   "jornada" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "Principal" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
   "indicaciones" text COLLATE utf8mb4_unicode_ci,
+  "id_servicio_subservicio" int DEFAULT NULL,
   "precio_comercial" decimal(12,2) DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "ID_Cotizacion" ("ID_Cotizacion"),
   KEY "ID_Servicio" ("ID_Servicio"),
+  KEY "idx_cotizacion_svc_subservicio" ("id_servicio_subservicio"),
   CONSTRAINT "COTIZACION_SERVICIO_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE,
-  CONSTRAINT "COTIZACION_SERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE
+  CONSTRAINT "COTIZACION_SERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_SERVICIO_ibfk_subservicio" FOREIGN KEY ("id_servicio_subservicio") REFERENCES "SERVICIO_SUBSERVICIO" ("id") ON DELETE SET NULL
 );
 
 
@@ -892,13 +898,16 @@ CREATE TABLE "PROYECTO_SERVICIO" (
   "precio_comercial" decimal(12,2) DEFAULT NULL,
   "Principal" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
   "indicaciones" text COLLATE utf8mb4_unicode_ci,
+  "id_servicio_subservicio" int DEFAULT NULL,
   PRIMARY KEY ("id"),
   KEY "idx_proyecto_servicio_proyecto" ("id_Proyecto"),
   KEY "idx_proyecto_servicio_servicio" ("ID_Servicio"),
   KEY "idx_proyecto_servicio_cot_svc" ("id_cotizacion_servicio"),
+  KEY "idx_proyecto_svc_subservicio" ("id_servicio_subservicio"),
   CONSTRAINT "PROYECTO_SERVICIO_ibfk_1" FOREIGN KEY ("id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE CASCADE,
   CONSTRAINT "PROYECTO_SERVICIO_ibfk_2" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE CASCADE,
-  CONSTRAINT "PROYECTO_SERVICIO_ibfk_3" FOREIGN KEY ("id_cotizacion_servicio") REFERENCES "COTIZACION_SERVICIO" ("id") ON DELETE SET NULL
+  CONSTRAINT "PROYECTO_SERVICIO_ibfk_3" FOREIGN KEY ("id_cotizacion_servicio") REFERENCES "COTIZACION_SERVICIO" ("id") ON DELETE SET NULL,
+  CONSTRAINT "PROYECTO_SERVICIO_ibfk_subservicio" FOREIGN KEY ("id_servicio_subservicio") REFERENCES "SERVICIO_SUBSERVICIO" ("id") ON DELETE SET NULL
 );
 
 

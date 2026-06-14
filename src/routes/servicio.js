@@ -135,8 +135,12 @@ router.get('/publicos', c.getPublico);
  * @openapi
  * /api/servicios/{id}/principal:
  *   get:
- *     tags: [Servicio]
+ *     tags: [Servicio - Público, Servicio]
  *     summary: Plantilla del servicio como principal (etapas, actividades y subservicios recomendados)
+ *     description: |
+ *       **Ruta pública** (no requiere Bearer).
+ *       Devuelve la plantilla para que el front arme el POST de solicitud.
+ *     security: []
  *     parameters:
  *       - in: path
  *         name: id

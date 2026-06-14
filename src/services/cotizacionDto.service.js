@@ -34,6 +34,7 @@ function normalizeServiceItem(item) {
         precio_comercial: item.precio_comercial ?? item.unitPrice ?? item.precioComercial ?? null,
         Principal: item.Principal,
         indicaciones: item.indicaciones ?? null,
+        id_servicio_subservicio: item.id_servicio_subservicio ?? item.id_subservicio ?? null,
         _name: item.name ?? item.nombre ?? item.nombre_servicio ?? null,
     };
 }
@@ -131,22 +132,38 @@ function normalizePhases(body) {
     };
 }
 
+function parseCotizacionServiciosFromBody(body = {}) {
+    if (body.servicio_principal || body.servicios_secundarios) {
+        const items = [];
+        if (body.servicio_principal) {
+            items.push({ ...body.servicio_principal, Principal: true });
+        }
+        if (Array.isArray(body.servicios_secundarios)) {
+            for (const sec of body.servicios_secundarios) {
+                items.push({ ...sec, Principal: false });
+            }
+        }
+        return items.map(normalizeServiceItem);
+    }
+
+    const servicesRaw = body.services ?? body.servicios;
+    if (servicesRaw === undefined) return undefined;
+    return normalizarMatrizBody(servicesRaw, 'services').map(normalizeServiceItem);
+}
+
 /**
  * Normaliza body UpsertQuotationDTO (frontend) y formato legacy al mismo shape interno.
  * No elimina campos legacy del body original; devuelve solo lo normalizado.
  */
 function normalizeCotizacionPayload(body = {}) {
     const inventoryRaw = body.inventory ?? body.productos;
-    const servicesRaw = body.services ?? body.servicios;
     const trucksRaw = body.trucks ?? body.camiones;
 
     const productos = inventoryRaw !== undefined
         ? normalizarMatrizBody(inventoryRaw, 'inventory').map(normalizeInventoryItem)
         : undefined;
 
-    const servicios = servicesRaw !== undefined
-        ? normalizarMatrizBody(servicesRaw, 'services').map(normalizeServiceItem)
-        : undefined;
+    const servicios = parseCotizacionServiciosFromBody(body);
 
     const camiones = trucksRaw !== undefined
         ? normalizarMatrizBody(trucksRaw, 'trucks').map((t, i) => normalizeTruckItem(t, i))
@@ -216,6 +233,48 @@ function parsePhasesFromRow(base) {
     return { items: [] };
 }
 
+function mapCotizacionServicioRow(row) {
+    const principalRaw = row.Principal;
+    const Principal = principalRaw === 'YES' || principalRaw === true;
+    return {
+        idCotizacionServicio: row.idCotizacionServicio ?? row.id ?? null,
+        idServicio: row.idServicio ?? row.ID_Servicio ?? null,
+        nombre: row.nombre ?? row.nombre_servicio ?? row.name ?? row._name ?? null,
+        fecha_inicio: row.fecha_inicio ?? null,
+        fecha_finalizacion: row.fecha_finalizacion ?? null,
+        jornada: row.jornada ?? null,
+        precio_comercial: row.precio_comercial ?? null,
+        Principal,
+        indicaciones: row.indicaciones ?? null,
+        id_servicio_subservicio: row.id_servicio_subservicio ?? row.id_subservicio ?? null,
+    };
+}
+
+function splitServiciosPrincipalSecundarios(servicios) {
+    const principal = servicios.find((s) => s.Principal === true);
+    const secundarios = servicios.filter((s) => !s.Principal);
+    return {
+        servicio_principal: principal ?? null,
+        servicios_secundarios: secundarios,
+    };
+}
+
+function mapCotizacionServicioToUpsertService(row) {
+    const mapped = mapCotizacionServicioRow(row);
+    return {
+        id: String(mapped.idServicio ?? ''),
+        idCotizacionServicio: mapped.idCotizacionServicio,
+        name: mapped.nombre ?? undefined,
+        startDate: toDateOnly(mapped.fecha_inicio),
+        dueDate: toDateOnly(mapped.fecha_finalizacion),
+        schedule: mapped.jornada ?? '',
+        unitPrice: Number(mapped.precio_comercial ?? 0),
+        Principal: mapped.Principal,
+        indicaciones: mapped.indicaciones,
+        id_servicio_subservicio: mapped.id_servicio_subservicio,
+    };
+}
+
 function buildUpsertQuotationResponse({
     base,
     productosRows = [],
@@ -235,14 +294,7 @@ function buildUpsertQuotationResponse({
             : null,
     }));
 
-    const services = serviciosRows.map((row) => ({
-        id: String(row.idServicio ?? row.ID_Servicio ?? row.id ?? ''),
-        name: row.nombre ?? row.nombre_servicio ?? row.name ?? undefined,
-        startDate: toDateOnly(row.fecha_inicio ?? row.startDate),
-        dueDate: toDateOnly(row.fecha_finalizacion ?? row.dueDate),
-        schedule: row.jornada ?? row.schedule ?? '',
-        unitPrice: Number(row.precio_comercial ?? row.unitPrice ?? 0),
-    }));
+    const services = serviciosRows.map((row) => mapCotizacionServicioToUpsertService(row));
 
     const trucks = camionesRows.map((row) => ({
         plate: row.placa ?? row.plate ?? row.Placa ?? '',
@@ -305,5 +357,9 @@ module.exports = {
     calcularPrecioTotal,
     buildUpsertQuotationResponse,
     parsePhasesFromRow,
+    parseCotizacionServiciosFromBody,
+    mapCotizacionServicioRow,
+    mapCotizacionServicioToUpsertService,
+    splitServiciosPrincipalSecundarios,
     toDateOnly,
 };

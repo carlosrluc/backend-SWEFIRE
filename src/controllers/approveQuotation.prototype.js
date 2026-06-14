@@ -68,15 +68,17 @@ const approveQuotation = catchAsync(async (req, res) => {
 
     // 4. Migrar Servicios (COTIZACION_SERVICIO -> PROYECTO_SERVICIO)
     const serviciosCot = await db.query(
-        `SELECT id, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones
+        `SELECT id, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial,
+                Principal, indicaciones, id_servicio_subservicio
          FROM COTIZACION_SERVICIO WHERE ID_Cotizacion = ? AND ID_Servicio != 7`,
         [QuotationID],
     );
     for (const svc of serviciosCot) {
         await db.query(
             `INSERT INTO PROYECTO_SERVICIO
-                (id_Proyecto, ID_Servicio, id_cotizacion_servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones)
-             VALUES (?,?,?,?,?,?,?,?,?)`,
+                (id_Proyecto, ID_Servicio, id_cotizacion_servicio, fecha_inicio, fecha_finalizacion,
+                 jornada, precio_comercial, Principal, indicaciones, id_servicio_subservicio)
+             VALUES (?,?,?,?,?,?,?,?,?,?)`,
             [
                 idProyecto,
                 svc.ID_Servicio,
@@ -87,6 +89,7 @@ const approveQuotation = catchAsync(async (req, res) => {
                 svc.precio_comercial,
                 svc.Principal,
                 svc.indicaciones,
+                svc.id_servicio_subservicio,
             ],
         );
     }

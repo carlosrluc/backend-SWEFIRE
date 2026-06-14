@@ -3,6 +3,132 @@ const c = require('../controllers/solicitud.controller');
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     SolicitudUbicacionEtapa:
+ *       type: object
+ *       properties:
+ *         id: { type: integer, example: 2 }
+ *         nombre: { type: string, example: "fase de instalacion" }
+ *         orden: { type: integer, example: 2 }
+ *     SolicitudServicioInput:
+ *       type: object
+ *       required: [ID_Servicio]
+ *       properties:
+ *         ID_Servicio: { type: integer, example: 1 }
+ *         Principal: { type: boolean, example: true, description: "true = servicio principal; false = secundario/subservicio" }
+ *         id_subservicio: { type: integer, nullable: true, example: 2, description: "ID de SERVICIO_SUBSERVICIO (de GET /servicios/{id}/principal). Requerido si el secundario viene del catálogo de subservicios." }
+ *         ubicacion_etapa:
+ *           $ref: '#/components/schemas/SolicitudUbicacionEtapa'
+ *         indicaciones: { type: string, nullable: true, example: "Coordinar acceso 48h antes" }
+ *         fecha_inicio_servicio: { type: string, format: date, example: "2026-06-10" }
+ *         fecha_fin_servicio: { type: string, format: date, example: "2026-06-20" }
+ *         horario_servicio: { type: string, example: "08:00 - 17:00" }
+ *     SolicitudServicioResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/SolicitudServicioInput'
+ *         - type: object
+ *           properties:
+ *             id: { type: integer, example: 42 }
+ *             ID_Solicitud: { type: integer, example: 115 }
+ *             nombre: { type: string, example: "Instalación de Sistema de Rociadores (Sprinklers)" }
+ *     SolicitudCreateConServicios:
+ *       type: object
+ *       description: |
+ *         Crear solicitud con servicios en un solo paso.
+ *         Acepta `servicios[]` o el formato devuelto por GET /servicios/{id}/principal
+ *         (`servicio_principal` + `servicios_secundarios`).
+ *       required: [Id_Cliente]
+ *       properties:
+ *         Id_Cliente: { type: string, example: "20501234567" }
+ *         descripcion: { type: string, example: "Instalación de rociadores zona expansión" }
+ *         ubicacion: { type: string, example: "Av. Javier Prado Este 4200, San Borja" }
+ *         productoenvio: { type: string }
+ *         camionesenvio: { type: string }
+ *         obsgenerales: { type: string }
+ *         obseleccion: { type: string }
+ *         Respuesta: { type: string }
+ *         servicios:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudServicioInput'
+ *         servicio_principal:
+ *           $ref: '#/components/schemas/SolicitudServicioInput'
+ *         servicios_secundarios:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudServicioInput'
+ *       example:
+ *         Id_Cliente: "20501234567"
+ *         descripcion: "Instalación de rociadores"
+ *         ubicacion: "San Borja, Lima"
+ *         servicio_principal:
+ *           ID_Servicio: 1
+ *           Principal: true
+ *           indicaciones: "Servicio principal del proyecto"
+ *           fecha_inicio_servicio: "2026-06-10"
+ *           horario_servicio: "08:00 - 17:00"
+ *         servicios_secundarios:
+ *           - ID_Servicio: 8
+ *             Principal: false
+ *             id_subservicio: 1
+ *             ubicacion_etapa: { id: 1, nombre: "fase de envio de productos", orden: 1 }
+ *             indicaciones: "Grupo electrógeno recomendado"
+ *           - ID_Servicio: 2
+ *             Principal: false
+ *             id_subservicio: 2
+ *             ubicacion_etapa: { id: 2, nombre: "fase de instalacion", orden: 2 }
+ *     SolicitudActividadFlujo:
+ *       type: object
+ *       properties:
+ *         id: { type: integer, example: 5 }
+ *         nombre: { type: string, example: "empacar todo lo requerido en el camion de envio" }
+ *         origen: { type: string, enum: [servicio, subservicio], example: "servicio" }
+ *         ID_Servicio_Hijo: { type: integer, nullable: true, description: "Presente si origen=subservicio" }
+ *     SolicitudEtapaFlujo:
+ *       type: object
+ *       properties:
+ *         id: { type: integer, example: 1 }
+ *         nombre: { type: string, example: "fase de envio de productos" }
+ *         descripcion: { type: string, nullable: true }
+ *         duracion: { type: integer, nullable: true }
+ *         orden: { type: integer, example: 1 }
+ *         actividades:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudActividadFlujo'
+ *     SolicitudDetalleResponse:
+ *       type: object
+ *       description: Solicitud con relaciones y preview del flujo según servicio principal y subservicios elegidos
+ *       properties:
+ *         etapas:
+ *           type: array
+ *           nullable: true
+ *           description: "Etapas del servicio principal con actividades filtradas. null si no hay principal."
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudEtapaFlujo'
+ *         servicio_principal:
+ *           allOf:
+ *             - $ref: '#/components/schemas/SolicitudServicioResponse'
+ *             - type: object
+ *               properties:
+ *                 etapas:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/SolicitudEtapaFlujo'
+ *           nullable: true
+ *         servicios_secundarios:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudServicioResponse'
+ *         servicios:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudServicioResponse'
+ */
+
+/**
+ * @openapi
  * tags:
  *   - name: Solicitud
  *     description: Gestión de solicitudes de clientes
@@ -36,28 +162,31 @@ const c = require('../controllers/solicitud.controller');
  *         description: Lista de solicitudes con metadatos de paginación
  *   post:
  *     tags: [Solicitud]
- *     summary: Crear una solicitud
+ *     summary: Crear una solicitud (opcionalmente con servicios principal y secundarios)
+ *     description: |
+ *       Puede crear solo la cabecera de la solicitud, o incluir servicios en el mismo POST.
+ *       Los servicios pueden enviarse como `servicios[]` o como `servicio_principal` + `servicios_secundarios`
+ *       (formato alineado con GET /api/servicios/{id}/principal).
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [Id_Cliente]
- *             properties:
- *               Id_Cliente: { type: string, example: "20512345678" }
- *               descripcion: { type: string }
- *               ubicacion: { type: string }
- *               productoenvio: { type: string }
- *               camionesenvio: { type: string }
- *               obsgenerales: { type: string }
- *               obseleccion: { type: string }
- *               estado: { type: string, enum: ['pendiente','aceptado','rechazado'] }
- *               Respuesta: { type: string }
- *               FechaCreacion: { type: string, format: date }
+ *             $ref: '#/components/schemas/SolicitudCreateConServicios'
  *     responses:
  *       201:
- *         description: Solicitud creada
+ *         description: Solicitud creada (incluye `servicios` si se enviaron)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: "Solicitud creada" }
+ *                 ID: { type: integer, example: 115 }
+ *                 servicios:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/SolicitudServicioResponse'
  */
 router.get('/', c.getAll);
 router.post('/', c.create);
@@ -101,7 +230,13 @@ router.get('/estado/:estado', c.getByEstado);
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Solicitud encontrada
+ *         description: Solicitud encontrada (incluye etapas/actividades del flujo según servicios elegidos)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - type: object
+ *                 - $ref: '#/components/schemas/SolicitudDetalleResponse'
  *       404:
  *         description: No encontrada
  *   put:
@@ -250,11 +385,26 @@ router.delete('/:id/medios/:mid', c.deleteMedio);
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Lista de servicios
+ *         description: Lista de servicios con Principal, id_subservicio y ubicacion_etapa
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/SolicitudServicioResponse'
  *   post:
  *     tags: [Solicitud - Servicios]
  *     summary: Agregar uno o varios servicios a la solicitud
- *     description: "Acepta un objeto, un arreglo de servicios, o un body con clave servicios"
+ *     description: |
+ *       Acepta:
+ *       - Un objeto o arreglo en `servicios`
+ *       - Formato de GET /api/servicios/{id}/principal (`servicio_principal` + `servicios_secundarios`)
+ *
+ *       Campos clave por servicio:
+ *       - `Principal` (boolean): un solo `true` por solicitud
+ *       - `id_subservicio`: ID de SERVICIO_SUBSERVICIO para secundarios del catálogo
+ *       - `ubicacion_etapa`: etapa donde ocurre el subservicio (validación; viene del GET principal)
+ *       - `indicaciones`: notas del cliente para ese servicio
  *     parameters:
  *       - in: path
  *         name: id
@@ -266,25 +416,68 @@ router.delete('/:id/medios/:mid', c.deleteMedio);
  *         application/json:
  *           schema:
  *             oneOf:
- *               - type: object
- *                 required: [ID_Servicio]
- *                 properties:
- *                   ID_Servicio: { type: integer }
- *                   fecha_inicio_servicio: { type: string, format: date }
- *                   fecha_fin_servicio: { type: string, format: date }
- *                   horario_servicio: { type: string }
+ *               - $ref: '#/components/schemas/SolicitudServicioInput'
  *               - type: array
  *                 items:
- *                   type: object
- *                   required: [ID_Servicio]
- *                   properties:
- *                     ID_Servicio: { type: integer }
- *                     fecha_inicio_servicio: { type: string, format: date }
- *                     fecha_fin_servicio: { type: string, format: date }
- *                     horario_servicio: { type: string }
+ *                   $ref: '#/components/schemas/SolicitudServicioInput'
+ *               - type: object
+ *                 properties:
+ *                   servicios:
+ *                     type: array
+ *                     items:
+ *                       $ref: '#/components/schemas/SolicitudServicioInput'
+ *               - type: object
+ *                 properties:
+ *                   servicio_principal:
+ *                     $ref: '#/components/schemas/SolicitudServicioInput'
+ *                   servicios_secundarios:
+ *                     type: array
+ *                     items:
+ *                       $ref: '#/components/schemas/SolicitudServicioInput'
+ *           examples:
+ *             desdeGetPrincipal:
+ *               summary: Formato alineado con GET /servicios/1/principal
+ *               value:
+ *                 servicio_principal:
+ *                   ID_Servicio: 1
+ *                   Principal: true
+ *                   fecha_inicio_servicio: "2026-06-10"
+ *                   horario_servicio: "08:00 - 17:00"
+ *                   indicaciones: "Servicio principal"
+ *                 servicios_secundarios:
+ *                   - ID_Servicio: 8
+ *                     Principal: false
+ *                     id_subservicio: 1
+ *                     ubicacion_etapa: { id: 1, nombre: "fase de envio de productos", orden: 1 }
+ *                   - ID_Servicio: 2
+ *                     Principal: false
+ *                     id_subservicio: 2
+ *                     ubicacion_etapa: { id: 2, nombre: "fase de instalacion", orden: 2 }
+ *             arregloSimple:
+ *               summary: Arreglo de servicios
+ *               value:
+ *                 - ID_Servicio: 1
+ *                   Principal: true
+ *                   indicaciones: "Principal"
+ *                 - ID_Servicio: 9
+ *                   Principal: false
+ *                   id_subservicio: 4
+ *                   ubicacion_etapa: { id: 4, nombre: "Inicio y material", orden: 1 }
  *     responses:
  *       201:
  *         description: Servicio(s) agregado(s)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - $ref: '#/components/schemas/SolicitudServicioResponse'
+ *                 - type: object
+ *                   properties:
+ *                     message: { type: string }
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/SolicitudServicioResponse'
  */
 router.get('/:id/servicios', c.getServicios);
 router.post('/:id/servicios', c.createServicio);
@@ -315,6 +508,8 @@ router.post('/:id/servicios', c.createServicio);
  *               fecha_inicio_servicio: { type: string, format: date }
  *               fecha_fin_servicio: { type: string, format: date }
  *               horario_servicio: { type: string }
+ *               indicaciones: { type: string, nullable: true }
+ *               id_subservicio: { type: integer, nullable: true, description: "No modificable vía PUT de subservicio una vez creado" }
  *     responses:
  *       200:
  *         description: Servicio actualizado

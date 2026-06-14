@@ -1,9 +1,10 @@
 const db = require('../config/db');
 const {
-    toPrincipalEnum,
-    principalToBoolean,
-    assertSinglePrincipal,
-} = require('../services/servicioFlujo.service');
+    parseServiciosInput,
+    insertarServiciosSolicitud,
+    listarServiciosSolicitud,
+    enriquecerFlujoSolicitud,
+} = require('../services/solicitudServicio.service');
 
 /** Acepta un objeto, un array, o { servicios: [...] } */
 const normalizarMatrizBody = (body, claveEnvoltorio) => {
@@ -20,10 +21,32 @@ async function obtenerServiciosSolicitud(idSolicitud) {
     );
 }
 
-function mapServicioResponse(row) {
+async function cargarDetalleSolicitud(idSolicitud) {
+    const [medios, servicios, inventario, camiones] = await Promise.all([
+        db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [idSolicitud]),
+        listarServiciosSolicitud(db, idSolicitud),
+        db.query(
+            'SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC',
+            [idSolicitud],
+        ),
+        db.query(
+            `SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo
+             FROM SOLICITUD_CAMION SC
+             LEFT JOIN CAMION C ON SC.id_camion = C.Placa
+             WHERE SC.ID_Solicitud = ?
+             ORDER BY SC.id DESC`,
+            [idSolicitud],
+        ),
+    ]);
+    const flujo = await enriquecerFlujoSolicitud(db, servicios);
     return {
-        ...row,
-        Principal: principalToBoolean(row.Principal),
+        medios,
+        servicios,
+        inventario,
+        camiones,
+        etapas: flujo.etapas,
+        servicio_principal: flujo.servicio_principal,
+        servicios_secundarios: flujo.servicios_secundarios,
     };
 }
 
@@ -78,13 +101,8 @@ exports.getAll = async (req, res) => {
         const total = countResult[0].total;
 
         const detailedRows = await Promise.all(rows.map(async (solicitud) => {
-            const [medios, servicios, inventario, camiones] = await Promise.all([
-                db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [solicitud.ID]),
-                db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [solicitud.ID]),
-                db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [solicitud.ID]),
-            ]);
-            return { ...solicitud, medios, servicios: servicios.map(mapServicioResponse), inventario, camiones };
+            const detalle = await cargarDetalleSolicitud(solicitud.ID);
+            return { ...solicitud, ...detalle };
         }));
 
         res.json({
@@ -130,13 +148,8 @@ exports.getByEstado = async (req, res) => {
         const total = countResult[0].total;
 
         const detailedRows = await Promise.all(rows.map(async (solicitud) => {
-            const [medios, servicios, inventario, camiones] = await Promise.all([
-                db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [solicitud.ID]),
-                db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [solicitud.ID]),
-                db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [solicitud.ID]),
-                db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [solicitud.ID]),
-            ]);
-            return { ...solicitud, medios, servicios: servicios.map(mapServicioResponse), inventario, camiones };
+            const detalle = await cargarDetalleSolicitud(solicitud.ID);
+            return { ...solicitud, ...detalle };
         }));
 
         res.json({
@@ -168,19 +181,15 @@ exports.getById = async (req, res) => {
         const rows = await db.query(query, args);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
         const solicitud = rows[0];
-        const [medios, servicios, inventario, camiones] = await Promise.all([
-            db.query('SELECT * FROM SOLICITUD_MEDIO_COMUNICACION WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id]),
-            db.query('SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC', [req.params.id]),
-            db.query('SELECT SI.*, I.nombre_objeto as nombre, I.precio_comercial as precio_unitario FROM SOLICITUD_INVENTARIO SI LEFT JOIN INVENTARIO I ON SI.ID_Inventario = I.Id_Objeto WHERE SI.ID_Solicitud = ? ORDER BY SI.id DESC', [req.params.id]),
-            db.query('SELECT SC.*, C.nombre as camion_nombre, C.modelo as camion_modelo FROM SOLICITUD_CAMION SC LEFT JOIN CAMION C ON SC.id_camion = C.Placa WHERE SC.ID_Solicitud = ? ORDER BY SC.id DESC', [req.params.id]),
-        ]);
-        res.json({ ...solicitud, medios, servicios: servicios.map(mapServicioResponse), inventario, camiones });
+        const detalle = await cargarDetalleSolicitud(req.params.id);
+        res.json({ ...solicitud, ...detalle });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.create = async (req, res) => {
     const { Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, Respuesta } = req.body;
     const estado = 'pendiente';
+    const serviciosItems = parseServiciosInput(req.body);
     try {
         let clientIdToUse = Id_Cliente;
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -196,8 +205,23 @@ exports.create = async (req, res) => {
             'INSERT INTO SOLICITUD (Id_Cliente,descripcion,ubicacion,ProductoEnvio,CamionesEnvio,ObsGenerales,ObsEleccion,estado,Respuesta) VALUES (?,?,?,?,?,?,?,?,?)',
             [clientIdToUse, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta]
         );
-        res.status(201).json({ message: 'Solicitud creada', ID: result.insertId });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        const newId = result.insertId;
+
+        let serviciosInsertados = [];
+        if (serviciosItems.length) {
+            await insertarServiciosSolicitud(db, newId, serviciosItems);
+            serviciosInsertados = await listarServiciosSolicitud(db, newId);
+        }
+
+        res.status(201).json({
+            message: 'Solicitud creada',
+            ID: newId,
+            servicios: serviciosInsertados,
+        });
+    } catch (e) {
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.update = async (req, res) => {
@@ -286,17 +310,13 @@ exports.deleteMedio = async (req, res) => {
 // ── SOLICITUD_SERVICIO ────────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
     try {
-        const rows = await db.query(
-            'SELECT * FROM SOLICITUD_SERVICIO WHERE ID_Solicitud = ? ORDER BY id DESC',
-            [req.params.id],
-        );
-        res.json(rows.map(mapServicioResponse));
+        res.json(await listarServiciosSolicitud(db, req.params.id));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.createServicio = async (req, res) => {
     try {
-        const items = normalizarMatrizBody(req.body, 'servicios');
+        const items = parseServiciosInput(req.body);
         if (!items.length) {
             return res.status(400).json({ error: 'Se requiere un servicio o un arreglo de servicios' });
         }
@@ -304,65 +324,18 @@ exports.createServicio = async (req, res) => {
         const existentes = await obtenerServiciosSolicitud(req.params.id);
         const yaTienePrincipal = existentes.some((e) => e.Principal === 'YES');
 
-        const normalizados = items.map((item) => ({
-            ...item,
-            Principal: toPrincipalEnum(item.Principal),
-        }));
+        const insertados = await insertarServiciosSolicitud(db, req.params.id, items, { yaTienePrincipal });
+        const todos = await listarServiciosSolicitud(db, req.params.id);
+        const nuevos = todos.filter((s) => insertados.some((i) => i.id === s.id));
 
-        try {
-            await assertSinglePrincipal(normalizados, 'la solicitud');
-        } catch (err) {
-            return res.status(err.statusCode || 400).json({ error: err.message });
+        if (nuevos.length === 1) {
+            return res.status(201).json({ message: 'Servicio en solicitud creado', ...nuevos[0] });
         }
-
-        if (yaTienePrincipal && normalizados.some((i) => i.Principal === 'YES')) {
-            return res.status(400).json({ error: 'La solicitud ya tiene un servicio principal; no se puede asignar otro' });
-        }
-
-        const insertados = [];
-        for (const item of normalizados) {
-            const {
-                ID_Servicio,
-                fecha_inicio_servicio,
-                fecha_fin_servicio,
-                horario_servicio,
-                Principal,
-                indicaciones,
-            } = item;
-            if (!ID_Servicio) {
-                return res.status(400).json({ error: 'Cada servicio debe incluir ID_Servicio' });
-            }
-            const result = await db.query(
-                `INSERT INTO SOLICITUD_SERVICIO
-                    (ID_Solicitud, ID_Servicio, fecha_inicio_servicio, fecha_fin_servicio, horario_servicio, Principal, indicaciones)
-                 VALUES (?,?,?,?,?,?,?)`,
-                [
-                    req.params.id,
-                    ID_Servicio,
-                    fecha_inicio_servicio || null,
-                    fecha_fin_servicio || null,
-                    horario_servicio || null,
-                    Principal,
-                    indicaciones ?? null,
-                ],
-            );
-            insertados.push(mapServicioResponse({
-                id: result.insertId,
-                ID_Solicitud: Number(req.params.id),
-                ID_Servicio,
-                fecha_inicio_servicio,
-                fecha_fin_servicio,
-                horario_servicio,
-                Principal,
-                indicaciones: indicaciones ?? null,
-            }));
-        }
-
-        if (insertados.length === 1) {
-            return res.status(201).json({ message: 'Servicio en solicitud creado', ...insertados[0] });
-        }
-        res.status(201).json({ message: 'Servicios en solicitud creados', data: insertados });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        res.status(201).json({ message: 'Servicios en solicitud creados', data: nuevos });
+    } catch (e) {
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.updateServicio = async (req, res) => {

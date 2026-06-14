@@ -134,6 +134,10 @@ function isPublicApiRoute(req) {
     if (req.method === 'GET' && /^\/servicios\/\d+\/foto$/.test(path)) {
         return true;
     }
+    // Plantilla principal del servicio (catálogo para armar solicitud)
+    if (req.method === 'GET' && /^\/servicios\/\d+\/principal$/.test(path)) {
+        return true;
+    }
     // Archivos estáticos de SERVICIO.foto bajo /api/uploads/servicios/...
     if (req.method === 'GET' && /^\/uploads\/servicios\/.+/.test(path)) {
         return true;

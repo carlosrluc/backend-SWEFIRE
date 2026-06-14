@@ -30,7 +30,7 @@ async function loadSolicitudDataForCotizacion(executor, idSolicitud) {
     const [servicioRows, inventarioRows] = await Promise.all([
         executor.query(
             `SELECT ss.id, ss.ID_Servicio, ss.fecha_inicio_servicio, ss.fecha_fin_servicio, ss.horario_servicio,
-                    ss.Principal, ss.indicaciones, s.precio_regular
+                    ss.Principal, ss.indicaciones, ss.id_servicio_subservicio, s.precio_regular
              FROM SOLICITUD_SERVICIO ss
              LEFT JOIN SERVICIO s ON ss.ID_Servicio = s.ID_Servicio
              WHERE ss.ID_Solicitud = ? AND ss.ID_Servicio != 7
@@ -56,10 +56,14 @@ async function loadSolicitudDataForCotizacion(executor, idSolicitud) {
         precio_comercial: row.precio_regular,
         Principal: row.Principal,
         indicaciones: row.indicaciones,
+        id_servicio_subservicio: row.id_servicio_subservicio ?? null,
     }));
 
     const servicioPrincipal = servicioRows.find((r) => toPrincipalEnum(r.Principal) === 'YES') || null;
     const serviciosSecundarios = servicioRows.filter((r) => toPrincipalEnum(r.Principal) !== 'YES');
+    const subservicioIds = serviciosSecundarios
+        .map((r) => r.id_servicio_subservicio)
+        .filter((id) => id != null);
 
     const productos = inventarioRows.map((row) => normalizeInventoryItem({
         id: row.ID_Inventario,
@@ -81,6 +85,7 @@ async function loadSolicitudDataForCotizacion(executor, idSolicitud) {
             ? { ID_Servicio: servicioPrincipal.ID_Servicio }
             : null,
         serviciosSecundariosIds: serviciosSecundarios.map((r) => r.ID_Servicio),
+        subservicioIds,
     };
 }
 

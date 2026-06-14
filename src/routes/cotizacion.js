@@ -38,11 +38,71 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *       required: [id, startDate, dueDate, unitPrice]
  *       properties:
  *         id: { type: string, description: ID_Servicio }
+ *         idCotizacionServicio: { type: integer, description: 'ID en COTIZACION_SERVICIO (solo en respuestas GET)' }
  *         name: { type: string }
  *         startDate: { type: string, format: date }
  *         dueDate: { type: string, format: date }
- *         schedule: { type: string }
+ *         schedule: { type: string, description: jornada / horario }
  *         unitPrice: { type: number }
+ *         Principal: { type: boolean, description: 'true = servicio principal; solo uno por cotización' }
+ *         indicaciones: { type: string, nullable: true }
+ *         id_servicio_subservicio: { type: integer, nullable: true, description: 'ID de SERVICIO_SUBSERVICIO si el secundario viene del catálogo' }
+ *     CotizacionServicioLegacy:
+ *       type: object
+ *       properties:
+ *         idCotizacionServicio: { type: integer, example: 120 }
+ *         idServicio: { type: integer, example: 1 }
+ *         nombre: { type: string, example: "Instalación de Sistema de Rociadores (Sprinklers)" }
+ *         fecha_inicio: { type: string, format: date, example: "2026-06-10" }
+ *         fecha_finalizacion: { type: string, format: date, example: "2026-06-20" }
+ *         jornada: { type: string, example: "08:00 - 17:00" }
+ *         precio_comercial: { type: number, example: 15000 }
+ *         Principal: { type: boolean, example: true }
+ *         indicaciones: { type: string, nullable: true, example: "Servicio principal con flujo de 3 etapas." }
+ *         id_servicio_subservicio: { type: integer, nullable: true, example: 2 }
+ *     CotizacionDetalleFrancoResponse:
+ *       type: object
+ *       description: Respuesta de GET /detalles-franco (UpsertQuotationDTO + campos legacy)
+ *       properties:
+ *         id: { type: integer, example: 45 }
+ *         id_solicitud: { type: integer, example: 1 }
+ *         name: { type: string }
+ *         inventory: { type: array, items: { $ref: '#/components/schemas/UpsertQuotationInventoryItem' } }
+ *         services:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/UpsertQuotationServiceItem' }
+ *         phases:
+ *           type: object
+ *           properties:
+ *             items:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: string, example: "srv-etapa-1" }
+ *                   id_bd: { type: integer }
+ *                   name: { type: string, example: "fase de envio de productos" }
+ *                   description: { type: string }
+ *                   duration: { type: number }
+ *                   activities:
+ *                     type: array
+ *                     items:
+ *                       type: object
+ *                       properties:
+ *                         id: { type: string, example: "srv-act-1" }
+ *                         id_bd: { type: integer }
+ *                         name: { type: string }
+ *         servicios:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/CotizacionServicioLegacy' }
+ *         servicio_principal:
+ *           $ref: '#/components/schemas/CotizacionServicioLegacy'
+ *           nullable: true
+ *         servicios_secundarios:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/CotizacionServicioLegacy' }
+ *         etapas: { type: integer, nullable: true, description: 'Cantidad de etapas (resumen)' }
+ *         duracion_etapa: { type: string, nullable: true, description: 'Duración total en días (resumen)' }
  *     UpsertQuotationTruckItem:
  *       type: object
  *       required: [plate]
@@ -56,11 +116,11 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *         unitPrice: { type: number, description: 'Legacy — PrecioUnit' }
  *     UpsertQuotationDTO:
  *       type: object
- *       required: [name]
+ *       required: [name, id_solicitud]
  *       properties:
  *         name: { type: string }
- *         id_solicitud: { type: integer, description: 'Requerido por BD si no hay valor previo' }
- *         DNI_O_RUC: { type: string, description: 'Requerido por BD si no hay valor previo' }
+ *         id_solicitud: { type: integer, description: 'Requerido al crear. Importa servicios, productos y flujo desde la solicitud.' }
+ *         DNI_O_RUC: { type: string, description: 'Opcional si viene de la solicitud' }
  *         inventory:
  *           type: array
  *           items: { $ref: '#/components/schemas/UpsertQuotationInventoryItem' }
@@ -117,7 +177,9 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *           description: Alias legacy de inventory
  *         servicios:
  *           type: array
- *           description: Alias legacy de services
+ *           description: |
+ *             Alias legacy de services. Cada ítem puede incluir Principal, indicaciones e id_servicio_subservicio.
+ *             También acepta formato servicio_principal + servicios_secundarios (como en solicitudes).
  *         camiones:
  *           type: array
  *           description: Alias legacy de trucks
@@ -134,6 +196,31 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *           type: object
  *           description: |
  *             Alias legacy del body (mismo shape que phases). Opcional si ya envías `phases`.
+ *       example:
+ *         name: "Cotización rociadores zona expansión"
+ *         id_solicitud: 1
+ *         quotationConditions:
+ *           emissionDate: "2026-06-14"
+ *           expirationDate: "2026-06-28"
+ *           observations: "Importada desde solicitud con servicio principal"
+ *         services:
+ *           - id: "1"
+ *             name: "Instalación de Sistema de Rociadores (Sprinklers)"
+ *             startDate: "2026-06-10"
+ *             dueDate: "2026-06-20"
+ *             schedule: "08:00 - 17:00"
+ *             unitPrice: 15000
+ *             Principal: true
+ *             indicaciones: "Servicio principal con flujo de 3 etapas."
+ *           - id: "8"
+ *             name: "Instalación de Grupo Electrógeno"
+ *             startDate: "2026-06-10"
+ *             dueDate: "2026-06-20"
+ *             schedule: "08:00 - 17:00"
+ *             unitPrice: 3500
+ *             Principal: false
+ *             id_servicio_subservicio: 1
+ *             indicaciones: "Subservicio recomendado: grupo electrógeno."
  */
 
 /**
@@ -156,10 +243,14 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *     description: |
  *       Acepta el payload del frontend (`name`, `inventory`, `services`, `trucks`, etc.)
  *       y también el formato legacy (`nombre`, `productos`, `servicios`, `camiones`, etc.).
- *       Si se envía `id_solicitud`, importa automáticamente servicios (`SOLICITUD_SERVICIO` →
- *       `COTIZACION_SERVICIO`), productos (`SOLICITUD_INVENTARIO` → `COTIZACION_INVENTARIO`),
- *       datos comunes de la solicitud (cliente, nombre, observaciones) y `ubicacion` →
- *       `direccion_recojo`. Los valores enviados en el body tienen prioridad sobre la solicitud.
+ *       **Requiere `id_solicitud`.** Si se envía, importa automáticamente:
+ *       - Servicios con `Principal`, `indicaciones` e `id_servicio_subservicio` desde `SOLICITUD_SERVICIO`
+ *       - Productos desde `SOLICITUD_INVENTARIO`
+ *       - Cliente, nombre, observaciones y `ubicacion` → `direccion_recojo`
+ *       - Etapas/actividades del servicio principal a `COTIZACION_ETAPA` / `COTIZACION_ACTIVIDAD`
+ *         (actividades de subservicio solo si están en la solicitud)
+ *       Los valores enviados en el body tienen prioridad sobre la solicitud.
+ *       Si envías `phases` / `etapas_detalle`, se usa ese flujo en lugar del importado.
  *     requestBody:
  *       required: true
  *       content:
@@ -168,7 +259,23 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *             $ref: '#/components/schemas/UpsertQuotationDTO'
  *     responses:
  *       201:
- *         description: Cotización creada. Devuelve el ID y el precio_total calculado.
+ *         description: Cotización creada. Devuelve ID, precio_total y servicios insertados.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message: { type: string, example: "Cotización creada" }
+ *                 ID: { type: integer, example: 48 }
+ *                 precio_total: { type: number, example: 18500 }
+ *                 importado_desde_solicitud: { type: boolean, example: true }
+ *                 servicios_insertados:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer, description: id COTIZACION_SERVICIO }
+ *                       index: { type: integer }
  */
 router.get('/', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getAll);
 router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.create);
@@ -300,7 +407,11 @@ router.get('/:id/detalles', auth, permit(['cliente', 'abogado', 'trabajtaller', 
  *       - $ref: '#/components/parameters/CotizacionNombreQuery'
  *     responses:
  *       200:
- *         description: Detalles completos de la cotización
+ *         description: Detalles completos (UpsertQuotationDTO + legacy con Principal, etapas y subservicios)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CotizacionDetalleFrancoResponse'
  *       404:
  *         description: No encontrada o no coincide con estado/nombre
  */
@@ -341,6 +452,8 @@ router.get('/:id/detalles-franco', auth, permit(['cliente', 'abogado', 'trabajta
  *               fecha_finalizacion: { type: string, format: date }
  *               jornada: { type: string }
  *               precio_comercial: { type: number }
+ *               indicaciones: { type: string, nullable: true }
+ *               id_servicio_subservicio: { type: integer, nullable: true, description: 'No se puede marcar Principal aquí' }
  *     responses:
  *       201:
  *         description: Servicio agregado
@@ -375,6 +488,8 @@ router.post('/:id/servicios', auth, permit(['abogado', 'trabajtaller', 'gerente'
  *               fecha_finalizacion: { type: string, format: date }
  *               jornada: { type: string }
  *               precio_comercial: { type: number }
+ *               indicaciones: { type: string, nullable: true }
+ *               id_servicio_subservicio: { type: integer, nullable: true, description: 'No se puede marcar Principal aquí' }
  *     responses:
  *       200:
  *         description: Servicio actualizado

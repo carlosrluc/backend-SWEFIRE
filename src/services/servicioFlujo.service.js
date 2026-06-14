@@ -155,7 +155,15 @@ async function buildPrincipalTemplate(executor, idServicio) {
     };
 }
 
-function filterSubservicioActivities(activities, secundarioCounts) {
+function filterSubservicioActivities(activities, secundarioCounts, subservicioIds = null) {
+    if (subservicioIds && subservicioIds.size > 0) {
+        return activities.filter((act) => {
+            if (act.origen !== 'subservicio') return true;
+            return act.id_servicio_subservicio != null
+                && subservicioIds.has(act.id_servicio_subservicio);
+        });
+    }
+
     const consumed = new Map();
     const filtered = [];
 
@@ -177,13 +185,19 @@ function filterSubservicioActivities(activities, secundarioCounts) {
 }
 
 function buildPhasesFromServicioTree(etapasTree, options = {}) {
-    const { secundarioCounts = null, onlyManualActivities = false } = options;
+    const {
+        secundarioCounts = null,
+        subservicioIds = null,
+        onlyManualActivities = false,
+    } = options;
 
     return {
-        items: etapasTree.map((etapa, ei) => {
+        items: etapasTree.map((etapa) => {
             let acts = etapa.actividades;
             if (onlyManualActivities) {
                 acts = acts.filter((a) => a.origen !== 'subservicio');
+            } else if (subservicioIds && subservicioIds.size > 0) {
+                acts = filterSubservicioActivities(acts, null, subservicioIds);
             } else if (secundarioCounts) {
                 acts = filterSubservicioActivities(acts, secundarioCounts);
             }
@@ -234,4 +248,6 @@ module.exports = {
     importServicioFlujoToCotizacion,
     assertSinglePrincipal,
     getNextActividadOrden,
+    filterSubservicioActivities,
+    mapActividadForResponse,
 };

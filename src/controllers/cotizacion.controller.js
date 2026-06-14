@@ -5,6 +5,7 @@ const {
     loadCotizacionEtapasTree,
     syncCotizacionEtapasFromPhases,
     ensureCotizacionEtapasFromJson,
+    summarizePhases,
 } = require('../services/cotizacionEtapas.service');
 const {
     normalizarMatrizBody,
@@ -14,6 +15,8 @@ const {
     normalizeCotizacionPayload,
     calcularPrecioTotal,
     buildUpsertQuotationResponse,
+    mapCotizacionServicioRow,
+    splitServiciosPrincipalSecundarios,
 } = require('../services/cotizacionDto.service');
 const { mergeSolicitudIntoCotizacionCreate, loadSolicitudDataForCotizacion } = require('../services/solicitudCotizacionImport.service');
 const {
@@ -158,8 +161,8 @@ async function insertarServiciosCotizacion(dbConn, cotizacionId, serviciosList) 
         }
         const ins = await dbConn.query(
             `INSERT INTO COTIZACION_SERVICIO
-                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones)
-             VALUES (?,?,?,?,?,?,?,?)`,
+                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones, id_servicio_subservicio)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
             [
                 cotizacionId,
                 s.ID_Servicio,
@@ -169,6 +172,7 @@ async function insertarServiciosCotizacion(dbConn, cotizacionId, serviciosList) 
                 s.precio_comercial ?? null,
                 s.Principal,
                 s.indicaciones ?? null,
+                s.id_servicio_subservicio ?? null,
             ],
         );
         serviciosInsertados.push({
@@ -190,12 +194,17 @@ async function aplicarFlujoDesdeSolicitud(dbConn, cotizacionId, idSolicitud, ser
     if (!solicitudData) return { applied: false, reason: 'no_solicitud' };
 
     if (solicitudData.servicioPrincipal) {
-        const secundarioCounts = countOccurrences(solicitudData.serviciosSecundariosIds);
+        const subservicioIdSet = solicitudData.subservicioIds?.length
+            ? new Set(solicitudData.subservicioIds)
+            : null;
+        const secundarioCounts = subservicioIdSet
+            ? null
+            : countOccurrences(solicitudData.serviciosSecundariosIds);
         return importServicioFlujoToCotizacion(
             dbConn,
             cotizacionId,
             solicitudData.servicioPrincipal.ID_Servicio,
-            { secundarioCounts },
+            subservicioIdSet ? { subservicioIds: subservicioIdSet } : { secundarioCounts },
         );
     }
 
@@ -383,15 +392,20 @@ exports.getDetalles = async (req, res) => {
         // Nota: se agregó 'NULL as placa' por requerimiento especificado, aunque no exista en los servicios
         const servQuery = `
             SELECT 
-                NULL as placa,
+                c.id AS idCotizacionServicio,
+                c.ID_Servicio as idServicio,
+                c.Principal,
+                c.indicaciones,
+                c.id_servicio_subservicio,
                 c.fecha_inicio, 
                 c.fecha_finalizacion, 
+                c.jornada,
                 c.precio_comercial, 
                 s.nombre as nombre_servicio 
             FROM COTIZACION_SERVICIO c 
             LEFT JOIN SERVICIO s ON c.ID_Servicio = s.ID_Servicio 
             WHERE c.ID_Cotizacion = ?
-            ORDER BY c.id DESC`;
+            ORDER BY c.Principal ASC, c.id ASC`;
         const serviciosResult = await db.query(servQuery, [cotizacionId]);
 
         const mapByKey = (arr, key) => arr.reduce((obj, item) => {
@@ -400,10 +414,12 @@ exports.getDetalles = async (req, res) => {
         }, {});
         const inventarioObj = mapByKey(inventarioResult, 'id');
         const camionesObj = mapByKey(camionesResult, 'placa');
-        const serviciosObj = serviciosResult.reduce((obj, item, idx) => {
+        const serviciosMapped = serviciosResult.map((row) => mapCotizacionServicioRow(row));
+        const serviciosObj = serviciosMapped.reduce((obj, item, idx) => {
             obj[idx] = item;
             return obj;
         }, {});
+        const { servicio_principal, servicios_secundarios } = splitServiciosPrincipalSecundarios(serviciosMapped);
         res.json({
             comentario_cliente: cotizacionBase.comentario_cliente,
             fecha_emision: cotizacionBase.fecha_emision,
@@ -411,7 +427,9 @@ exports.getDetalles = async (req, res) => {
             observacion: cotizacionBase.observacion,
             inventario: inventarioObj,
             camiones: camionesObj,
-            servicios: serviciosObj
+            servicios: serviciosObj,
+            servicio_principal,
+            servicios_secundarios,
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -556,6 +574,9 @@ exports.getDetallesFranco = async (req, res) => {
             SELECT 
                 c.id AS idCotizacionServicio,
                 c.ID_Servicio as idServicio,
+                c.Principal,
+                c.indicaciones,
+                c.id_servicio_subservicio,
                 s.nombre as nombre_servicio,
                 c.fecha_inicio,
                 c.fecha_finalizacion,
@@ -564,17 +585,10 @@ exports.getDetallesFranco = async (req, res) => {
             FROM COTIZACION_SERVICIO c
             LEFT JOIN SERVICIO s ON c.ID_Servicio = s.ID_Servicio
             WHERE c.ID_Cotizacion = ? AND c.ID_Servicio != 7
-            ORDER BY c.id DESC`;
+            ORDER BY c.Principal ASC, c.id ASC`;
         const serviciosResult = await db.query(servQuery, [cotizacionId]);
-        const servicios = serviciosResult.map(row => ({
-            idCotizacionServicio: row.idCotizacionServicio,
-            idServicio: row.idServicio,
-            nombre: row.nombre_servicio,
-            fecha_inicio: row.fecha_inicio,
-            fecha_finalizacion: row.fecha_finalizacion,
-            jornada: row.jornada,
-            precio_comercial: row.precio_comercial,
-        }));
+        const servicios = serviciosResult.map((row) => mapCotizacionServicioRow(row));
+        const { servicio_principal, servicios_secundarios } = splitServiciosPrincipalSecundarios(servicios);
 
         // Verificar si existen mensajes en el chat de la cotización
         const chatCheck = await db.query(
@@ -598,14 +612,7 @@ exports.getDetallesFranco = async (req, res) => {
                 intencion: p.intencion,
                 dias_alquilados: p.diasAlquilados,
             })),
-            serviciosRows: servicios.map((s) => ({
-                idServicio: s.idServicio,
-                nombre: s.nombre,
-                fecha_inicio: s.fecha_inicio,
-                fecha_finalizacion: s.fecha_finalizacion,
-                jornada: s.jornada,
-                precio_comercial: s.precio_comercial,
-            })),
+            serviciosRows: servicios,
             camionesRows: camiones,
             costoRecojo: costoRecojo ? {
                 ...costoRecojo,
@@ -613,8 +620,11 @@ exports.getDetallesFranco = async (req, res) => {
             } : null,
         });
 
+        const phaseSummary = etapasTree.length ? summarizePhases(etapasTree) : null;
+
         res.json({
             id: base.ID,
+            id_solicitud: base.id_solicitud ?? null,
             ...upsertDto,
             // Legacy (compatibilidad con consumidores existentes)
             nombre: base.nombre || '',
@@ -625,6 +635,8 @@ exports.getDetallesFranco = async (req, res) => {
             camiones,
             costoRecojo,
             servicios,
+            servicio_principal,
+            servicios_secundarios,
             chat,
             condiciones: {
                 fechaEmision: base.fecha_emision ? new Date(base.fecha_emision).toISOString().split('T')[0] : null,
@@ -636,8 +648,8 @@ exports.getDetallesFranco = async (req, res) => {
                 tasaCompra: base.tacaCompra || 0,
                 tasaVenta: base.tasaVenta || 0,
             },
-            etapas: base.etapas !== undefined ? base.etapas : null,
-            duracion_etapa: base.duracion_etapa !== undefined ? base.duracion_etapa : null,
+            etapas: phaseSummary?.etapas ?? base.etapas ?? null,
+            duracion_etapa: phaseSummary?.duracion_etapa ?? base.duracion_etapa ?? null,
         });
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -683,15 +695,16 @@ exports.create = async (req, res) => {
     const solicitudParaFlujo = await loadSolicitudDataForCotizacion(db, id_solicitud);
     if (solicitudParaFlujo?.servicioPrincipal) {
         const principalId = solicitudParaFlujo.servicioPrincipal.ID_Servicio;
-        const indicacionesMap = new Map(
-            (solicitudParaFlujo.servicios || []).map((s) => [s.ID_Servicio, s.indicaciones]),
-        );
         serviciosList = serviciosList.map((s) => {
             const norm = normalizeServiceItem(s);
+            const src = solicitudParaFlujo.servicios.find((x) => x.ID_Servicio === norm.ID_Servicio
+                && toPrincipalEnum(x.Principal) === toPrincipalEnum(norm.Principal ?? (norm.ID_Servicio === principalId ? 'YES' : 'NO')));
+            const match = src || solicitudParaFlujo.servicios.find((x) => x.ID_Servicio === norm.ID_Servicio);
             return {
                 ...norm,
                 Principal: norm.ID_Servicio === principalId ? 'YES' : 'NO',
-                indicaciones: indicacionesMap.get(norm.ID_Servicio) ?? norm.indicaciones,
+                indicaciones: match?.indicaciones ?? norm.indicaciones,
+                id_servicio_subservicio: match?.id_servicio_subservicio ?? s.id_servicio_subservicio ?? s.id_subservicio ?? null,
             };
         });
     }
@@ -1013,10 +1026,19 @@ exports.getServicios = async (req, res) => {
     try {
         if (!(await ensureCotizacionVigente(req.params.id, res))) return;
         const rows = await db.query(
-            'SELECT CS.*, S.nombre as Servicio_Nombre FROM COTIZACION_SERVICIO CS LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio WHERE CS.ID_Cotizacion = ? ORDER BY CS.id DESC',
+            `SELECT CS.*, S.nombre as Servicio_Nombre, SS.ID_Servicio_subservicio AS subservicio_id_servicio
+             FROM COTIZACION_SERVICIO CS
+             LEFT JOIN SERVICIO S ON CS.ID_Servicio = S.ID_Servicio
+             LEFT JOIN SERVICIO_SUBSERVICIO SS ON CS.id_servicio_subservicio = SS.id
+             WHERE CS.ID_Cotizacion = ?
+             ORDER BY CS.Principal ASC, CS.id ASC`,
             [req.params.id],
         );
-        res.json(rows.map((r) => ({ ...r, Principal: principalToBoolean(r.Principal) })));
+        res.json(rows.map((r) => ({
+            ...r,
+            Principal: principalToBoolean(r.Principal),
+            id_subservicio: r.id_servicio_subservicio ?? null,
+        })));
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -1029,9 +1051,9 @@ exports.createServicio = async (req, res) => {
         }
         const result = await db.query(
             `INSERT INTO COTIZACION_SERVICIO
-                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones)
-             VALUES (?,?,?,?,?,?,?,?)`,
-            [req.params.id, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, 'NO', s.indicaciones ?? null],
+                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones, id_servicio_subservicio)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+            [req.params.id, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, 'NO', s.indicaciones ?? null, s.id_servicio_subservicio ?? null],
         );
         res.status(201).json({ message: 'Servicio en cotización creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1045,9 +1067,9 @@ exports.updateServicio = async (req, res) => {
     try {
         const result = await db.query(
             `UPDATE COTIZACION_SERVICIO
-             SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=?, indicaciones=?
+             SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=?, indicaciones=?, id_servicio_subservicio=?
              WHERE id=? AND ID_Cotizacion=?`,
-            [s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, s.indicaciones ?? null, req.params.sid, req.params.id],
+            [s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, s.indicaciones ?? null, s.id_servicio_subservicio ?? null, req.params.sid, req.params.id],
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio en cotización actualizado' });
