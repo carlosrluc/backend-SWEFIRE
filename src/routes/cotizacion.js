@@ -30,9 +30,19 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *         id: { type: string, description: ID_Inventario }
  *         nombre: { type: string }
  *         cantidad: { type: number }
- *         precio_unitario: { type: number }
+ *         precio_unitario: { type: number, description: 'Precio comercial unitario del objeto' }
  *         intencion: { type: string, enum: [comprar, alquilar] }
- *         dias_alquilados: { type: number, nullable: true }
+ *         dias_alquilados: { type: number, nullable: true, description: 'Opcional si hay servicio_a_alquilar; si no, días manuales' }
+ *         servicio_a_alquilar: { type: integer, nullable: true, description: 'id de COTIZACION_SERVICIO (solo tras crear la cotización)' }
+ *         idCotizacionServicio: { type: integer, nullable: true, description: 'Alias de servicio_a_alquilar en respuestas GET' }
+ *         serviceIndex: { type: integer, description: 'Índice en services[] del mismo POST (recomendado al crear)' }
+ *         ID_Servicio: { type: integer, description: 'ID del catálogo SERVICIO (alternativa a serviceIndex)' }
+ *         id_servicio_subservicio: { type: integer, description: 'Desambigua si hay varios servicios con el mismo ID_Servicio' }
+ *         Principal: { type: boolean, description: 'Filtra servicio principal/secundario al resolver por ID_Servicio' }
+ *         costo_comercial: { type: number, nullable: true, description: 'Costo_Comercial = precio_unitario × dias (solo alquilar). Calculado si se omite.' }
+ *         fecha_salida_taller: { type: string, format: date-time, nullable: true, description: 'Desde servicio vinculado o manual si alquilar sin FK' }
+ *         fecha_ingreso_taller: { type: string, format: date-time, nullable: true }
+ *         precio_linea: { type: number, description: 'comprar: precio×cantidad; alquilar: costo_comercial×cantidad (solo respuesta)' }
  *     UpsertQuotationServiceItem:
  *       type: object
  *       required: [id, startDate, dueDate, unitPrice]
@@ -680,13 +690,19 @@ router.get(
  *             required: [ID_Inventario]
  *             properties:
  *               ID_Inventario: { type: integer }
+ *               id: { type: integer, description: 'Alias de ID_Inventario' }
  *               cantidad: { type: integer }
  *               intencion: { type: string, enum: [comprar, alquilar] }
- *               dias_alquilados: { type: integer }
+ *               dias_alquilados: { type: integer, nullable: true }
+ *               servicio_a_alquilar: { type: integer, nullable: true, description: 'FK a COTIZACION_SERVICIO (solo alquilar)' }
+ *               idCotizacionServicio: { type: integer, nullable: true, description: 'Alias de servicio_a_alquilar' }
+ *               serviceIndex: { type: integer, description: 'Índice en services[] al crear junto con servicios' }
+ *               ID_Servicio: { type: integer }
  *               precio_comercial: { type: number }
- *               costo_comercial: { type: number }
- *               fecha_salida_taller: { type: string, format: date-time }
- *               fecha_ingreso_taller: { type: string, format: date-time }
+ *               precio_unitario: { type: number, description: 'Alias de precio_comercial' }
+ *               costo_comercial: { type: number, nullable: true }
+ *               fecha_salida_taller: { type: string, format: date-time, nullable: true }
+ *               fecha_ingreso_taller: { type: string, format: date-time, nullable: true }
  *               observaciones: { type: string }
  *     responses:
  *       201:
@@ -718,13 +734,19 @@ router.post('/:id/inventario', auth, permit(['abogado', 'trabajtaller', 'gerente
  *             type: object
  *             properties:
  *               ID_Inventario: { type: integer }
+ *               id: { type: integer }
  *               cantidad: { type: integer }
  *               intencion: { type: string, enum: [comprar, alquilar] }
- *               dias_alquilados: { type: integer }
+ *               dias_alquilados: { type: integer, nullable: true }
+ *               servicio_a_alquilar: { type: integer, nullable: true }
+ *               idCotizacionServicio: { type: integer, nullable: true }
+ *               serviceIndex: { type: integer }
+ *               ID_Servicio: { type: integer }
  *               precio_comercial: { type: number }
- *               costo_comercial: { type: number }
- *               fecha_salida_taller: { type: string, format: date-time }
- *               fecha_ingreso_taller: { type: string, format: date-time }
+ *               precio_unitario: { type: number }
+ *               costo_comercial: { type: number, nullable: true }
+ *               fecha_salida_taller: { type: string, format: date-time, nullable: true }
+ *               fecha_ingreso_taller: { type: string, format: date-time, nullable: true }
  *               observaciones: { type: string }
  *     responses:
  *       200:

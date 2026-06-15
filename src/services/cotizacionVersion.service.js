@@ -57,14 +57,17 @@ async function copyCotizacionChildren(executor, sourceId, targetId) {
         [sourceId],
     );
     for (const inv of inventarios) {
+        const nuevoServicioAlquiler = inv.servicio_a_alquilar != null && svcMap[inv.servicio_a_alquilar] != null
+            ? svcMap[inv.servicio_a_alquilar]
+            : inv.servicio_a_alquilar;
         await executor.query(
             `INSERT INTO COTIZACION_INVENTARIO
-                (ID_Cotizacion, ID_Inventario, cantidad, intencion, dias_alquilados, precio_comercial,
-                 fecha_salida_taller, fecha_ingreso_taller, observaciones, Costo_Comercial)
-             VALUES (?,?,?,?,?,?,?,?,?,?)`,
+                (ID_Cotizacion, ID_Inventario, cantidad, intencion, dias_alquilados, servicio_a_alquilar,
+                 precio_comercial, fecha_salida_taller, fecha_ingreso_taller, observaciones, Costo_Comercial)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
             [
                 targetId, inv.ID_Inventario, inv.cantidad, inv.intencion, inv.dias_alquilados,
-                inv.precio_comercial, inv.fecha_salida_taller, inv.fecha_ingreso_taller,
+                nuevoServicioAlquiler, inv.precio_comercial, inv.fecha_salida_taller, inv.fecha_ingreso_taller,
                 inv.observaciones, inv.Costo_Comercial,
             ],
         );

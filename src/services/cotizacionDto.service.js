@@ -45,14 +45,55 @@ function toDateTimeFin(value) {
 function normalizeInventoryItem(item) {
     const intencion = item.intencion;
     const diasRaw = item.dias_alquilados ?? item.diasAlquilados;
+    const hasServiceId = item.serviceId !== undefined && item.serviceId !== null && item.serviceId !== '';
     return {
         id: item.id ?? item.Id_Objeto ?? item.ID_Inventario,
         nombre: item.nombre ?? item.nombre_objeto ?? null,
         cantidad: Number(item.cantidad) || 0,
         precio_unitario: Number(item.precio_unitario ?? item.precioUnitario ?? item.precio_comercial ?? 0),
         intencion,
-        dias_alquilados: intencion === 'alquilar' ? (Number(diasRaw) || 0) : null,
+        dias_alquilados: intencion === 'alquilar'
+            ? (diasRaw !== undefined && diasRaw !== null && diasRaw !== '' ? Number(diasRaw) : null)
+            : null,
+        servicio_a_alquilar: item.servicio_a_alquilar ?? item.idCotizacionServicio ?? item.id_cotizacion_servicio ?? item.uso ?? null,
+        serviceIndex: item.serviceIndex ?? item.service_index ?? null,
+        ID_Servicio: item.ID_Servicio ?? item.idServicio ?? (hasServiceId ? Number(item.serviceId) : null),
+        id_servicio_subservicio: item.id_servicio_subservicio ?? item.id_subservicio ?? null,
+        Principal: item.Principal ?? item.principal ?? null,
+        observaciones: item.observaciones ?? null,
+        fecha_salida_taller: item.fecha_salida_taller ?? item.fechaSalidaTaller ?? null,
+        fecha_ingreso_taller: item.fecha_ingreso_taller ?? item.fechaIngresoTaller ?? null,
+        costo_comercial: item.costo_comercial ?? item.Costo_Comercial ?? item.costoComercial ?? null,
+        _itemIndex: item._itemIndex ?? item._truckIndex ?? null,
     };
+}
+
+function inventoryItemToServicioLookup(item, index = 0) {
+    return {
+        Placa: String(item.id ?? index),
+        uso: item.servicio_a_alquilar,
+        serviceIndex: item.serviceIndex,
+        ID_Servicio: item.ID_Servicio,
+        id_servicio_subservicio: item.id_servicio_subservicio,
+        Principal: item.Principal,
+        _truckIndex: item._itemIndex ?? index,
+    };
+}
+
+function calcularCostoComercialAlquiler(precioUnitario, dias) {
+    return Number(((Number(precioUnitario) || 0) * (Number(dias) || 0)).toFixed(2));
+}
+
+function calcularPrecioLineaInventario(item) {
+    const cantidad = Number(item.cantidad) || 0;
+    const precio = Number(item.precio_unitario) || 0;
+    if (item.intencion === 'alquilar') {
+        const dias = Number(item.dias_alquilados) || 0;
+        const costo = Number(item.costo_comercial ?? item.Costo_Comercial)
+            || calcularCostoComercialAlquiler(precio, dias);
+        return costo * cantidad;
+    }
+    return precio * cantidad;
 }
 
 function normalizeServiceItem(item) {
@@ -345,7 +386,7 @@ function calcularPrecioTotal({ productos, servicios, camiones, costoRecojo }) {
     let precioTotal = 0;
     if (Array.isArray(productos)) {
         precioTotal += productos.reduce(
-            (sum, p) => sum + ((Number(p.precio_unitario) || 0) * (Number(p.cantidad) || 0)),
+            (sum, p) => sum + calcularPrecioLineaInventario(p),
             0,
         );
     }
@@ -442,6 +483,18 @@ function buildUpsertQuotationResponse({
         dias_alquilados: row.intencion === 'alquilar'
             ? (Number(row.dias_alquilados ?? row.diasAlquilados) || 0)
             : null,
+        servicio_a_alquilar: row.servicio_a_alquilar ?? row.idCotizacionServicio ?? null,
+        idCotizacionServicio: row.servicio_a_alquilar ?? row.idCotizacionServicio ?? null,
+        costo_comercial: row.Costo_Comercial ?? row.costo_comercial ?? null,
+        fecha_salida_taller: row.fecha_salida_taller ?? row.fechaSalidaTaller ?? null,
+        fecha_ingreso_taller: row.fecha_ingreso_taller ?? row.fechaIngresoTaller ?? null,
+        precio_linea: calcularPrecioLineaInventario({
+            cantidad: row.cantidad,
+            precio_unitario: row.precio_unitario ?? row.precioUnitario ?? row.precio_comercial,
+            intencion: row.intencion,
+            dias_alquilados: row.dias_alquilados ?? row.diasAlquilados,
+            costo_comercial: row.Costo_Comercial ?? row.costo_comercial,
+        }),
     }));
 
     const services = serviciosRows.map((row) => mapCotizacionServicioToUpsertService(row));
@@ -507,6 +560,9 @@ function buildUpsertQuotationResponse({
 module.exports = {
     normalizarMatrizBody,
     normalizeInventoryItem,
+    inventoryItemToServicioLookup,
+    calcularCostoComercialAlquiler,
+    calcularPrecioLineaInventario,
     normalizeServiceItem,
     normalizeTruckItem,
     resolverServicioCotizacionParaCamion,

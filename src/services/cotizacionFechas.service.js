@@ -112,6 +112,31 @@ async function calcularDiasServicioCotizacion(executor, cotizacionId, svc, etapa
     return 0;
 }
 
+async function obtenerFechasDesdeCotizacionServicio(executor, cotizacionId, cotizacionServicioId) {
+    const rows = await executor.query(
+        'SELECT id, fecha_inicio, fecha_finalizacion FROM COTIZACION_SERVICIO WHERE id = ? AND ID_Cotizacion = ?',
+        [cotizacionServicioId, cotizacionId],
+    );
+    if (!rows.length) return null;
+    return {
+        id: rows[0].id,
+        fecha_inicio: rows[0].fecha_inicio,
+        fecha_finalizacion: rows[0].fecha_finalizacion,
+        fecha_hora_entrada: toDateTimeInicio(rows[0].fecha_inicio),
+        fecha_hora_salida: toDateTimeFin(rows[0].fecha_finalizacion),
+    };
+}
+
+function calcularDiasEntreFechas(inicio, fin) {
+    const a = toDateOnly(inicio);
+    const b = toDateOnly(fin);
+    if (!a || !b) return null;
+    const start = new Date(`${a}T00:00:00Z`);
+    const end = new Date(`${b}T00:00:00Z`);
+    const diff = Math.round((end - start) / 86400000);
+    return Math.max(1, diff + 1);
+}
+
 async function calcularPrecioLineaServicios(executor, cotizacionId, serviciosOverride = null) {
     const etapas = await executor.query(
         `SELECT orden, duracion FROM COTIZACION_ETAPA WHERE ID_Cotizacion = ? ORDER BY orden ASC`,
@@ -137,6 +162,37 @@ async function calcularPrecioLineaServicios(executor, cotizacionId, serviciosOve
         });
     }
     return { total, lineas };
+}
+
+async function sincronizarInventarioAlquilerCotizacion(executor, cotizacionId) {
+    const filas = await executor.query(
+        `SELECT ci.id, ci.precio_comercial, ci.dias_alquilados, ci.servicio_a_alquilar,
+                cs.fecha_inicio, cs.fecha_finalizacion
+         FROM COTIZACION_INVENTARIO ci
+         INNER JOIN COTIZACION_SERVICIO cs ON ci.servicio_a_alquilar = cs.id
+         WHERE ci.ID_Cotizacion = ? AND ci.intencion = 'alquilar'`,
+        [cotizacionId],
+    );
+    let updated = 0;
+    for (const row of filas) {
+        const dias = calcularDiasEntreFechas(row.fecha_inicio, row.fecha_finalizacion)
+            ?? (Number(row.dias_alquilados) || 0);
+        const costo = Number((Number(row.precio_comercial || 0) * dias).toFixed(2));
+        await executor.query(
+            `UPDATE COTIZACION_INVENTARIO
+             SET dias_alquilados = ?, fecha_salida_taller = ?, fecha_ingreso_taller = ?, Costo_Comercial = ?
+             WHERE id = ?`,
+            [
+                dias,
+                toDateTimeInicio(row.fecha_inicio),
+                toDateTimeFin(row.fecha_finalizacion),
+                costo,
+                row.id,
+            ],
+        );
+        updated += 1;
+    }
+    return { inventario_actualizado: updated };
 }
 
 async function sincronizarFechasCamionesCotizacion(executor, cotizacionId) {
@@ -168,5 +224,8 @@ module.exports = {
     aplicarFechasServiciosCotizacion,
     calcularPrecioLineaServicios,
     loadServiciosCotizacionParaPrecio,
+    obtenerFechasDesdeCotizacionServicio,
+    calcularDiasEntreFechas,
     sincronizarFechasCamionesCotizacion,
+    sincronizarInventarioAlquilerCotizacion,
 };

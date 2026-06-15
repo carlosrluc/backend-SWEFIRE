@@ -585,6 +585,7 @@ CREATE TABLE "COTIZACION_INVENTARIO" (
   "cantidad" int DEFAULT NULL,
   "intencion" enum('comprar','alquilar') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "dias_alquilados" int DEFAULT '0',
+  "servicio_a_alquilar" int DEFAULT NULL,
   "precio_comercial" decimal(12,2) DEFAULT NULL,
   "fecha_salida_taller" datetime DEFAULT NULL,
   "fecha_ingreso_taller" datetime DEFAULT NULL,
@@ -593,8 +594,10 @@ CREATE TABLE "COTIZACION_INVENTARIO" (
   PRIMARY KEY ("id"),
   KEY "ID_Cotizacion" ("ID_Cotizacion"),
   KEY "ID_Inventario" ("ID_Inventario"),
+  KEY "COTIZACION_INVENTARIO_idx_servicio_a_alquilar" ("servicio_a_alquilar"),
   CONSTRAINT "COTIZACION_INVENTARIO_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE,
-  CONSTRAINT "COTIZACION_INVENTARIO_ibfk_2" FOREIGN KEY ("ID_Inventario") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE
+  CONSTRAINT "COTIZACION_INVENTARIO_ibfk_2" FOREIGN KEY ("ID_Inventario") REFERENCES "INVENTARIO" ("Id_Objeto") ON DELETE CASCADE,
+  CONSTRAINT "COTIZACION_INVENTARIO_ibfk_servicio_a_alquilar" FOREIGN KEY ("servicio_a_alquilar") REFERENCES "COTIZACION_SERVICIO" ("id") ON DELETE SET NULL
 );
 
 
