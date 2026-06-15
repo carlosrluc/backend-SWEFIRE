@@ -474,7 +474,9 @@ router.post('/:id/foto', uploadServicioFoto.single('foto'), c.uploadFoto);
  *           schema:
  *             type: object
  *             properties:
- *               profesion: { type: string }
+ *               profesion:
+ *                 type: string
+ *                 enum: [bombero, "ingeniero de sistemas", "ingeniero sanitario", SSOMA, "Supervisor de planta", "ingeniero ambiental", mecanico, tecnico, arquitecto, piloto, otros]
  *               cantidad: { type: integer }
  *               disponibilidad: { type: string }
  *               requerimiento_legal: { type: string }
@@ -507,7 +509,9 @@ router.post('/:id/personal', c.createPersonal);
  *           schema:
  *             type: object
  *             properties:
- *               profesion: { type: string }
+ *               profesion:
+ *                 type: string
+ *                 enum: [bombero, "ingeniero de sistemas", "ingeniero sanitario", SSOMA, "Supervisor de planta", "ingeniero ambiental", mecanico, tecnico, arquitecto, piloto, otros]
  *               cantidad: { type: integer }
  *               disponibilidad: { type: string }
  *               requerimiento_legal: { type: string }

@@ -46,6 +46,7 @@ CREATE TABLE "PERFIL" (
   "alergias" text COLLATE utf8mb4_unicode_ci,
   "condicion_medica" text COLLATE utf8mb4_unicode_ci,
   "profesion" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "profesion_clasificacion" enum('bombero','ingeniero de sistemas','ingeniero sanitario','SSOMA','Supervisor de planta','ingeniero ambiental','mecanico','tecnico','arquitecto','piloto','otros') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "nro_cta_bancaria" varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "cv" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "foto_perfil" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -323,7 +324,7 @@ CREATE TABLE "SERVICIO_INVENTARIO_REQUERIDO" (
 CREATE TABLE "SERVICIO_PERSONAL_REQUERIDO" (
   "id" int NOT NULL AUTO_INCREMENT,
   "ID_Servicio" int NOT NULL,
-  "profesion" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "profesion" enum('bombero','ingeniero de sistemas','ingeniero sanitario','SSOMA','Supervisor de planta','ingeniero ambiental','mecanico','tecnico','arquitecto','piloto','otros') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "cantidad" int DEFAULT NULL,
   "disponibilidad" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "requerimiento_legal" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -627,7 +628,8 @@ CREATE TABLE "COTIZACION_SERVICIO" (
   "ID_Servicio" int NOT NULL,
   "fecha_inicio" date DEFAULT NULL,
   "fecha_finalizacion" date DEFAULT NULL,
-  "jornada" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "jornada_comienzo" time DEFAULT NULL,
+  "jornada_final" time DEFAULT NULL,
   "Principal" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
   "indicaciones" text COLLATE utf8mb4_unicode_ci,
   "id_servicio_subservicio" int DEFAULT NULL,
@@ -898,7 +900,8 @@ CREATE TABLE "PROYECTO_SERVICIO" (
   "id_cotizacion_servicio" int DEFAULT NULL,
   "fecha_inicio" date DEFAULT NULL,
   "fecha_finalizacion" date DEFAULT NULL,
-  "jornada" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "jornada_comienzo" time DEFAULT NULL,
+  "jornada_final" time DEFAULT NULL,
   "precio_comercial" decimal(12,2) DEFAULT NULL,
   "Principal" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
   "indicaciones" text COLLATE utf8mb4_unicode_ci,
@@ -1002,31 +1005,23 @@ CREATE TABLE "PROYECTO_INVENTARIO" (
 CREATE TABLE "TRABAJO" (
   "Id_trabajo" int NOT NULL AUTO_INCREMENT,
   "Id_Proyecto" int NOT NULL,
-  "fecha" date DEFAULT NULL,
-  "horario" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "dia" date DEFAULT NULL,
+  "horario_entrada" time DEFAULT NULL,
+  "horario_salida" time DEFAULT NULL,
+  "DNI_Trabajador" varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "profesion" enum('bombero','ingeniero de sistemas','ingeniero sanitario','SSOMA','Supervisor de planta','ingeniero ambiental','mecanico','tecnico','arquitecto','piloto','otros') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "ID_Servicio" int DEFAULT NULL,
   "comentario" text COLLATE utf8mb4_unicode_ci,
   "asistencia" enum('Programada','Cancelada','Realizada') COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("Id_trabajo"),
   KEY "TRABAJO_ibfk_1" ("Id_Proyecto"),
+  KEY "TRABAJO_idx_dia" ("dia"),
+  KEY "TRABAJO_ibfk_dni" ("DNI_Trabajador"),
+  KEY "TRABAJO_ibfk_servicio" ("ID_Servicio"),
   CONSTRAINT "fk_trabajo_proyecto" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT "TRABAJO_ibfk_1" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE RESTRICT ON UPDATE RESTRICT
-);
-
-
--- swefire_db.TRABAJO_JORNADA definition
-
-CREATE TABLE "TRABAJO_JORNADA" (
-  "id" int NOT NULL AUTO_INCREMENT,
-  "Id_trabajo" int NOT NULL,
-  "DNI_Trabajador" varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  "dia" date DEFAULT NULL,
-  "horario_entrada" time DEFAULT NULL,
-  "horario_salida" time DEFAULT NULL,
-  PRIMARY KEY ("id"),
-  KEY "Id_trabajo" ("Id_trabajo"),
-  KEY "DNI_Trabajador" ("DNI_Trabajador"),
-  CONSTRAINT "TRABAJO_JORNADA_ibfk_1" FOREIGN KEY ("Id_trabajo") REFERENCES "TRABAJO" ("Id_trabajo") ON DELETE CASCADE,
-  CONSTRAINT "TRABAJO_JORNADA_ibfk_2" FOREIGN KEY ("DNI_Trabajador") REFERENCES "PERFIL" ("DNI") ON DELETE CASCADE
+  CONSTRAINT "TRABAJO_ibfk_1" FOREIGN KEY ("Id_Proyecto") REFERENCES "PROYECTO" ("id_Proyecto") ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT "TRABAJO_ibfk_dni_trabajador" FOREIGN KEY ("DNI_Trabajador") REFERENCES "PERFIL" ("DNI") ON DELETE SET NULL,
+  CONSTRAINT "TRABAJO_ibfk_servicio" FOREIGN KEY ("ID_Servicio") REFERENCES "SERVICIO" ("ID_Servicio") ON DELETE SET NULL
 );
 
 

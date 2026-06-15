@@ -55,6 +55,47 @@ const { uploadPDF, uploadImage } = require('../middlewares/upload.middleware');
  */
 router.get('/trabajadores/disponibles', c.getTrabajadoresDisponibles);
 
+/**
+ * @openapi
+ * /api/perfiles/disponibles:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Profesionales disponibles por clasificación y fecha
+ *     description: |
+ *       Filtra por `profesion_clasificacion`. Si la profesión es **piloto**, exige brevete vigente (PERFIL_BREVETE).
+ *       Excluye perfiles ya asignados en TRABAJO para la fecha indicada.
+ *     parameters:
+ *       - in: query
+ *         name: fecha
+ *         required: true
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: profesion
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [bombero, "ingeniero de sistemas", "ingeniero sanitario", SSOMA, "Supervisor de planta", "ingeniero ambiental", mecanico, tecnico, arquitecto, piloto, otros]
+ *     responses:
+ *       200:
+ *         description: Lista de profesionales disponibles
+ */
+router.get('/disponibles', c.getProfesionalesDisponibles);
+
+/**
+ * @openapi
+ * /api/perfiles/conductores/disponibles:
+ *   get:
+ *     tags: [Perfil]
+ *     summary: Pilotos disponibles con brevete (alias de profesion=piloto)
+ *     parameters:
+ *       - in: query
+ *         name: fecha
+ *         required: true
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Lista de pilotos disponibles
+ */
 router.get('/conductores/disponibles', c.getConductoresDisponibles);
 
 /**

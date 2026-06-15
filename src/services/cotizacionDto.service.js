@@ -36,6 +36,8 @@ function toDateTimeInicio(value) {
     return `${datePart} 00:00:00`;
 }
 
+const { resolveJornadaFromItem, formatJornadaSchedule } = require('../utils/jornada.utils');
+
 function toDateTimeFin(value) {
     const datePart = formatMysqlDatePart(value);
     if (!datePart) return null;
@@ -98,11 +100,13 @@ function calcularPrecioLineaInventario(item) {
 
 function normalizeServiceItem(item) {
     const idServicio = item.ID_Servicio ?? item.idServicio ?? item.id;
+    const jornada = resolveJornadaFromItem(item);
     return {
         ID_Servicio: idServicio !== undefined && idServicio !== null ? Number(idServicio) : null,
         fecha_inicio: toDateOnly(item.fecha_inicio ?? item.startDate),
         fecha_finalizacion: toDateOnly(item.fecha_finalizacion ?? item.dueDate ?? item.endDate),
-        jornada: item.jornada ?? item.schedule ?? null,
+        jornada_comienzo: jornada.jornada_comienzo,
+        jornada_final: jornada.jornada_final,
         precio_comercial: item.precio_comercial ?? item.unitPrice ?? item.precioComercial ?? null,
         Principal: item.Principal,
         indicaciones: item.indicaciones ?? null,
@@ -421,13 +425,17 @@ function parsePhasesFromRow(base) {
 function mapCotizacionServicioRow(row) {
     const principalRaw = row.Principal;
     const Principal = principalRaw === 'YES' || principalRaw === true;
+    const jornadaComienzo = row.jornada_comienzo ?? null;
+    const jornadaFinal = row.jornada_final ?? null;
     return {
         idCotizacionServicio: row.idCotizacionServicio ?? row.id ?? null,
         idServicio: row.idServicio ?? row.ID_Servicio ?? null,
         nombre: row.nombre ?? row.nombre_servicio ?? row.name ?? row._name ?? null,
         fecha_inicio: row.fecha_inicio ?? null,
         fecha_finalizacion: row.fecha_finalizacion ?? null,
-        jornada: row.jornada ?? null,
+        jornada_comienzo: jornadaComienzo,
+        jornada_final: jornadaFinal,
+        jornada: formatJornadaSchedule(jornadaComienzo, jornadaFinal),
         precio_comercial: row.precio_comercial ?? null,
         Principal,
         indicaciones: row.indicaciones ?? null,
@@ -455,7 +463,11 @@ function mapCotizacionServicioToUpsertService(row) {
         name: mapped.nombre ?? undefined,
         startDate: toDateOnly(mapped.fecha_inicio),
         dueDate: toDateOnly(mapped.fecha_finalizacion),
+        scheduleStart: mapped.jornada_comienzo ? String(mapped.jornada_comienzo).slice(0, 8) : null,
+        scheduleEnd: mapped.jornada_final ? String(mapped.jornada_final).slice(0, 8) : null,
         schedule: mapped.jornada ?? '',
+        jornada_comienzo: mapped.jornada_comienzo,
+        jornada_final: mapped.jornada_final,
         unitPrice: Number(mapped.precio_comercial ?? 0),
         Principal: mapped.Principal,
         indicaciones: mapped.indicaciones,

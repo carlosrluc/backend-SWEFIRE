@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const { assertProfesionClasificacion } = require('../constants/profesionClasificacion');
 const fs = require('fs');
 const path = require('path');
 const {
@@ -235,9 +236,10 @@ exports.getPersonal = async (req, res) => {
 exports.createPersonal = async (req, res) => {
     const { profesion, cantidad, disponibilidad, requerimiento_legal } = req.body;
     try {
+        const profesionNorm = assertProfesionClasificacion(profesion, { required: true });
         const result = await db.query(
             'INSERT INTO SERVICIO_PERSONAL_REQUERIDO (ID_Servicio,profesion,cantidad,disponibilidad,requerimiento_legal) VALUES (?,?,?,?,?)',
-            [req.params.id, profesion, cantidad, disponibilidad, requerimiento_legal]
+            [req.params.id, profesionNorm, cantidad, disponibilidad, requerimiento_legal]
         );
         res.status(201).json({ message: 'Personal requerido creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -246,9 +248,10 @@ exports.createPersonal = async (req, res) => {
 exports.updatePersonal = async (req, res) => {
     const { profesion, cantidad, disponibilidad, requerimiento_legal } = req.body;
     try {
+        const profesionNorm = assertProfesionClasificacion(profesion, { required: true });
         const result = await db.query(
             'UPDATE SERVICIO_PERSONAL_REQUERIDO SET profesion=?, cantidad=?, disponibilidad=?, requerimiento_legal=? WHERE id=? AND ID_Servicio=?',
-            [profesion, cantidad, disponibilidad, requerimiento_legal, req.params.pid, req.params.id]
+            [profesionNorm, cantidad, disponibilidad, requerimiento_legal, req.params.pid, req.params.id]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Personal requerido actualizado' });

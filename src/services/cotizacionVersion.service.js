@@ -45,9 +45,9 @@ async function copyCotizacionChildren(executor, sourceId, targetId) {
     for (const s of servicios) {
         const ins = await executor.query(
             `INSERT INTO COTIZACION_SERVICIO
-                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial)
-             VALUES (?,?,?,?,?,?)`,
-            [targetId, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial],
+                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada_comienzo, jornada_final, precio_comercial)
+             VALUES (?,?,?,?,?,?,?)`,
+            [targetId, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada_comienzo, s.jornada_final, s.precio_comercial],
         );
         svcMap[s.id] = ins.insertId;
     }

@@ -1,5 +1,9 @@
 const db = require('../config/db');
 const { formatQuotation } = require('./cotizacion.controller');
+const {
+    assertProfesionClasificacion,
+    PROFESION_CLASIFICACION_VALUES,
+} = require('../constants/profesionClasificacion');
 
 const normalizeRol = (rol) => {
     if (!rol) return null;
@@ -8,7 +12,7 @@ const normalizeRol = (rol) => {
 
 const CAMPOS_PERFIL_CLIENTE = [
     'DNI', 'Nombre', 'Apellido', 'Genero', 'RUC',
-    'correo_contacto', 'telefono_contacto', 'foto_perfil', 'profesion',
+    'correo_contacto', 'telefono_contacto', 'foto_perfil', 'profesion', 'profesion_clasificacion',
 ];
 
 const formatearPerfilPorRol = (row, brevetes, educacion, certificaciones) => {
@@ -290,18 +294,19 @@ exports.create = async (req, res) => {
     const { DNI, Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
         telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
         aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
-        profesion, nro_cta_bancaria } = req.body;
+        profesion, profesion_clasificacion, nro_cta_bancaria } = req.body;
     try {
+        const profesionClasificacion = assertProfesionClasificacion(profesion_clasificacion, { required: false });
         await db.query(
             `INSERT INTO PERFIL (DNI,Nombre,Apellido,Genero,RUC,fecha_nacimiento,
              correo_contacto,telefono_contacto,estado_civil,distrito_residencia,
              seguro_vida_ley,aficiones,experiencia,comentarios,estado,alergias,
-             condicion_medica,profesion,nro_cta_bancaria)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             condicion_medica,profesion,profesion_clasificacion,nro_cta_bancaria)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [DNI, Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
              telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
              aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
-             profesion, nro_cta_bancaria]
+             profesion, profesionClasificacion, nro_cta_bancaria]
         );
         res.status(201).json({ message: 'Perfil creado', DNI });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -311,18 +316,21 @@ exports.update = async (req, res) => {
     const { Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
         telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
         aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
-        profesion, nro_cta_bancaria } = req.body;
+        profesion, profesion_clasificacion, nro_cta_bancaria } = req.body;
     try {
+        const profesionClasificacion = profesion_clasificacion !== undefined
+            ? assertProfesionClasificacion(profesion_clasificacion, { required: false })
+            : undefined;
         const result = await db.query(
             `UPDATE PERFIL SET Nombre=?,Apellido=?,Genero=?,RUC=?,fecha_nacimiento=?,
              correo_contacto=?,telefono_contacto=?,estado_civil=?,distrito_residencia=?,
              seguro_vida_ley=?,aficiones=?,experiencia=?,comentarios=?,estado=?,
-             alergias=?,condicion_medica=?,profesion=?,nro_cta_bancaria=?
+             alergias=?,condicion_medica=?,profesion=?,profesion_clasificacion=?,nro_cta_bancaria=?
              WHERE DNI=?`,
             [Nombre, Apellido, Genero, RUC, fecha_nacimiento, correo_contacto,
              telefono_contacto, estado_civil, distrito_residencia, seguro_vida_ley,
              aficiones, experiencia, comentarios, estado, alergias, condicion_medica,
-             profesion, nro_cta_bancaria, req.params.dni]
+             profesion, profesionClasificacion, nro_cta_bancaria, req.params.dni]
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Perfil actualizado' });
@@ -528,14 +536,13 @@ exports.getTrabajadoresDisponibles = async (req, res) => {
         }
 
         const sql = `
-            SELECT p.DNI as dni, p.Nombre as nombre, p.Apellido as apellidos, u.rol
+            SELECT p.DNI as dni, p.Nombre as nombre, p.Apellido as apellidos, p.profesion_clasificacion, u.rol
             FROM PERFIL p
             JOIN USUARIO u ON p.DNI = u.dni_perfil
             WHERE (LOWER(u.rol) IN ('supervisorcampo', 'trabajtaller', 'trabajcampo'))
+            AND p.estado != 'inhabilitado'
             AND p.DNI NOT IN (
-                SELECT DNI_Trabajador 
-                FROM TRABAJO_JORNADA 
-                WHERE dia = ?
+                SELECT DNI_Trabajador FROM TRABAJO WHERE dia = ? AND DNI_Trabajador IS NOT NULL
             )
             ORDER BY p.DNI DESC
         `;
@@ -547,30 +554,42 @@ exports.getTrabajadoresDisponibles = async (req, res) => {
 };
 
 exports.getConductoresDisponibles = async (req, res) => {
-    const { fecha } = req.query;
+    req.query.profesion = 'piloto';
+    return exports.getProfesionalesDisponibles(req, res);
+};
+
+exports.getProfesionalesDisponibles = async (req, res) => {
+    const { fecha, profesion } = req.query;
     try {
         if (!fecha) {
             return res.status(400).json({ error: 'Se requiere el parámetro fecha (YYYY-MM-DD)' });
         }
+        if (!profesion) {
+            return res.status(400).json({
+                error: 'Se requiere el parámetro profesion',
+                valores_permitidos: PROFESION_CLASIFICACION_VALUES,
+            });
+        }
 
-        // Buscamos perfiles que:
-        // 1. Tengan al menos un registro en PERFIL_BREVETE (tienen licencia)
-        // 2. No tengan una jornada asignada en la fecha indicada en TRABAJO_JORNADA
-        // 3. Tengan uno de los roles solicitados
+        const profesionNorm = assertProfesionClasificacion(profesion, { required: true });
+        let breveteJoin = '';
+        if (profesionNorm === 'piloto') {
+            breveteJoin = 'INNER JOIN PERFIL_BREVETE b ON p.DNI = b.DNI_perfil';
+        }
+
         const sql = `
-            SELECT DISTINCT p.DNI, p.Nombre, p.Apellido, u.rol, p.estado
+            SELECT DISTINCT p.DNI, p.Nombre, p.Apellido, p.profesion_clasificacion, u.rol, p.estado
             FROM PERFIL p
-            JOIN PERFIL_BREVETE b ON p.DNI = b.DNI_perfil
+            ${breveteJoin}
             LEFT JOIN USUARIO u ON p.DNI = u.dni_perfil
-            WHERE (LOWER(u.rol) IN ('supervisorcampo', 'trabajtaller', 'trabajcampo'))
+            WHERE p.profesion_clasificacion = ?
+            AND p.estado != 'inhabilitado'
             AND p.DNI NOT IN (
-                SELECT DNI_Trabajador 
-                FROM TRABAJO_JORNADA 
-                WHERE dia = ?
+                SELECT DNI_Trabajador FROM TRABAJO WHERE dia = ? AND DNI_Trabajador IS NOT NULL
             )
             ORDER BY p.DNI DESC
         `;
-        const rows = await db.query(sql, [fecha]);
+        const rows = await db.query(sql, [profesionNorm, fecha]);
         res.json(rows);
     } catch (e) {
         res.status(500).json({ error: e.message });
@@ -660,8 +679,16 @@ exports.getIncidenciasPorPerfil = async (req, res) => {
 
 // ── TABLAS CON PK DE PERFIL ───────────────────────────────────────────────────
 exports.getTrabajosJornadaPorPerfil = async (req, res) => {
-    try { res.json(await db.query('SELECT * FROM TRABAJO_JORNADA WHERE DNI_Trabajador = ? ORDER BY id DESC', [req.params.dni])); }
-    catch (e) { res.status(500).json({ error: e.message }); }
+    try {
+        res.json(await db.query(
+            `SELECT t.*, pr.descripcion_servicio, pr.id_Proyecto
+             FROM TRABAJO t
+             LEFT JOIN PROYECTO pr ON t.Id_Proyecto = pr.id_Proyecto
+             WHERE t.DNI_Trabajador = ?
+             ORDER BY t.dia DESC, t.Id_trabajo DESC`,
+            [req.params.dni],
+        ));
+    } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.getTrabajosRRHHPorPerfil = async (req, res) => {

@@ -52,7 +52,11 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *         name: { type: string }
  *         startDate: { type: string, format: date }
  *         dueDate: { type: string, format: date }
- *         schedule: { type: string, description: jornada / horario }
+ *         scheduleStart: { type: string, format: time, example: "08:00:00", description: 'Hora inicio jornada' }
+ *         scheduleEnd: { type: string, format: time, example: "17:00:00", description: 'Hora fin jornada' }
+ *         schedule: { type: string, description: 'Legacy — texto "08:00 - 17:00" (solo lectura en respuestas)' }
+ *         jornada_comienzo: { type: string, format: time }
+ *         jornada_final: { type: string, format: time }
  *         unitPrice: { type: number }
  *         Principal: { type: boolean }
  *         pago_por_dia: { type: boolean, description: 'Heredado de SERVICIO; si true precio × días' }
@@ -68,7 +72,8 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *         nombre: { type: string, example: "Instalación de Sistema de Rociadores (Sprinklers)" }
  *         fecha_inicio: { type: string, format: date, example: "2026-06-10" }
  *         fecha_finalizacion: { type: string, format: date, example: "2026-06-20" }
- *         jornada: { type: string, example: "08:00 - 17:00" }
+ *         jornada_comienzo: { type: string, format: time, example: "08:00:00" }
+ *         jornada_final: { type: string, format: time, example: "17:00:00" }
  *         precio_comercial: { type: number, example: 15000 }
  *         Principal: { type: boolean, example: true }
  *         indicaciones: { type: string, nullable: true, example: "Servicio principal con flujo de 3 etapas." }
@@ -470,7 +475,8 @@ router.get('/:id/detalles-franco', auth, permit(['cliente', 'abogado', 'trabajta
  *               ID_Servicio: { type: integer }
  *               fecha_inicio: { type: string, format: date }
  *               fecha_finalizacion: { type: string, format: date }
- *               jornada: { type: string }
+ *               jornada_comienzo: { type: string, format: time }
+ *               jornada_final: { type: string, format: time }
  *               precio_comercial: { type: number }
  *               indicaciones: { type: string, nullable: true }
  *               id_servicio_subservicio: { type: integer, nullable: true, description: 'No se puede marcar Principal aquí' }
@@ -506,7 +512,8 @@ router.post('/:id/servicios', auth, permit(['abogado', 'trabajtaller', 'gerente'
  *               ID_Servicio: { type: integer }
  *               fecha_inicio: { type: string, format: date }
  *               fecha_finalizacion: { type: string, format: date }
- *               jornada: { type: string }
+ *               jornada_comienzo: { type: string, format: time }
+ *               jornada_final: { type: string, format: time }
  *               precio_comercial: { type: number }
  *               indicaciones: { type: string, nullable: true }
  *               id_servicio_subservicio: { type: integer, nullable: true, description: 'No se puede marcar Principal aquí' }

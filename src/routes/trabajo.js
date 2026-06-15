@@ -6,9 +6,7 @@ const { uploadPDF } = require('../middlewares/upload.middleware');
  * @openapi
  * tags:
  *   - name: Trabajo
- *     description: Gestión de jornadas de trabajo
- *   - name: Trabajo - Jornada
- *     description: Jornadas detalladas por trabajador
+ *     description: Jornadas de trabajo por proyecto (un registro = un día de un trabajador)
  *   - name: Trabajo - RRHH
  *     description: Datos de RRHH del trabajo
  *   - name: Trabajo - RRHH PDFs
@@ -17,28 +15,56 @@ const { uploadPDF } = require('../middlewares/upload.middleware');
 
 /**
  * @openapi
+ * components:
+ *   schemas:
+ *     TrabajoItem:
+ *       type: object
+ *       properties:
+ *         Id_trabajo: { type: integer }
+ *         Id_Proyecto: { type: integer }
+ *         ID_Servicio: { type: integer, nullable: true }
+ *         dia: { type: string, format: date }
+ *         horario_entrada: { type: string, example: "08:00:00" }
+ *         horario_salida: { type: string, example: "17:00:00" }
+ *         DNI_Trabajador: { type: string, nullable: true, description: 'NULL hasta asignar trabajador' }
+ *         profesion:
+ *           type: string
+ *           enum: [bombero, "ingeniero de sistemas", "ingeniero sanitario", SSOMA, "Supervisor de planta", "ingeniero ambiental", mecanico, tecnico, arquitecto, piloto, otros]
+ *         asistencia: { type: string, enum: [Programada, Cancelada, Realizada] }
+ *         comentario: { type: string, nullable: true }
+ */
+
+/**
+ * @openapi
  * /api/trabajos:
  *   get:
  *     tags: [Trabajo]
- *     summary: Listar todos los trabajos
+ *     summary: Listar trabajos (jornadas)
+ *     parameters:
+ *       - in: query
+ *         name: Id_Proyecto
+ *         schema: { type: integer }
+ *       - in: query
+ *         name: dia
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: profesion
+ *         schema: { type: string }
+ *       - in: query
+ *         name: DNI_Trabajador
+ *         schema: { type: string }
  *     responses:
  *       200:
- *         description: Lista de trabajos
+ *         description: Lista paginada de trabajos
  *   post:
  *     tags: [Trabajo]
- *     summary: Crear un trabajo
+ *     summary: Crear jornada de trabajo
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               Id_Proyecto: { type: integer }
- *               fecha: { type: string, format: date }
- *               horario: { type: string }
- *               asistencia: { type: string, enum: [Programada, Cancelada, Realizada] }
- *               comentario: { type: string }
+ *             $ref: '#/components/schemas/TrabajoItem'
  *     responses:
  *       201:
  *         description: Trabajo creado
@@ -48,53 +74,38 @@ router.post('/', c.create);
 
 /**
  * @openapi
+ * /api/trabajos/proyecto/{proyectoId}:
+ *   get:
+ *     tags: [Trabajo]
+ *     summary: Listar todas las jornadas de un proyecto
+ *     parameters:
+ *       - in: path
+ *         name: proyectoId
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Lista de jornadas del proyecto
+ */
+router.get('/proyecto/:proyectoId', c.getByProyecto);
+
+/**
+ * @openapi
  * /api/trabajos/{id}:
  *   get:
  *     tags: [Trabajo]
  *     summary: Obtener trabajo por ID
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Trabajo encontrado
- *       404:
- *         description: No encontrado
  *   put:
  *     tags: [Trabajo]
- *     summary: Actualizar trabajo
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
+ *     summary: Actualizar trabajo (asignar DNI_Trabajador, asistencia, etc.)
  *     requestBody:
- *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               fecha: { type: string, format: date }
- *               horario: { type: string }
- *               asistencia: { type: string, enum: [Programada, Cancelada, Realizada] }
- *               comentario: { type: string }
- *     responses:
- *       200:
- *         description: Actualizado
+ *             $ref: '#/components/schemas/TrabajoItem'
  *   delete:
  *     tags: [Trabajo]
  *     summary: Eliminar trabajo
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Eliminado
  */
 router.get('/:id', c.getById);
 router.put('/:id', c.update);
@@ -102,170 +113,18 @@ router.delete('/:id', c.remove);
 
 /**
  * @openapi
- * /api/trabajos/{id}/jornadas:
- *   get:
- *     tags: [Trabajo - Jornada]
- *     summary: Listar jornadas del trabajo
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Lista de jornadas
- *   post:
- *     tags: [Trabajo - Jornada]
- *     summary: Registrar jornada de un trabajador
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [DNI_Trabajador]
- *             properties:
- *               DNI_Trabajador: { type: string }
- *               dia: { type: string, format: date }
- *               horario_entrada: { type: string, example: "08:00:00" }
- *               horario_salida: { type: string, example: "17:00:00" }
- *     responses:
- *       201:
- *         description: Jornada creada
- */
-router.get('/:id/jornadas', c.getJornadas);
-router.post('/:id/jornadas', c.createJornada);
-
-/**
- * @openapi
- * /api/trabajos/{id}/jornadas/{jid}:
- *   delete:
- *     tags: [Trabajo - Jornada]
- *     summary: Eliminar jornada
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *       - in: path
- *         name: jid
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Jornada eliminada
- */
-router.delete('/:id/jornadas/:jid', c.deleteJornada);
-
-/**
- * @openapi
  * /api/trabajos/{id}/rrhh:
  *   get:
  *     tags: [Trabajo - RRHH]
  *     summary: Listar registros RRHH del trabajo
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Lista de RRHH
  *   post:
  *     tags: [Trabajo - RRHH]
  *     summary: Registrar RRHH de trabajador
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [DNI_Trabajador]
- *             properties:
- *               DNI_Trabajador: { type: string }
- *               estado_pago: { type: string, enum: [completado, "por realizar", "no pagar aun", "devolucion pendiente"] }
- *     responses:
- *       201:
- *         description: RRHH creado
  */
 router.get('/:id/rrhh', c.getRRHH);
 router.post('/:id/rrhh', c.createRRHH);
 
-/**
- * @openapi
- * /api/trabajos/{id}/rrhh/{rid}:
- *   delete:
- *     tags: [Trabajo - RRHH]
- *     summary: Eliminar registro RRHH
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *       - in: path
- *         name: rid
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Eliminado
- */
 router.delete('/:id/rrhh/:rid', c.deleteRRHH);
-
-/**
- * @openapi
- * /api/trabajos/{id}/rrhh/{rid}/pdf:
- *   get:
- *     tags: [Trabajo - RRHH]
- *     summary: Descargar o visualizar PDF del registro RRHH
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *       - in: path
- *         name: rid
- *         required: true
- *         schema: { type: integer }
- *     responses:
- *       200:
- *         description: Archivo PDF
- *   post:
- *     tags: [Trabajo - RRHH]
- *     summary: Subir PDF al registro RRHH
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: integer }
- *       - in: path
- *         name: rid
- *         required: true
- *         schema: { type: integer }
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               pdf_RRHH:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Archivo PDF subido
- */
 router.get('/:id/rrhh/:rid/pdf', c.getRRHHPDF);
 router.post('/:id/rrhh/:rid/pdf', uploadPDF.single('pdf_RRHH'), c.uploadRRHHPDF);
 

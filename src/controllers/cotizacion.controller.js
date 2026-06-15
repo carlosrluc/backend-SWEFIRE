@@ -282,14 +282,15 @@ async function insertarServiciosCotizacion(dbConn, cotizacionId, serviciosList) 
         }
         const ins = await dbConn.query(
             `INSERT INTO COTIZACION_SERVICIO
-                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones, id_servicio_subservicio)
-             VALUES (?,?,?,?,?,?,?,?,?)`,
+                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada_comienzo, jornada_final, precio_comercial, Principal, indicaciones, id_servicio_subservicio)
+             VALUES (?,?,?,?,?,?,?,?,?,?)`,
             [
                 cotizacionId,
                 s.ID_Servicio,
                 s.fecha_inicio || null,
                 s.fecha_finalizacion || null,
-                s.jornada || null,
+                s.jornada_comienzo || null,
+                s.jornada_final || null,
                 s.precio_comercial ?? null,
                 s.Principal,
                 s.indicaciones ?? null,
@@ -521,7 +522,8 @@ exports.getDetalles = async (req, res) => {
                 c.id_servicio_subservicio,
                 c.fecha_inicio, 
                 c.fecha_finalizacion, 
-                c.jornada,
+                c.jornada_comienzo,
+                c.jornada_final,
                 c.precio_comercial, 
                 s.nombre as nombre_servicio 
             FROM COTIZACION_SERVICIO c 
@@ -719,7 +721,8 @@ exports.getDetallesFranco = async (req, res) => {
                 s.pago_por_dia,
                 c.fecha_inicio,
                 c.fecha_finalizacion,
-                c.jornada,
+                c.jornada_comienzo,
+                c.jornada_final,
                 c.precio_comercial
             FROM COTIZACION_SERVICIO c
             LEFT JOIN SERVICIO s ON c.ID_Servicio = s.ID_Servicio
@@ -1263,9 +1266,9 @@ exports.createServicio = async (req, res) => {
         }
         const result = await db.query(
             `INSERT INTO COTIZACION_SERVICIO
-                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada, precio_comercial, Principal, indicaciones, id_servicio_subservicio)
-             VALUES (?,?,?,?,?,?,?,?,?)`,
-            [req.params.id, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, 'NO', s.indicaciones ?? null, s.id_servicio_subservicio ?? null],
+                (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada_comienzo, jornada_final, precio_comercial, Principal, indicaciones, id_servicio_subservicio)
+             VALUES (?,?,?,?,?,?,?,?,?,?)`,
+            [req.params.id, s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada_comienzo, s.jornada_final, s.precio_comercial, 'NO', s.indicaciones ?? null, s.id_servicio_subservicio ?? null],
         );
         res.status(201).json({ message: 'Servicio en cotización creado', id: result.insertId });
     } catch (e) { res.status(500).json({ error: e.message }); }
@@ -1279,9 +1282,9 @@ exports.updateServicio = async (req, res) => {
     try {
         const result = await db.query(
             `UPDATE COTIZACION_SERVICIO
-             SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada=?, precio_comercial=?, indicaciones=?, id_servicio_subservicio=?
+             SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada_comienzo=?, jornada_final=?, precio_comercial=?, indicaciones=?, id_servicio_subservicio=?
              WHERE id=? AND ID_Cotizacion=?`,
-            [s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada, s.precio_comercial, s.indicaciones ?? null, s.id_servicio_subservicio ?? null, req.params.sid, req.params.id],
+            [s.ID_Servicio, s.fecha_inicio, s.fecha_finalizacion, s.jornada_comienzo, s.jornada_final, s.precio_comercial, s.indicaciones ?? null, s.id_servicio_subservicio ?? null, req.params.sid, req.params.id],
         );
         if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
         res.json({ message: 'Servicio en cotización actualizado' });
