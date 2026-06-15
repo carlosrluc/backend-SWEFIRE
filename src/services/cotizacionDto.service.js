@@ -40,15 +40,83 @@ function normalizeServiceItem(item) {
 }
 
 function normalizeTruckItem(item, index = 0) {
+    const hasServiceId = item.serviceId !== undefined && item.serviceId !== null && item.serviceId !== '';
     return {
         Placa: item.Placa ?? item.placa ?? item.plate,
-        uso: item.uso ?? item.serviceIndex ?? item.serviceId ?? index,
+        // id de COTIZACION_SERVICIO (solo existe tras crear la cotización o en PUT)
+        uso: item.uso ?? item.idCotizacionServicio ?? item.id_cotizacion_servicio ?? null,
+        // índice en services[] / servicios[] del mismo POST (recomendado al crear)
+        serviceIndex: item.serviceIndex ?? item.service_index ?? null,
+        // ID_Servicio del catálogo SERVICIO (alternativa al índice en el POST)
+        ID_Servicio: item.ID_Servicio ?? item.idServicio ?? (hasServiceId ? Number(item.serviceId) : null),
+        id_servicio_subservicio: item.id_servicio_subservicio ?? item.id_subservicio ?? null,
+        Principal: item.Principal ?? item.principal ?? null,
         PrecioUnit: item.PrecioUnit ?? item.precioUnit ?? item.unitPrice ?? item.preciounit ?? 0,
         model: item.model ?? item.modelo ?? null,
         color: item.color ?? null,
         maintenanceDate: toDateOnly(item.maintenanceDate ?? item.fecha_prox_revision ?? item.fechaProximaRevision),
         description: item.description ?? item.caracteristicas ?? item.descripcion ?? null,
+        _truckIndex: index,
     };
+}
+
+/**
+ * Vincula un camión con una fila de COTIZACION_SERVICIO recién insertada (aún sin PK conocido en el cliente).
+ * Prioridad: id COTIZACION_SERVICIO → serviceIndex → ID_Servicio (+ subservicio/Principal) → uso como índice legacy.
+ */
+function resolverServicioCotizacionParaCamion(truck, truckIndex, serviciosInsertados, { toPrincipalEnum } = {}) {
+    if (!Array.isArray(serviciosInsertados) || !serviciosInsertados.length) return null;
+
+    const idx = truck._truckIndex ?? truckIndex ?? 0;
+    const placa = truck.Placa ?? truck.placa ?? truck.plate ?? `#${idx}`;
+
+    const matchPrincipal = (list, principal) => {
+        if (principal === undefined || principal === null || principal === '' || !toPrincipalEnum) return list;
+        const target = toPrincipalEnum(principal);
+        return list.filter((s) => toPrincipalEnum(s.Principal) === target);
+    };
+
+    const usoExplicit = truck.uso;
+    if (usoExplicit !== undefined && usoExplicit !== null && usoExplicit !== '') {
+        const byCsId = serviciosInsertados.find((s) => Number(s.id) === Number(usoExplicit));
+        if (byCsId) return byCsId;
+    }
+
+    const serviceIndex = truck.serviceIndex;
+    if (serviceIndex !== undefined && serviceIndex !== null && serviceIndex !== '') {
+        const i = Number(serviceIndex);
+        if (!Number.isNaN(i) && serviciosInsertados[i]) return serviciosInsertados[i];
+    }
+
+    const idServicio = truck.ID_Servicio;
+    if (idServicio !== undefined && idServicio !== null && idServicio !== '') {
+        const sid = Number(idServicio);
+        let candidates = serviciosInsertados.filter((s) => Number(s.ID_Servicio) === sid);
+        const idSub = truck.id_servicio_subservicio;
+        if (idSub !== undefined && idSub !== null && idSub !== '') {
+            candidates = candidates.filter((s) => Number(s.id_servicio_subservicio) === Number(idSub));
+        }
+        candidates = matchPrincipal(candidates, truck.Principal);
+        if (candidates.length === 1) return candidates[0];
+        if (candidates.length > 1) {
+            throw new Error(
+                `Camión ${placa}: ID_Servicio ${sid} es ambiguo; indique serviceIndex, id_servicio_subservicio o Principal`,
+            );
+        }
+    }
+
+    if (usoExplicit !== undefined && usoExplicit !== null && usoExplicit !== '') {
+        const n = Number(usoExplicit);
+        if (!Number.isNaN(n) && Number.isInteger(n) && serviciosInsertados[n]) {
+            return serviciosInsertados[n];
+        }
+        const bySvcId = serviciosInsertados.filter((s) => Number(s.ID_Servicio) === n);
+        const narrowed = matchPrincipal(bySvcId, truck.Principal);
+        if (narrowed.length === 1) return narrowed[0];
+    }
+
+    if (serviciosInsertados[idx]) return serviciosInsertados[idx];
+    return null;
 }
 
 function normalizePickup(body) {
@@ -322,6 +390,12 @@ function buildUpsertQuotationResponse({
         color: row.color ?? '',
         maintenanceDate: toDateOnly(row.fechaProximaRevision ?? row.maintenanceDate ?? row.fecha_prox_revision),
         description: row.caracteristicas ?? row.description ?? '',
+        // Para PUT: id de COTIZACION_SERVICIO (ya existe tras el POST)
+        uso: row.uso ?? row.idCotizacionServicio ?? null,
+        idCotizacionServicio: row.uso ?? row.idCotizacionServicio ?? null,
+        unitPrice: Number(row.precioUnit ?? row.PrecioUnit ?? row.unitPrice ?? 0),
+        fechaEntrada: row.fechaEntrada ?? row.fecha_hora_entrada ?? null,
+        fechaSalida: row.fechaSalida ?? row.fecha_hora_salida ?? null,
     }));
 
     return {
@@ -373,6 +447,7 @@ module.exports = {
     normalizeInventoryItem,
     normalizeServiceItem,
     normalizeTruckItem,
+    resolverServicioCotizacionParaCamion,
     normalizeCotizacionPayload,
     calcularPrecioTotal,
     buildUpsertQuotationResponse,

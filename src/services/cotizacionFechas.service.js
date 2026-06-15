@@ -139,8 +139,34 @@ async function calcularPrecioLineaServicios(executor, cotizacionId, serviciosOve
     return { total, lineas };
 }
 
+async function sincronizarFechasCamionesCotizacion(executor, cotizacionId) {
+    const camiones = await executor.query(
+        `SELECT cc.id, cc.uso, cs.fecha_inicio, cs.fecha_finalizacion
+         FROM COTIZACION_CAMION cc
+         INNER JOIN COTIZACION_SERVICIO cs ON cc.uso = cs.id
+         WHERE cc.ID_Cotizacion = ? AND cs.fecha_inicio IS NOT NULL AND cs.fecha_finalizacion IS NOT NULL`,
+        [cotizacionId],
+    );
+    let updated = 0;
+    for (const row of camiones) {
+        await executor.query(
+            `UPDATE COTIZACION_CAMION
+             SET fecha_hora_entrada = ?, fecha_hora_salida = ?
+             WHERE id = ?`,
+            [
+                `${String(row.fecha_inicio).slice(0, 10)} 00:00:00`,
+                `${String(row.fecha_finalizacion).slice(0, 10)} 23:59:59`,
+                row.id,
+            ],
+        );
+        updated += 1;
+    }
+    return { camiones_actualizados: updated };
+}
+
 module.exports = {
     aplicarFechasServiciosCotizacion,
     calcularPrecioLineaServicios,
     loadServiciosCotizacionParaPrecio,
+    sincronizarFechasCamionesCotizacion,
 };

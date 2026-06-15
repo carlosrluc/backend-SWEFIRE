@@ -12,6 +12,7 @@ const {
     normalizeInventoryItem,
     normalizeServiceItem,
     normalizeTruckItem,
+    resolverServicioCotizacionParaCamion,
     normalizeCotizacionPayload,
     calcularPrecioTotal,
     buildUpsertQuotationResponse,
@@ -29,6 +30,7 @@ const {
 const {
     aplicarFechasServiciosCotizacion,
     calcularPrecioLineaServicios,
+    sincronizarFechasCamionesCotizacion,
 } = require('../services/cotizacionFechas.service');
 const {
     archiveCotizacionSnapshot,
@@ -56,6 +58,7 @@ async function recalcularCotizacionFechasYPrecio(executor, cotizacionId, {
 } = {}) {
     if (fechaInicioProyecto) {
         await aplicarFechasServiciosCotizacion(executor, cotizacionId, fechaInicioProyecto);
+        await sincronizarFechasCamionesCotizacion(executor, cotizacionId);
     }
     const { total: serviciosTotal, lineas } = await calcularPrecioLineaServicios(executor, cotizacionId);
     const precioTotal = calcularPrecioTotal({
@@ -131,31 +134,31 @@ async function insertarCamionesCotizacion(dbConn, cotizacionId, camionesList, se
         await updateCamionMetadataIfPresent(dbConn, normalized);
 
         const PrecioUnit = normalized.PrecioUnit ?? null;
-        const n = Number(normalized.uso);
-        let cotizacionServicioId;
-        let fecha_hora_entrada;
-        let fecha_hora_salida;
+        const svcLocal = resolverServicioCotizacionParaCamion(
+            normalized, i, serviciosInsertados, { toPrincipalEnum },
+        );
+        if (!svcLocal) {
+            throw new Error(
+                `Camión ${Placa}: no se pudo vincular a un servicio. `
+                + 'Use serviceIndex (índice en services[]), ID_Servicio del catálogo, o uso=id de COTIZACION_SERVICIO',
+            );
+        }
 
-        const svcLocal = serviciosInsertados?.[n] ?? serviciosInsertados?.find((s) => s.id === n);
-        if (svcLocal) {
-            cotizacionServicioId = svcLocal.id;
-            fecha_hora_entrada = toDateTimeInicio(svcLocal.fecha_inicio);
-            fecha_hora_salida = toDateTimeFin(svcLocal.fecha_finalizacion);
-        } else {
-            const fechasDb = await obtenerFechasDesdeCotizacionServicio(dbConn, cotizacionId, n);
-            if (!fechasDb) {
-                throw new Error(`uso ${normalized.uso} no corresponde a un servicio de la cotización ${cotizacionId}`);
+        let fecha_hora_entrada = toDateTimeInicio(svcLocal.fecha_inicio);
+        let fecha_hora_salida = toDateTimeFin(svcLocal.fecha_finalizacion);
+        if (!fecha_hora_entrada || !fecha_hora_salida) {
+            const fechasDb = await obtenerFechasDesdeCotizacionServicio(dbConn, cotizacionId, svcLocal.id);
+            if (fechasDb) {
+                fecha_hora_entrada = fechasDb.fecha_hora_entrada;
+                fecha_hora_salida = fechasDb.fecha_hora_salida;
             }
-            cotizacionServicioId = fechasDb.id;
-            fecha_hora_entrada = fechasDb.fecha_hora_entrada;
-            fecha_hora_salida = fechasDb.fecha_hora_salida;
         }
 
         await dbConn.query(
             `INSERT INTO COTIZACION_CAMION
                 (ID_Cotizacion, Placa, uso, fecha_hora_entrada, fecha_hora_salida, PrecioUnit)
              VALUES (?,?,?,?,?,?)`,
-            [cotizacionId, Placa, cotizacionServicioId, fecha_hora_entrada, fecha_hora_salida, PrecioUnit],
+            [cotizacionId, Placa, svcLocal.id, fecha_hora_entrada, fecha_hora_salida, PrecioUnit],
         );
     }
 }
@@ -215,6 +218,7 @@ async function insertarServiciosCotizacion(dbConn, cotizacionId, serviciosList) 
             index: i,
             ID_Servicio: s.ID_Servicio,
             Principal: s.Principal,
+            id_servicio_subservicio: s.id_servicio_subservicio ?? null,
             fecha_inicio: s.fecha_inicio,
             fecha_finalizacion: s.fecha_finalizacion,
         });
@@ -846,7 +850,13 @@ exports.create = async (req, res) => {
             ID: newId,
             precio_total: precioFinal,
             fecha_inicio_proyecto: fechaInicioProyecto,
-            servicios_insertados: serviciosInsertados.map((s) => ({ id: s.id, index: s.index })),
+            servicios_insertados: serviciosInsertados.map((s) => ({
+                id: s.id,
+                index: s.index,
+                ID_Servicio: s.ID_Servicio,
+                Principal: s.Principal,
+                id_servicio_subservicio: s.id_servicio_subservicio,
+            })),
             importado_desde_solicitud: true,
         });
     } catch (e) {
@@ -974,7 +984,7 @@ exports.update = async (req, res) => {
             if (serviciosInsertados === null) {
                 await exec.query('DELETE FROM COTIZACION_CAMION WHERE ID_Cotizacion = ?', [cotizacionId]);
                 const existingSvc = await exec.query(
-                    `SELECT id, fecha_inicio, fecha_finalizacion
+                    `SELECT id, ID_Servicio, Principal, id_servicio_subservicio, fecha_inicio, fecha_finalizacion
                      FROM COTIZACION_SERVICIO
                      WHERE ID_Cotizacion = ? AND ID_Servicio != 7
                      ORDER BY id`,
@@ -983,6 +993,9 @@ exports.update = async (req, res) => {
                 serviciosInsertados = existingSvc.map((row, index) => ({
                     id: row.id,
                     index,
+                    ID_Servicio: row.ID_Servicio,
+                    Principal: row.Principal,
+                    id_servicio_subservicio: row.id_servicio_subservicio,
                     fecha_inicio: row.fecha_inicio,
                     fecha_finalizacion: row.fecha_finalizacion,
                 }));
@@ -1060,14 +1073,25 @@ exports.update = async (req, res) => {
         await conn.commit();
         conn.release();
 
-        res.json({
+        const response = {
             message: 'Cotización actualizada',
             precio_total: precioFinal,
             fecha_inicio_proyecto: fechaInicioProyecto ?? undefined,
             version: archiveInfo.nextVersion,
             version_archivada: archiveInfo.archivedVersion,
             id_cotizacion_archivada: archiveInfo.archiveId,
-        });
+        };
+        if (serviciosInsertados !== null) {
+            response.servicios_insertados = serviciosInsertados.map((s) => ({
+                id: s.id,
+                index: s.index,
+                ID_Servicio: s.ID_Servicio,
+                Principal: s.Principal,
+                id_servicio_subservicio: s.id_servicio_subservicio,
+            }));
+            response.nota_servicios = 'Si reemplazaste services[], los id de COTIZACION_SERVICIO cambiaron; usa servicios_insertados o serviceIndex en trucks.';
+        }
+        res.json(response);
     } catch (e) {
         try { await conn.rollback(); } catch (_) {}
         conn.release();
@@ -1180,13 +1204,32 @@ exports.getCamiones = async (req, res) => {
 exports.createCamion = async (req, res) => {
     const truck = normalizeTruckItem(req.body, 0);
     const Placa = truck.Placa;
-    const uso = truck.uso;
     const precio = truck.PrecioUnit ?? null;
     try {
         await updateCamionMetadataIfPresent(db, truck);
-        const fechas = await obtenerFechasDesdeCotizacionServicio(db, req.params.id, uso);
+        const svcRows = await db.query(
+            `SELECT id, ID_Servicio, Principal, id_servicio_subservicio, fecha_inicio, fecha_finalizacion
+             FROM COTIZACION_SERVICIO WHERE ID_Cotizacion = ? AND ID_Servicio != 7 ORDER BY id`,
+            [req.params.id],
+        );
+        const serviciosInsertados = svcRows.map((row, index) => ({
+            id: row.id,
+            index,
+            ID_Servicio: row.ID_Servicio,
+            Principal: row.Principal,
+            id_servicio_subservicio: row.id_servicio_subservicio,
+            fecha_inicio: row.fecha_inicio,
+            fecha_finalizacion: row.fecha_finalizacion,
+        }));
+        const svcLocal = resolverServicioCotizacionParaCamion(truck, 0, serviciosInsertados, { toPrincipalEnum });
+        if (!svcLocal) {
+            return res.status(400).json({
+                error: 'No se pudo vincular el camión. Use serviceIndex, ID_Servicio o uso=id de COTIZACION_SERVICIO',
+            });
+        }
+        const fechas = await obtenerFechasDesdeCotizacionServicio(db, req.params.id, svcLocal.id);
         if (!fechas) {
-            return res.status(400).json({ error: 'uso / serviceIndex debe ser el id de un COTIZACION_SERVICIO de esta cotización' });
+            return res.status(400).json({ error: 'Servicio de cotización no encontrado para este camión' });
         }
         const result = await db.query(
             `INSERT INTO COTIZACION_CAMION
@@ -1201,13 +1244,32 @@ exports.createCamion = async (req, res) => {
 exports.updateCamion = async (req, res) => {
     const truck = normalizeTruckItem(req.body, 0);
     const Placa = truck.Placa;
-    const uso = truck.uso;
     const precio = truck.PrecioUnit ?? null;
     try {
         await updateCamionMetadataIfPresent(db, truck);
-        const fechas = await obtenerFechasDesdeCotizacionServicio(db, req.params.id, uso);
+        const svcRows = await db.query(
+            `SELECT id, ID_Servicio, Principal, id_servicio_subservicio, fecha_inicio, fecha_finalizacion
+             FROM COTIZACION_SERVICIO WHERE ID_Cotizacion = ? AND ID_Servicio != 7 ORDER BY id`,
+            [req.params.id],
+        );
+        const serviciosInsertados = svcRows.map((row, index) => ({
+            id: row.id,
+            index,
+            ID_Servicio: row.ID_Servicio,
+            Principal: row.Principal,
+            id_servicio_subservicio: row.id_servicio_subservicio,
+            fecha_inicio: row.fecha_inicio,
+            fecha_finalizacion: row.fecha_finalizacion,
+        }));
+        const svcLocal = resolverServicioCotizacionParaCamion(truck, 0, serviciosInsertados, { toPrincipalEnum });
+        if (!svcLocal) {
+            return res.status(400).json({
+                error: 'No se pudo vincular el camión. Use serviceIndex, ID_Servicio o uso=id de COTIZACION_SERVICIO',
+            });
+        }
+        const fechas = await obtenerFechasDesdeCotizacionServicio(db, req.params.id, svcLocal.id);
         if (!fechas) {
-            return res.status(400).json({ error: 'uso / serviceIndex debe ser el id de un COTIZACION_SERVICIO de esta cotización' });
+            return res.status(400).json({ error: 'Servicio de cotización no encontrado para este camión' });
         }
         const result = await db.query(
             `UPDATE COTIZACION_CAMION

@@ -115,7 +115,10 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *         color: { type: string }
  *         maintenanceDate: { type: string, format: date }
  *         description: { type: string }
- *         uso: { type: integer, description: 'Legacy — índice en services[] o id COTIZACION_SERVICIO. Default índice del camión.' }
+ *         uso: { type: integer, description: 'id de COTIZACION_SERVICIO (solo tras crear la cotización)' }
+ *         serviceIndex: { type: integer, description: 'Índice en services[] del mismo POST (recomendado al crear)' }
+ *         ID_Servicio: { type: integer, description: 'ID del catálogo SERVICIO (alternativa a serviceIndex)' }
+ *         id_servicio_subservicio: { type: integer, description: 'Desambigua si hay varios servicios con el mismo ID_Servicio' }
  *         unitPrice: { type: number, description: 'Legacy — PrecioUnit' }
  *     UpsertQuotationDTO:
  *       type: object
