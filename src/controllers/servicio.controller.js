@@ -4,6 +4,7 @@ const path = require('path');
 const {
     syncActividadFromSubservicio,
     buildPrincipalTemplate,
+    buildServicioDetalleFlujo,
     getNextActividadOrden,
 } = require('../services/servicioFlujo.service');
 const {
@@ -63,7 +64,8 @@ exports.getById = async (req, res) => {
     try {
         const rows = await db.query('SELECT * FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-        res.json(rows[0]);
+        const flujo = await buildServicioDetalleFlujo(db, req.params.id);
+        res.json({ ...rows[0], ...flujo });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

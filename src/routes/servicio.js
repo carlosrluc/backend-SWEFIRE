@@ -104,6 +104,54 @@ const { uploadServicioFoto } = require('../middlewares/upload.middleware');
  *           type: array
  *           description: Subservicios recomendados; generan actividades automáticas en la etapa indicada
  *           items: { $ref: '#/components/schemas/ServicioSubservicioInput' }
+ *     ServicioDetalleResponse:
+ *       allOf:
+ *         - type: object
+ *           properties:
+ *             ID_Servicio: { type: integer, example: 1 }
+ *             nombre: { type: string, example: "Instalación de Sistema de Rociadores (Sprinklers)" }
+ *             descripcion: { type: string }
+ *             precio_regular: { type: number }
+ *             condicional_precio: { type: string, nullable: true }
+ *             observaciones: { type: string, nullable: true }
+ *             Estado: { type: string, enum: [Activo, Desactivado] }
+ *             foto: { type: string, nullable: true }
+ *         - type: object
+ *           properties:
+ *             etapas:
+ *               type: array
+ *               items:
+ *                 allOf:
+ *                   - $ref: '#/components/schemas/ServicioEtapaInput'
+ *                   - type: object
+ *                     properties:
+ *                       actividades:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id: { type: integer }
+ *                             nombre: { type: string }
+ *                             orden: { type: integer }
+ *                             origen: { type: string, enum: [manual, subservicio] }
+ *                             id_servicio_subservicio: { type: integer, nullable: true }
+ *                             ID_Servicio_Hijo: { type: integer, nullable: true }
+ *             subservicios:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: integer, example: 1 }
+ *                   ID_Servicio_subservicio: { type: integer, example: 8 }
+ *                   id_servicio_etapa: { type: integer, example: 1 }
+ *                   nombre_subservicio: { type: string, example: "Instalación de Grupo Electrógeno" }
+ *                   orden_etapa: { type: integer, example: 1 }
+ *                   ubicacion_etapa:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: integer }
+ *                       nombre: { type: string }
+ *                       orden: { type: integer }
  */
 
 /**
@@ -250,7 +298,11 @@ router.get('/:id/principal', c.getPrincipal);
  *         schema: { type: integer }
  *     responses:
  *       200:
- *         description: Servicio encontrado
+ *         description: Servicio encontrado (incluye etapas, actividades y subservicios del flujo)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ServicioDetalleResponse'
  *       404:
  *         description: No encontrado
  *   put:

@@ -107,6 +107,58 @@ function mapActividadForResponse(act) {
     return base;
 }
 
+async function buildServicioDetalleFlujo(executor, idServicio) {
+    const etapasTree = await loadServicioEtapasTree(executor, idServicio);
+    const subservicios = await executor.query(
+        `SELECT ss.id, ss.ID_Servicio_subservicio, ss.id_servicio_etapa,
+                s.nombre AS nombre_subservicio,
+                se.nombre AS nombre_etapa, se.orden AS orden_etapa
+         FROM SERVICIO_SUBSERVICIO ss
+         INNER JOIN SERVICIO s ON s.ID_Servicio = ss.ID_Servicio_subservicio
+         INNER JOIN SERVICIO_ETAPA se ON se.id = ss.id_servicio_etapa
+         WHERE ss.ID_Servicio = ?
+         ORDER BY ss.id ASC`,
+        [idServicio],
+    );
+
+    return {
+        etapas: etapasTree.map((e) => ({
+            id: e.id,
+            nombre: e.nombre,
+            descripcion: e.descripcion ?? null,
+            duracion: e.duracion,
+            orden: e.orden,
+            actividades: e.actividades.map((a) => {
+                const act = {
+                    id: a.id,
+                    nombre: a.nombre,
+                    orden: a.orden,
+                    origen: a.origen === 'subservicio' ? 'subservicio' : 'manual',
+                };
+                if (a.origen === 'subservicio') {
+                    act.id_servicio_subservicio = a.id_servicio_subservicio ?? null;
+                    if (a.ID_Servicio_subservicio != null) {
+                        act.ID_Servicio_Hijo = a.ID_Servicio_subservicio;
+                    }
+                }
+                return act;
+            }),
+        })),
+        subservicios: subservicios.map((ss) => ({
+            id: ss.id,
+            ID_Servicio_subservicio: ss.ID_Servicio_subservicio,
+            id_servicio_etapa: ss.id_servicio_etapa,
+            nombre_subservicio: ss.nombre_subservicio,
+            orden_etapa: ss.orden_etapa,
+            ubicacion_etapa: {
+                id: ss.id_servicio_etapa,
+                nombre: ss.nombre_etapa,
+                orden: ss.orden_etapa,
+            },
+        })),
+    };
+}
+
 async function buildPrincipalTemplate(executor, idServicio) {
     const servicioRows = await executor.query(
         'SELECT ID_Servicio, nombre FROM SERVICIO WHERE ID_Servicio = ?',
@@ -244,6 +296,7 @@ module.exports = {
     syncActividadFromSubservicio,
     loadServicioEtapasTree,
     buildPrincipalTemplate,
+    buildServicioDetalleFlujo,
     buildPhasesFromServicioTree,
     importServicioFlujoToCotizacion,
     assertSinglePrincipal,
