@@ -6,9 +6,40 @@ function normalizarMatrizBody(body, claveEnvoltorio) {
     return [];
 }
 
+/** Extrae YYYY-MM-DD desde string ISO, Date de mysql2 u otros valores de BD. */
+function formatMysqlDatePart(value) {
+    if (value === undefined || value === null || value === '') return null;
+    if (value instanceof Date) {
+        if (Number.isNaN(value.getTime())) return null;
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+    }
+    const s = String(value).trim();
+    const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    const parsed = new Date(s);
+    if (!Number.isNaN(parsed.getTime())) {
+        const pad = (n) => String(n).padStart(2, '0');
+        return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`;
+    }
+    return null;
+}
+
 function toDateOnly(value) {
-    if (!value) return null;
-    return String(value).slice(0, 10);
+    return formatMysqlDatePart(value);
+}
+
+/** DATETIME MySQL/MariaDB: YYYY-MM-DD HH:mm:ss */
+function toDateTimeInicio(value) {
+    const datePart = formatMysqlDatePart(value);
+    if (!datePart) return null;
+    return `${datePart} 00:00:00`;
+}
+
+function toDateTimeFin(value) {
+    const datePart = formatMysqlDatePart(value);
+    if (!datePart) return null;
+    return `${datePart} 23:59:59`;
 }
 
 function normalizeInventoryItem(item) {
@@ -458,4 +489,7 @@ module.exports = {
     splitServiciosPrincipalSecundarios,
     resolveFechaInicioProyecto,
     toDateOnly,
+    formatMysqlDatePart,
+    toDateTimeInicio,
+    toDateTimeFin,
 };

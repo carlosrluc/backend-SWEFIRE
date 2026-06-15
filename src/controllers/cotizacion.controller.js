@@ -18,6 +18,8 @@ const {
     buildUpsertQuotationResponse,
     mapCotizacionServicioRow,
     splitServiciosPrincipalSecundarios,
+    toDateTimeInicio,
+    toDateTimeFin,
 } = require('../services/cotizacionDto.service');
 const { mergeSolicitudIntoCotizacionCreate, loadSolicitudDataForCotizacion } = require('../services/solicitudCotizacionImport.service');
 const {
@@ -80,16 +82,6 @@ function resolverFechaInicioCotizacion(merged, serviciosList) {
         ?? principal?.fecha_inicio
         ?? principal?.startDate
         ?? null;
-}
-
-function toDateTimeInicio(fecha) {
-    if (!fecha) return null;
-    return `${String(fecha).slice(0, 10)} 00:00:00`;
-}
-
-function toDateTimeFin(fecha) {
-    if (!fecha) return null;
-    return `${String(fecha).slice(0, 10)} 23:59:59`;
 }
 
 async function obtenerFechasDesdeCotizacionServicio(dbConn, cotizacionId, cotizacionServicioId) {

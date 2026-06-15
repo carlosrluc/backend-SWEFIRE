@@ -6,7 +6,7 @@ const {
     pagoPorDiaToBoolean,
 } = require('./servicioFechas.service');
 const { toPrincipalEnum } = require('./servicioFlujo.service');
-const { toDateOnly } = require('./cotizacionDto.service');
+const { toDateOnly, toDateTimeInicio, toDateTimeFin } = require('./cotizacionDto.service');
 
 /**
  * Calcula y persiste fecha_inicio / fecha_finalizacion en COTIZACION_SERVICIO
@@ -154,8 +154,8 @@ async function sincronizarFechasCamionesCotizacion(executor, cotizacionId) {
              SET fecha_hora_entrada = ?, fecha_hora_salida = ?
              WHERE id = ?`,
             [
-                `${String(row.fecha_inicio).slice(0, 10)} 00:00:00`,
-                `${String(row.fecha_finalizacion).slice(0, 10)} 23:59:59`,
+                toDateTimeInicio(row.fecha_inicio),
+                toDateTimeFin(row.fecha_finalizacion),
                 row.id,
             ],
         );
