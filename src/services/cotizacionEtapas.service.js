@@ -1,4 +1,4 @@
-const { parsePhasesFromRow } = require('./cotizacionDto.service');
+const { parsePhasesFromRow, serializeEtapasDetalleForDb } = require('./cotizacionDto.service');
 
 function etapaReferencia(item, index) {
     const raw = item?.id ?? item?.referencia;
@@ -48,7 +48,7 @@ function summarizePhases(etapasTree) {
     return {
         etapas: etapasTree.length,
         duracion_etapa: String(totalDuration),
-        etapas_detalle: JSON.stringify(phasesPayload),
+        etapas_detalle: serializeEtapasDetalleForDb(phasesPayload),
     };
 }
 

@@ -20,6 +20,8 @@ const {
     splitServiciosPrincipalSecundarios,
     toDateTimeInicio,
     toDateTimeFin,
+    serializeEtapasDetalleForDb,
+    serializePhasesBodyForDb,
 } = require('../services/cotizacionDto.service');
 const { mergeSolicitudIntoCotizacionCreate, loadSolicitudDataForCotizacion } = require('../services/solicitudCotizacionImport.service');
 const {
@@ -782,7 +784,8 @@ exports.create = async (req, res) => {
                 tasaCambio?.tasaVenta || null,
                 merged.etapas ?? null,
                 merged.duracion_etapa ?? null,
-                merged.etapas_detalle ?? null,
+                serializePhasesBodyForDb(merged.phases)
+                    ?? serializeEtapasDetalleForDb(merged.etapas_detalle),
                 direccionRecojo,
                 Id_incidencia,
             ],
@@ -943,7 +946,11 @@ exports.update = async (req, res) => {
         if (Tasa_Cambio !== undefined) updateFields.Tasa_Cambio = Tasa_Cambio;
         if (normalized.etapas !== undefined) updateFields.etapas = normalized.etapas;
         if (normalized.duracion_etapa !== undefined) updateFields.duracion_etapa = normalized.duracion_etapa;
-        if (normalized.etapas_detalle !== undefined) updateFields.etapas_detalle = normalized.etapas_detalle;
+        if (normalized.phasesProvided) {
+            updateFields.etapas_detalle = serializePhasesBodyForDb(normalized.phases ?? { items: [] });
+        } else if (normalized.etapas_detalle !== undefined) {
+            updateFields.etapas_detalle = serializeEtapasDetalleForDb(normalized.etapas_detalle);
+        }
         if (normalized.direccion_recojo !== undefined) updateFields.direccion_recojo = normalized.direccion_recojo;
         if (Id_incidencia !== undefined) updateFields.Id_incidencia = Id_incidencia;
 

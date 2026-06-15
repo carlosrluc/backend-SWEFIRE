@@ -1,3 +1,5 @@
+const { serializeEtapasDetalleForDb } = require('./cotizacionDto.service');
+
 const DESACTUALIZADO_VIGENTE = 'NO';
 const DESACTUALIZADO_ARCHIVO = 'YES';
 
@@ -27,7 +29,7 @@ function rowToInsertValues(row, desactualizado) {
         row.Orden_compra,
         row.duracion_etapa,
         row.etapas,
-        row.etapas_detalle,
+        serializeEtapasDetalleForDb(row.etapas_detalle),
         row.direccion_recojo,
         row.Id_incidencia ?? null,
         desactualizado,

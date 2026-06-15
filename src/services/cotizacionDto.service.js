@@ -202,6 +202,37 @@ function parsePhasesRaw(raw) {
     return raw;
 }
 
+/** Siempre string JSON válido (o null) antes de guardar en columna JSON de MariaDB. */
+function serializeEtapasDetalleForDb(value) {
+    if (value === undefined || value === null || value === '') return null;
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed) return null;
+        try {
+            return JSON.stringify(JSON.parse(trimmed));
+        } catch (_) {
+            return null;
+        }
+    }
+    if (typeof value === 'object') {
+        try {
+            return JSON.stringify(value);
+        } catch (_) {
+            return null;
+        }
+    }
+    return null;
+}
+
+/** Serializa body.phases / { items: [...] } para etapas_detalle. */
+function serializePhasesBodyForDb(phases) {
+    if (phases === undefined || phases === null) return null;
+    const payload = phases.items !== undefined
+        ? phases
+        : (Array.isArray(phases) ? { items: phases } : { items: [] });
+    return serializeEtapasDetalleForDb(payload);
+}
+
 /** Acepta `phases` (UpsertQuotationDTO) o `etapas_detalle` (JSON legacy en body). */
 function normalizePhases(body) {
     let raw;
@@ -236,7 +267,7 @@ function normalizePhases(body) {
     return {
         etapas: normalizedItems.length,
         duracion_etapa: String(totalDuration),
-        etapas_detalle: JSON.stringify(phasesPayload),
+        etapas_detalle: serializeEtapasDetalleForDb(phasesPayload),
         phases: phasesPayload,
     };
 }
@@ -492,4 +523,6 @@ module.exports = {
     formatMysqlDatePart,
     toDateTimeInicio,
     toDateTimeFin,
+    serializeEtapasDetalleForDb,
+    serializePhasesBodyForDb,
 };
