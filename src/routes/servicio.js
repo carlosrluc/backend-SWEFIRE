@@ -53,6 +53,57 @@ const { uploadServicioFoto } = require('../middlewares/upload.middleware');
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/ServicioPublico'
+ *     ServicioActividadInput:
+ *       type: object
+ *       required: [nombre]
+ *       properties:
+ *         id: { type: integer, description: 'Solo en PUT para actualizar actividad manual existente' }
+ *         nombre: { type: string, example: "empacar todo lo requerido en el camion de envio" }
+ *         orden: { type: integer, example: 2 }
+ *     ServicioEtapaInput:
+ *       type: object
+ *       required: [nombre]
+ *       properties:
+ *         id: { type: integer, description: 'Solo en PUT para actualizar etapa existente' }
+ *         nombre: { type: string, example: "fase de envio de productos" }
+ *         descripcion: { type: string, example: "salida del taller hasta el establecimiento" }
+ *         duracion: { type: integer, example: 1 }
+ *         orden: { type: integer, example: 1 }
+ *         actividades:
+ *           type: array
+ *           items: { $ref: '#/components/schemas/ServicioActividadInput' }
+ *     ServicioSubservicioInput:
+ *       type: object
+ *       required: [ID_Servicio_subservicio]
+ *       properties:
+ *         id: { type: integer, description: 'Solo en PUT para actualizar subservicio existente (SERVICIO_SUBSERVICIO.id)' }
+ *         ID_Servicio_subservicio: { type: integer, example: 8, description: 'ID_Servicio del servicio hijo recomendado' }
+ *         id_servicio_etapa: { type: integer, description: 'ID de SERVICIO_ETAPA (en PUT o si la etapa ya existe)' }
+ *         orden_etapa: { type: integer, example: 1, description: 'Orden de la etapa del principal (útil en POST al crear etapas en el mismo body)' }
+ *         ubicacion_etapa:
+ *           type: object
+ *           description: 'Alias de orden_etapa; misma forma que GET /servicios/{id}/principal'
+ *           properties:
+ *             orden: { type: integer, example: 2 }
+ *     ServicioUpsert:
+ *       type: object
+ *       required: [nombre]
+ *       properties:
+ *         nombre: { type: string, example: "Instalación de Sistema de Rociadores (Sprinklers)" }
+ *         descripcion: { type: string, example: "Instalación completa de sistema de rociadores automáticos" }
+ *         precio_regular: { type: number, example: 15000 }
+ *         condicional_precio: { type: string, nullable: true }
+ *         observaciones: { type: string, nullable: true }
+ *         Estado: { type: string, enum: [Activo, Desactivado], example: Activo }
+ *         foto: { type: string, nullable: true, description: 'URL relativa; usar POST /servicios/{id}/foto para subir imagen' }
+ *         etapas:
+ *           type: array
+ *           description: Etapas del flujo por defecto del servicio (actividades manuales anidadas)
+ *           items: { $ref: '#/components/schemas/ServicioEtapaInput' }
+ *         subservicios:
+ *           type: array
+ *           description: Subservicios recomendados; generan actividades automáticas en la etapa indicada
+ *           items: { $ref: '#/components/schemas/ServicioSubservicioInput' }
  */
 
 /**
@@ -75,25 +126,57 @@ const { uploadServicioFoto } = require('../middlewares/upload.middleware');
  *         description: Lista de servicios con metadatos de paginación
  *   post:
  *     tags: [Servicio]
- *     summary: Crear un servicio
+ *     summary: Crear un servicio (opcionalmente con etapas, actividades y subservicios)
+ *     description: |
+ *       Crea el registro en `SERVICIO`. Opcionalmente puede enviar en el mismo body:
+ *       - `etapas[]` con `actividades[]` manuales
+ *       - `subservicios[]` referenciando la etapa por `orden_etapa` (si las etapas se crean en el mismo POST)
+ *         o por `id_servicio_etapa` (si la etapa ya existe)
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required: [nombre]
- *             properties:
- *               nombre: { type: string, example: "Contraincendios" }
- *               descripcion: { type: string }
- *               precio_regular: { type: number }
- *               condicional_precio: { type: string }
- *               observaciones: { type: string }
- *               Estado: { type: string, enum: [Activo, Desactivado] }
- *               foto: { type: string, nullable: true, description: 'URL relativa; usar POST /servicios/{id}/foto para subir imagen' }
+ *             $ref: '#/components/schemas/ServicioUpsert'
+ *           example:
+ *             nombre: "Instalación de Sistema de Rociadores (Sprinklers)"
+ *             descripcion: "Instalación completa de sistema de rociadores automáticos"
+ *             precio_regular: 15000
+ *             Estado: Activo
+ *             etapas:
+ *               - nombre: "fase de envio de productos"
+ *                 descripcion: "salida del taller hasta el establecimiento"
+ *                 duracion: 1
+ *                 orden: 1
+ *                 actividades:
+ *                   - nombre: "manejar el camion hasta la instalacion"
+ *                     orden: 1
+ *                   - nombre: "empacar todo lo requerido en el camion de envio"
+ *                     orden: 2
+ *               - nombre: "fase de instalacion"
+ *                 descripcion: "la instalacion de los productos"
+ *                 duracion: 1
+ *                 orden: 2
+ *                 actividades:
+ *                   - nombre: "realizar la instalacion"
+ *                     orden: 1
+ *               - nombre: "fase de despedida"
+ *                 duracion: 1
+ *                 orden: 3
+ *                 actividades:
+ *                   - nombre: "el personal se retira"
+ *                     orden: 1
+ *             subservicios:
+ *               - ID_Servicio_subservicio: 8
+ *                 orden_etapa: 1
+ *                 ubicacion_etapa: { orden: 1 }
+ *               - ID_Servicio_subservicio: 2
+ *                 orden_etapa: 2
+ *               - ID_Servicio_subservicio: 4
+ *                 orden_etapa: 2
  *     responses:
  *       201:
- *         description: Servicio creado
+ *         description: Servicio creado (incluye conteo de etapas y subservicios si se enviaron)
  */
 router.get('/', c.getAll);
 router.post('/', c.create);
@@ -172,7 +255,12 @@ router.get('/:id/principal', c.getPrincipal);
  *         description: No encontrado
  *   put:
  *     tags: [Servicio]
- *     summary: Actualizar servicio
+ *     summary: Actualizar servicio (y opcionalmente etapas, actividades o subservicios)
+ *     description: |
+ *       Actualiza campos del servicio. Si envía `etapas` o `subservicios`:
+ *       - Etapa/actividad con `id` → actualiza el registro existente
+ *       - Sin `id` → crea uno nuevo
+ *       - Actividades con `origen=subservicio` no se editan por aquí; se gestionan vía `subservicios`
  *     parameters:
  *       - in: path
  *         name: id
@@ -183,14 +271,37 @@ router.get('/:id/principal', c.getPrincipal);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               nombre: { type: string }
- *               descripcion: { type: string }
- *               precio_regular: { type: number }
- *               condicional_precio: { type: string }
- *               observaciones: { type: string }
- *               Estado: { type: string, enum: [Activo, Desactivado] }
+ *             $ref: '#/components/schemas/ServicioUpsert'
+ *           example:
+ *             nombre: "Instalación de Sistema de Rociadores (Sprinklers)"
+ *             descripcion: "Instalación completa — flujo actualizado"
+ *             precio_regular: 16500
+ *             Estado: Activo
+ *             etapas:
+ *               - id: 1
+ *                 nombre: "fase de envio de productos"
+ *                 descripcion: "salida del taller hasta el establecimiento"
+ *                 duracion: 2
+ *                 orden: 1
+ *                 actividades:
+ *                   - id: 1
+ *                     nombre: "manejar el camion hasta la instalacion"
+ *                     orden: 1
+ *                   - nombre: "revisar inventario antes del despacho"
+ *                     orden: 4
+ *               - nombre: "fase de pruebas hidráulicas"
+ *                 descripcion: "nueva etapa agregada"
+ *                 duracion: 1
+ *                 orden: 4
+ *                 actividades:
+ *                   - nombre: "prueba de presión del sistema"
+ *                     orden: 1
+ *             subservicios:
+ *               - id: 1
+ *                 ID_Servicio_subservicio: 8
+ *                 id_servicio_etapa: 1
+ *               - ID_Servicio_subservicio: 2
+ *                 orden_etapa: 2
  *     responses:
  *       200:
  *         description: Actualizado

@@ -6,6 +6,10 @@ const {
     buildPrincipalTemplate,
     getNextActividadOrden,
 } = require('../services/servicioFlujo.service');
+const {
+    persistFlujoOnServicioCreate,
+    mergeFlujoOnServicioUpdate,
+} = require('../services/servicioFlujoWrite.service');
 
 const unlinkFotoIfExists = (fotoUrl) => {
     if (!fotoUrl) return;
@@ -64,26 +68,74 @@ exports.getById = async (req, res) => {
 };
 
 exports.create = async (req, res) => {
-    const { nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado } = req.body;
+    const { nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado, etapas, subservicios } = req.body;
+    const conn = await db.getConnection();
+    const exec = {
+        query: async (sql, params) => {
+            const [rows] = await conn.query(sql, params);
+            return rows;
+        },
+    };
     try {
-        const result = await db.query(
+        await conn.beginTransaction();
+        const result = await exec.query(
             'INSERT INTO SERVICIO (nombre,descripcion,precio_regular,condicional_precio,observaciones,Estado) VALUES (?,?,?,?,?,?)',
-            [nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado]
+            [nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado],
         );
-        res.status(201).json({ message: 'Servicio creado', ID_Servicio: result.insertId });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        const newId = result.insertId;
+        const flujo = await persistFlujoOnServicioCreate(exec, newId, { etapas, subservicios });
+        await conn.commit();
+        conn.release();
+        res.status(201).json({
+            message: 'Servicio creado',
+            ID_Servicio: newId,
+            etapas_creadas: flujo.etapas,
+            subservicios_creados: flujo.subservicios,
+        });
+    } catch (e) {
+        try { await conn.rollback(); } catch (_) {}
+        conn.release();
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
+        if (e.statusCode === 404) return res.status(404).json({ error: e.message });
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.update = async (req, res) => {
-    const { nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado } = req.body;
+    const { nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado, etapas, subservicios } = req.body;
+    const conn = await db.getConnection();
+    const exec = {
+        query: async (sql, params) => {
+            const [rows] = await conn.query(sql, params);
+            return rows;
+        },
+    };
     try {
-        const result = await db.query(
+        await conn.beginTransaction();
+        const result = await exec.query(
             'UPDATE SERVICIO SET nombre=?,descripcion=?,precio_regular=?,condicional_precio=?,observaciones=?,Estado=? WHERE ID_Servicio=?',
-            [nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado, req.params.id]
+            [nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado, req.params.id],
         );
-        if (result.affectedRows === 0) return res.status(404).json({ error: 'No encontrado' });
-        res.json({ message: 'Servicio actualizado' });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        if (result.affectedRows === 0) {
+            await conn.rollback();
+            conn.release();
+            return res.status(404).json({ error: 'No encontrado' });
+        }
+        const flujo = await mergeFlujoOnServicioUpdate(exec, req.params.id, { etapas, subservicios });
+        await conn.commit();
+        conn.release();
+        res.json({
+            message: 'Servicio actualizado',
+            etapas_procesadas: flujo.etapas || undefined,
+            subservicios_procesados: flujo.subservicios || undefined,
+        });
+    } catch (e) {
+        try { await conn.rollback(); } catch (_) {}
+        conn.release();
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
+        if (e.statusCode === 404) return res.status(404).json({ error: e.message });
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.remove = async (req, res) => {
