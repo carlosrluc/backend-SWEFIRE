@@ -128,8 +128,7 @@ exports.update = async (req, res) => {
         conn.release();
         res.json({
             message: 'Servicio actualizado',
-            etapas_procesadas: flujo.etapas || undefined,
-            subservicios_procesados: flujo.subservicios || undefined,
+            ...flujo,
         });
     } catch (e) {
         try { await conn.rollback(); } catch (_) {}

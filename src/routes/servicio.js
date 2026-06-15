@@ -307,12 +307,16 @@ router.get('/:id/principal', c.getPrincipal);
  *         description: No encontrado
  *   put:
  *     tags: [Servicio]
- *     summary: Actualizar servicio (y opcionalmente etapas, actividades o subservicios)
+ *     summary: Actualizar servicio (sincroniza etapas, actividades y subservicios)
  *     description: |
- *       Actualiza campos del servicio. Si envía `etapas` o `subservicios`:
- *       - Etapa/actividad con `id` → actualiza el registro existente
- *       - Sin `id` → crea uno nuevo
- *       - Actividades con `origen=subservicio` no se editan por aquí; se gestionan vía `subservicios`
+ *       Actualiza campos del servicio. Si envía `etapas` y/o `subservicios`, el PUT **sincroniza** el flujo:
+ *       - Registro con `id` en el body → se actualiza
+ *       - Sin `id` → se crea
+ *       - Registro que existía en BD pero **no** viene en el array → se elimina
+ *       - En cada etapa, si envía `actividades[]`, aplica la misma lógica solo para actividades **manuales**
+ *         (las de subservicio se eliminan al quitar el subservicio del array)
+ *       - Subservicio existente sin cambios de etapa/servicio hijo **no** duplica su actividad
+ *       Flujo recomendado: GET → editar objeto → PUT con el objeto completo.
  *     parameters:
  *       - in: path
  *         name: id

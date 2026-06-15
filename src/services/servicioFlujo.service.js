@@ -38,18 +38,39 @@ async function syncActividadFromSubservicio(executor, subservicioId) {
     if (!rows.length) return;
 
     const sub = rows[0];
-    const existing = await executor.query(
+    let existing = await executor.query(
         `SELECT id FROM SERVICIO_ACTIVIDAD
-         WHERE id_servicio_subservicio = ? AND origen = 'subservicio'`,
+         WHERE id_servicio_subservicio = ? AND origen = 'subservicio'
+         ORDER BY id ASC`,
         [subservicioId],
     );
+
+    if (!existing.length) {
+        existing = await executor.query(
+            `SELECT sa.id FROM SERVICIO_ACTIVIDAD sa
+             WHERE sa.id_servicio_etapa = ? AND sa.ID_Servicio = ? AND sa.origen = 'subservicio'
+               AND sa.nombre = ?
+             ORDER BY sa.id ASC`,
+            [sub.id_servicio_etapa, sub.ID_Servicio, sub.nombre_subservicio],
+        );
+    }
+
+    if (existing.length > 1) {
+        const removeIds = existing.slice(1).map((r) => r.id);
+        const placeholders = removeIds.map(() => '?').join(',');
+        await executor.query(
+            `DELETE FROM SERVICIO_ACTIVIDAD WHERE id IN (${placeholders})`,
+            removeIds,
+        );
+        existing = [existing[0]];
+    }
 
     if (existing.length) {
         await executor.query(
             `UPDATE SERVICIO_ACTIVIDAD
-             SET id_servicio_etapa = ?, nombre = ?, ID_Servicio = ?
+             SET id_servicio_etapa = ?, nombre = ?, ID_Servicio = ?, id_servicio_subservicio = ?
              WHERE id = ?`,
-            [sub.id_servicio_etapa, sub.nombre_subservicio, sub.ID_Servicio, existing[0].id],
+            [sub.id_servicio_etapa, sub.nombre_subservicio, sub.ID_Servicio, subservicioId, existing[0].id],
         );
         return;
     }
