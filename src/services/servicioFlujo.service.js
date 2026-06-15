@@ -1,4 +1,11 @@
-const { syncCotizacionEtapasFromPhases } = require('./cotizacionEtapas.service');
+const {
+    pagoPorDiaToBoolean,
+    toPagoPorDiaEnum,
+    enrichEtapasConFechas,
+    enrichSubserviciosConFechas,
+    getPrincipalFechasFromTimeline,
+    buildEtapaTimeline,
+} = require('./servicioFechas.service');
 
 function principalToBoolean(value) {
     return value === 'YES' || value === true;
@@ -128,12 +135,12 @@ function mapActividadForResponse(act) {
     return base;
 }
 
-async function buildServicioDetalleFlujo(executor, idServicio) {
+async function buildServicioDetalleFlujo(executor, idServicio, fechaInicioProyecto = null) {
     const etapasTree = await loadServicioEtapasTree(executor, idServicio);
     const subservicios = await executor.query(
         `SELECT ss.id, ss.ID_Servicio_subservicio, ss.id_servicio_etapa,
-                s.nombre AS nombre_subservicio,
-                se.nombre AS nombre_etapa, se.orden AS orden_etapa
+                s.nombre AS nombre_subservicio, s.pago_por_dia AS pago_por_dia_sub,
+                se.nombre AS nombre_etapa, se.orden AS orden_etapa, se.duracion AS duracion_etapa
          FROM SERVICIO_SUBSERVICIO ss
          INNER JOIN SERVICIO s ON s.ID_Servicio = ss.ID_Servicio_subservicio
          INNER JOIN SERVICIO_ETAPA se ON se.id = ss.id_servicio_etapa
@@ -142,89 +149,106 @@ async function buildServicioDetalleFlujo(executor, idServicio) {
         [idServicio],
     );
 
-    return {
-        etapas: etapasTree.map((e) => ({
-            id: e.id,
-            nombre: e.nombre,
-            descripcion: e.descripcion ?? null,
-            duracion: e.duracion,
-            orden: e.orden,
-            actividades: e.actividades.map((a) => {
-                const act = {
-                    id: a.id,
-                    nombre: a.nombre,
-                    orden: a.orden,
-                    origen: a.origen === 'subservicio' ? 'subservicio' : 'manual',
-                };
-                if (a.origen === 'subservicio') {
-                    act.id_servicio_subservicio = a.id_servicio_subservicio ?? null;
-                    if (a.ID_Servicio_subservicio != null) {
-                        act.ID_Servicio_Hijo = a.ID_Servicio_subservicio;
-                    }
+    const etapasBase = etapasTree.map((e) => ({
+        id: e.id,
+        nombre: e.nombre,
+        descripcion: e.descripcion ?? null,
+        duracion: e.duracion,
+        orden: e.orden,
+        actividades: e.actividades.map((a) => {
+            const act = {
+                id: a.id,
+                nombre: a.nombre,
+                orden: a.orden,
+                origen: a.origen === 'subservicio' ? 'subservicio' : 'manual',
+            };
+            if (a.origen === 'subservicio') {
+                act.id_servicio_subservicio = a.id_servicio_subservicio ?? null;
+                if (a.ID_Servicio_subservicio != null) {
+                    act.ID_Servicio_Hijo = a.ID_Servicio_subservicio;
                 }
-                return act;
-            }),
-        })),
-        subservicios: subservicios.map((ss) => ({
-            id: ss.id,
-            ID_Servicio_subservicio: ss.ID_Servicio_subservicio,
-            id_servicio_etapa: ss.id_servicio_etapa,
-            nombre_subservicio: ss.nombre_subservicio,
-            orden_etapa: ss.orden_etapa,
-            ubicacion_etapa: {
-                id: ss.id_servicio_etapa,
-                nombre: ss.nombre_etapa,
-                orden: ss.orden_etapa,
-            },
-        })),
+            }
+            return act;
+        }),
+    }));
+
+    const etapas = fechaInicioProyecto
+        ? enrichEtapasConFechas(etapasBase, fechaInicioProyecto)
+        : etapasBase;
+
+    const subsBase = subservicios.map((ss) => ({
+        id: ss.id,
+        ID_Servicio_subservicio: ss.ID_Servicio_subservicio,
+        id_servicio_etapa: ss.id_servicio_etapa,
+        nombre_subservicio: ss.nombre_subservicio,
+        pago_por_dia: pagoPorDiaToBoolean(ss.pago_por_dia_sub),
+        orden_etapa: ss.orden_etapa,
+        duracion_etapa: ss.duracion_etapa,
+        ubicacion_etapa: {
+            id: ss.id_servicio_etapa,
+            nombre: ss.nombre_etapa,
+            orden: ss.orden_etapa,
+            duracion: ss.duracion_etapa,
+        },
+    }));
+
+    const subserviciosOut = fechaInicioProyecto
+        ? enrichSubserviciosConFechas(subsBase, etapasBase, fechaInicioProyecto)
+        : subsBase;
+
+    const timeline = fechaInicioProyecto ? buildEtapaTimeline(etapasBase, fechaInicioProyecto) : [];
+    const fechasPrincipal = timeline.length ? getPrincipalFechasFromTimeline(timeline) : null;
+
+    return {
+        etapas,
+        subservicios: subserviciosOut,
+        fecha_inicio_proyecto: fechaInicioProyecto ?? null,
+        fechas_servicio_principal: fechasPrincipal,
     };
 }
 
-async function buildPrincipalTemplate(executor, idServicio) {
+async function buildPrincipalTemplate(executor, idServicio, fechaInicioProyecto = null) {
     const servicioRows = await executor.query(
-        'SELECT ID_Servicio, nombre FROM SERVICIO WHERE ID_Servicio = ?',
+        'SELECT ID_Servicio, nombre, pago_por_dia FROM SERVICIO WHERE ID_Servicio = ?',
         [idServicio],
     );
     if (!servicioRows.length) return null;
 
     const servicio = servicioRows[0];
-    const etapasTree = await loadServicioEtapasTree(executor, idServicio);
-
-    const subservicios = await executor.query(
-        `SELECT ss.id, ss.ID_Servicio_subservicio, ss.id_servicio_etapa,
-                s.nombre AS nombre_subservicio,
-                se.nombre AS nombre_etapa, se.orden AS orden_etapa
-         FROM SERVICIO_SUBSERVICIO ss
-         INNER JOIN SERVICIO s ON s.ID_Servicio = ss.ID_Servicio_subservicio
-         INNER JOIN SERVICIO_ETAPA se ON se.id = ss.id_servicio_etapa
-         WHERE ss.ID_Servicio = ?
-         ORDER BY ss.id ASC`,
-        [idServicio],
-    );
+    const detalle = await buildServicioDetalleFlujo(executor, idServicio, fechaInicioProyecto);
 
     return {
         servicio_principal: {
             ID_Servicio: servicio.ID_Servicio,
             nombre: servicio.nombre,
             Principal: true,
-            etapas: etapasTree.map((e) => ({
+            pago_por_dia: pagoPorDiaToBoolean(servicio.pago_por_dia),
+            fecha_inicio: detalle.fechas_servicio_principal?.fecha_inicio ?? null,
+            fecha_finalizacion: detalle.fechas_servicio_principal?.fecha_finalizacion ?? null,
+            etapas: detalle.etapas.map((e) => ({
                 id: e.id,
                 nombre: e.nombre,
                 orden: e.orden,
+                duracion: e.duracion,
+                fecha_inicio: e.fecha_inicio ?? null,
+                fecha_finalizacion: e.fecha_finalizacion ?? null,
                 actividades: e.actividades.map(mapActividadForResponse),
             })),
         },
-        servicios_secundarios: subservicios.map((ss) => ({
+        servicios_secundarios: detalle.subservicios.map((ss) => ({
             id_subservicio: ss.id,
             ID_Servicio: ss.ID_Servicio_subservicio,
             nombre: ss.nombre_subservicio,
             Principal: false,
+            pago_por_dia: ss.pago_por_dia ?? false,
+            fecha_inicio: ss.fecha_inicio ?? null,
+            fecha_finalizacion: ss.fecha_finalizacion ?? null,
             ubicacion_etapa: {
-                id: ss.id_servicio_etapa,
-                nombre: ss.nombre_etapa,
-                orden: ss.orden_etapa,
+                ...ss.ubicacion_etapa,
+                duracion: ss.duracion_etapa ?? ss.ubicacion_etapa?.duracion,
             },
         })),
+        fecha_inicio_proyecto: fechaInicioProyecto ?? null,
     };
 }
 

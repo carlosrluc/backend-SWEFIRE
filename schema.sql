@@ -60,6 +60,7 @@ CREATE TABLE "SERVICIO" (
   "nombre" varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
   "descripcion" text COLLATE utf8mb4_unicode_ci,
   "precio_regular" decimal(12,2) DEFAULT NULL,
+  "pago_por_dia" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
   "condicional_precio" text COLLATE utf8mb4_unicode_ci,
   "observaciones" text COLLATE utf8mb4_unicode_ci,
   "Estado" enum('Activo','Desactivado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,

@@ -44,7 +44,10 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *         dueDate: { type: string, format: date }
  *         schedule: { type: string, description: jornada / horario }
  *         unitPrice: { type: number }
- *         Principal: { type: boolean, description: 'true = servicio principal; solo uno por cotización' }
+ *         Principal: { type: boolean }
+ *         pago_por_dia: { type: boolean, description: 'Heredado de SERVICIO; si true precio × días' }
+ *         dias: { type: integer, description: 'Días del servicio según etapas (solo respuesta)' }
+ *         precio_linea: { type: number, description: 'precio_comercial o precio_comercial × dias (solo respuesta)' }
  *         indicaciones: { type: string, nullable: true }
  *         id_servicio_subservicio: { type: integer, nullable: true, description: 'ID de SERVICIO_SUBSERVICIO si el secundario viene del catálogo' }
  *     CotizacionServicioLegacy:
@@ -120,6 +123,7 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *       properties:
  *         name: { type: string }
  *         id_solicitud: { type: integer, description: 'Requerido al crear. Importa servicios, productos y flujo desde la solicitud.' }
+ *         fecha_inicio_proyecto: { type: string, format: date, example: "2026-06-16", description: 'Inicio del proyecto; calcula fechas de servicios según duración de etapas' }
  *         DNI_O_RUC: { type: string, description: 'Opcional si viene de la solicitud' }
  *         inventory:
  *           type: array
@@ -199,6 +203,7 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *       example:
  *         name: "Cotización rociadores zona expansión"
  *         id_solicitud: 1
+ *         fecha_inicio_proyecto: "2026-06-16"
  *         quotationConditions:
  *           emissionDate: "2026-06-14"
  *           expirationDate: "2026-06-28"
@@ -247,8 +252,10 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *       - Servicios con `Principal`, `indicaciones` e `id_servicio_subservicio` desde `SOLICITUD_SERVICIO`
  *       - Productos desde `SOLICITUD_INVENTARIO`
  *       - Cliente, nombre, observaciones y `ubicacion` → `direccion_recojo`
- *       - Etapas/actividades del servicio principal a `COTIZACION_ETAPA` / `COTIZACION_ACTIVIDAD`
+ *       - Etapas/actividades del servicio principal a `COTIZACION_ETAPA` / `COTIZACION_ACTIVIDAD` (con `duracion` en días)
  *         (actividades de subservicio solo si están en la solicitud)
+ *       - Con `fecha_inicio_proyecto`, calcula `fecha_inicio`/`fecha_finalizacion` de servicios según duración de etapas
+ *       - Si `pago_por_dia` del servicio es true, el total usa `precio_comercial × días`; si no, solo `precio_comercial`
  *       Los valores enviados en el body tienen prioridad sobre la solicitud.
  *       Si envías `phases` / `etapas_detalle`, se usa ese flujo en lugar del importado.
  *     requestBody:

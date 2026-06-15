@@ -92,10 +92,12 @@ const { uploadServicioFoto } = require('../middlewares/upload.middleware');
  *         nombre: { type: string, example: "Instalación de Sistema de Rociadores (Sprinklers)" }
  *         descripcion: { type: string, example: "Instalación completa de sistema de rociadores automáticos" }
  *         precio_regular: { type: number, example: 15000 }
+ *         pago_por_dia: { type: boolean, example: true, description: 'Si true, precio_comercial × días del servicio en cotización' }
  *         condicional_precio: { type: string, nullable: true }
  *         observaciones: { type: string, nullable: true }
  *         Estado: { type: string, enum: [Activo, Desactivado], example: Activo }
  *         foto: { type: string, nullable: true, description: 'URL relativa; usar POST /servicios/{id}/foto para subir imagen' }
+ *         fecha_inicio_proyecto: { type: string, format: date, example: "2026-06-16", description: 'Fecha de inicio del proyecto para calcular fechas por etapa (preview en GET/POST/PUT)' }
  *         etapas:
  *           type: array
  *           description: Etapas del flujo por defecto del servicio (actividades manuales anidadas)
@@ -190,7 +192,9 @@ const { uploadServicioFoto } = require('../middlewares/upload.middleware');
  *             nombre: "Instalación de Sistema de Rociadores (Sprinklers)"
  *             descripcion: "Instalación completa de sistema de rociadores automáticos"
  *             precio_regular: 15000
+ *             pago_por_dia: true
  *             Estado: Activo
+ *             fecha_inicio_proyecto: "2026-06-16"
  *             etapas:
  *               - nombre: "fase de envio de productos"
  *                 descripcion: "salida del taller hasta el establecimiento"
@@ -296,9 +300,13 @@ router.get('/:id/principal', c.getPrincipal);
  *         name: id
  *         required: true
  *         schema: { type: integer }
+ *       - in: query
+ *         name: fecha_inicio
+ *         schema: { type: string, format: date, example: "2026-06-16" }
+ *         description: Fecha de inicio del proyecto para calcular fechas de etapas y subservicios
  *     responses:
  *       200:
- *         description: Servicio encontrado (incluye etapas, actividades y subservicios del flujo)
+ *         description: Servicio encontrado (incluye etapas con duracion/fechas, subservicios y pago_por_dia)
  *         content:
  *           application/json:
  *             schema:

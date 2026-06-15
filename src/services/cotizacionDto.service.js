@@ -81,6 +81,16 @@ function normalizeRate(body) {
     };
 }
 
+function resolveFechaInicioProyecto(body = {}) {
+    return toDateOnly(
+        body.fecha_inicio_proyecto
+        ?? body.fechaInicioProyecto
+        ?? body.projectStartDate
+        ?? body.fecha_inicio
+        ?? null,
+    );
+}
+
 function parsePhasesRaw(raw) {
     if (raw == null) return null;
     if (typeof raw === 'string') {
@@ -197,6 +207,7 @@ function normalizeCotizacionPayload(body = {}) {
         phasesProvided: body.phases !== undefined || body.etapas_detalle !== undefined,
         direccion_recojo: costoRecojo?.direccion_recojo ?? body.direccion_recojo ?? null,
         Id_incidencia: body.Id_incidencia ?? null,
+        fecha_inicio_proyecto: resolveFechaInicioProyecto(body),
     };
 }
 
@@ -209,7 +220,10 @@ function calcularPrecioTotal({ productos, servicios, camiones, costoRecojo }) {
         );
     }
     if (Array.isArray(servicios)) {
-        precioTotal += servicios.reduce((sum, s) => sum + Number(s.precio_comercial || 0), 0);
+        precioTotal += servicios.reduce(
+            (sum, s) => sum + Number((s.precio_linea ?? s.precio_comercial) || 0),
+            0,
+        );
     }
     if (Array.isArray(camiones)) {
         precioTotal += camiones.reduce((sum, c) => sum + Number(c.PrecioUnit ?? 0), 0);
@@ -247,6 +261,9 @@ function mapCotizacionServicioRow(row) {
         Principal,
         indicaciones: row.indicaciones ?? null,
         id_servicio_subservicio: row.id_servicio_subservicio ?? row.id_subservicio ?? null,
+        pago_por_dia: row.pago_por_dia === 'YES' || row.pago_por_dia === true,
+        dias: row.dias ?? null,
+        precio_linea: row.precio_linea ?? null,
     };
 }
 
@@ -272,6 +289,9 @@ function mapCotizacionServicioToUpsertService(row) {
         Principal: mapped.Principal,
         indicaciones: mapped.indicaciones,
         id_servicio_subservicio: mapped.id_servicio_subservicio,
+        pago_por_dia: mapped.pago_por_dia,
+        dias: mapped.dias,
+        precio_linea: mapped.precio_linea,
     };
 }
 
@@ -361,5 +381,6 @@ module.exports = {
     mapCotizacionServicioRow,
     mapCotizacionServicioToUpsertService,
     splitServiciosPrincipalSecundarios,
+    resolveFechaInicioProyecto,
     toDateOnly,
 };

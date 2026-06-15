@@ -27,6 +27,10 @@ const {
     principalToBoolean,
 } = require('../services/servicioFlujo.service');
 const {
+    aplicarFechasServiciosCotizacion,
+    calcularPrecioLineaServicios,
+} = require('../services/cotizacionFechas.service');
+const {
     archiveCotizacionSnapshot,
     assertCotizacionVigente,
     DESACTUALIZADO_VIGENTE,
@@ -43,6 +47,37 @@ async function ensureCotizacionVigente(cotizacionId, res) {
 
 const COTIZACION_VIGENTE_SQL = `desactualizado = '${DESACTUALIZADO_VIGENTE}'`;
 const approveQuotation = require('./approveQuotation.prototype');
+
+async function recalcularCotizacionFechasYPrecio(executor, cotizacionId, {
+    fechaInicioProyecto,
+    productos = [],
+    camiones = [],
+    costoRecojo = null,
+} = {}) {
+    if (fechaInicioProyecto) {
+        await aplicarFechasServiciosCotizacion(executor, cotizacionId, fechaInicioProyecto);
+    }
+    const { total: serviciosTotal, lineas } = await calcularPrecioLineaServicios(executor, cotizacionId);
+    const precioTotal = calcularPrecioTotal({
+        productos,
+        servicios: lineas.map((l) => ({ precio_linea: l.precio_linea })),
+        camiones,
+        costoRecojo,
+    });
+    await executor.query(
+        'UPDATE COTIZACION_COMERCIAL SET precio_total = ? WHERE ID = ?',
+        [precioTotal, cotizacionId],
+    );
+    return { precioTotal, lineas_servicios: lineas };
+}
+
+function resolverFechaInicioCotizacion(merged, serviciosList) {
+    const principal = (serviciosList || []).find((s) => toPrincipalEnum(s.Principal) === 'YES');
+    return merged.fecha_inicio_proyecto
+        ?? principal?.fecha_inicio
+        ?? principal?.startDate
+        ?? null;
+}
 
 function toDateTimeInicio(fecha) {
     if (!fecha) return null;
@@ -578,6 +613,7 @@ exports.getDetallesFranco = async (req, res) => {
                 c.indicaciones,
                 c.id_servicio_subservicio,
                 s.nombre as nombre_servicio,
+                s.pago_por_dia,
                 c.fecha_inicio,
                 c.fecha_finalizacion,
                 c.jornada,
@@ -587,7 +623,14 @@ exports.getDetallesFranco = async (req, res) => {
             WHERE c.ID_Cotizacion = ? AND c.ID_Servicio != 7
             ORDER BY c.Principal ASC, c.id ASC`;
         const serviciosResult = await db.query(servQuery, [cotizacionId]);
-        const servicios = serviciosResult.map((row) => mapCotizacionServicioRow(row));
+        const { lineas } = await calcularPrecioLineaServicios(db, cotizacionId);
+        const lineasById = new Map(lineas.map((l) => [l.id, l]));
+        const servicios = serviciosResult.map((row) => mapCotizacionServicioRow({
+            ...row,
+            dias: lineasById.get(row.idCotizacionServicio)?.dias,
+            precio_linea: lineasById.get(row.idCotizacionServicio)?.precio_linea,
+            pago_por_dia: row.pago_por_dia,
+        }));
         const { servicio_principal, servicios_secundarios } = splitServiciosPrincipalSecundarios(servicios);
 
         // Verificar si existen mensajes en el chat de la cotización
@@ -790,10 +833,19 @@ exports.create = async (req, res) => {
             }
         }
 
+        const fechaInicioProyecto = resolverFechaInicioCotizacion(merged, serviciosList);
+        const { precioTotal: precioFinal } = await recalcularCotizacionFechasYPrecio(db, newId, {
+            fechaInicioProyecto,
+            productos,
+            camiones: camionesList,
+            costoRecojo,
+        });
+
         res.status(201).json({
             message: 'Cotización creada',
             ID: newId,
-            precio_total: precioTotal,
+            precio_total: precioFinal,
+            fecha_inicio_proyecto: fechaInicioProyecto,
             servicios_insertados: serviciosInsertados.map((s) => ({ id: s.id, index: s.index })),
             importado_desde_solicitud: true,
         });
@@ -985,12 +1037,33 @@ exports.update = async (req, res) => {
         await exec.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL AND ${COTIZACION_VIGENTE_SQL})`);
         await exec.query(`UPDATE SOLICITUD SET estado = 'pendiente' WHERE ID NOT IN (SELECT id_solicitud FROM COTIZACION_COMERCIAL WHERE id_solicitud IS NOT NULL AND ${COTIZACION_VIGENTE_SQL})`);
 
+        const fechaInicioProyecto = resolverFechaInicioCotizacion(
+            normalized,
+            normalized.servicios ?? [],
+        );
+        const debeRecalcularFechas = fechaInicioProyecto && (
+            normalized.phasesProvided
+            || normalized.servicios !== undefined
+            || normalized.fecha_inicio_proyecto !== undefined
+        );
+        let precioFinal = precioTotal;
+        if (debeRecalcularFechas || normalized.servicios !== undefined || normalized.phasesProvided) {
+            const recalculo = await recalcularCotizacionFechasYPrecio(exec, cotizacionId, {
+                fechaInicioProyecto: debeRecalcularFechas ? fechaInicioProyecto : null,
+                productos: normalized.productos,
+                camiones: normalized.camiones,
+                costoRecojo: normalized.costoRecojo,
+            });
+            precioFinal = recalculo.precioTotal;
+        }
+
         await conn.commit();
         conn.release();
 
         res.json({
             message: 'Cotización actualizada',
-            precio_total: precioTotal,
+            precio_total: precioFinal,
+            fecha_inicio_proyecto: fechaInicioProyecto ?? undefined,
             version: archiveInfo.nextVersion,
             version_archivada: archiveInfo.archivedVersion,
             id_cotizacion_archivada: archiveInfo.archiveId,

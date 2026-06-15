@@ -11,6 +11,25 @@ const {
     persistFlujoOnServicioCreate,
     mergeFlujoOnServicioUpdate,
 } = require('../services/servicioFlujoWrite.service');
+const {
+    pagoPorDiaToBoolean,
+    toPagoPorDiaEnum,
+} = require('../services/servicioFechas.service');
+const { toDateOnly } = require('../services/cotizacionDto.service');
+
+function mapServicioRow(row) {
+    if (!row) return row;
+    return { ...row, pago_por_dia: pagoPorDiaToBoolean(row.pago_por_dia) };
+}
+
+function resolveFechaInicioProyecto(body, query) {
+    return toDateOnly(
+        body?.fecha_inicio_proyecto
+        ?? body?.fecha_inicio
+        ?? query?.fecha_inicio
+        ?? null,
+    );
+}
 
 const unlinkFotoIfExists = (fotoUrl) => {
     if (!fotoUrl) return;
@@ -64,13 +83,18 @@ exports.getById = async (req, res) => {
     try {
         const rows = await db.query('SELECT * FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-        const flujo = await buildServicioDetalleFlujo(db, req.params.id);
-        res.json({ ...rows[0], ...flujo });
+        const fechaInicio = resolveFechaInicioProyecto(req.body, req.query);
+        const flujo = await buildServicioDetalleFlujo(db, req.params.id, fechaInicio);
+        res.json({ ...mapServicioRow(rows[0]), ...flujo });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
 exports.create = async (req, res) => {
-    const { nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado, etapas, subservicios } = req.body;
+    const {
+        nombre, descripcion, precio_regular, pago_por_dia,
+        condicional_precio, observaciones, Estado, etapas, subservicios,
+    } = req.body;
+    const fechaInicio = resolveFechaInicioProyecto(req.body, req.query);
     const conn = await db.getConnection();
     const exec = {
         query: async (sql, params) => {
@@ -81,18 +105,22 @@ exports.create = async (req, res) => {
     try {
         await conn.beginTransaction();
         const result = await exec.query(
-            'INSERT INTO SERVICIO (nombre,descripcion,precio_regular,condicional_precio,observaciones,Estado) VALUES (?,?,?,?,?,?)',
-            [nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado],
+            `INSERT INTO SERVICIO
+                (nombre, descripcion, precio_regular, pago_por_dia, condicional_precio, observaciones, Estado)
+             VALUES (?,?,?,?,?,?,?)`,
+            [nombre, descripcion, precio_regular, toPagoPorDiaEnum(pago_por_dia), condicional_precio, observaciones, Estado],
         );
         const newId = result.insertId;
-        const flujo = await persistFlujoOnServicioCreate(exec, newId, { etapas, subservicios });
+        const flujoSync = await persistFlujoOnServicioCreate(exec, newId, { etapas, subservicios });
         await conn.commit();
         conn.release();
+        const detalle = await buildServicioDetalleFlujo(db, newId, fechaInicio);
         res.status(201).json({
             message: 'Servicio creado',
             ID_Servicio: newId,
-            etapas_creadas: flujo.etapas,
-            subservicios_creados: flujo.subservicios,
+            etapas_creadas: flujoSync.etapas,
+            subservicios_creados: flujoSync.subservicios,
+            ...detalle,
         });
     } catch (e) {
         try { await conn.rollback(); } catch (_) {}
@@ -104,7 +132,11 @@ exports.create = async (req, res) => {
 };
 
 exports.update = async (req, res) => {
-    const { nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado, etapas, subservicios } = req.body;
+    const {
+        nombre, descripcion, precio_regular, pago_por_dia,
+        condicional_precio, observaciones, Estado, etapas, subservicios,
+    } = req.body;
+    const fechaInicio = resolveFechaInicioProyecto(req.body, req.query);
     const conn = await db.getConnection();
     const exec = {
         query: async (sql, params) => {
@@ -114,21 +146,30 @@ exports.update = async (req, res) => {
     };
     try {
         await conn.beginTransaction();
+        const updateFields = {
+            nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado,
+        };
+        if (pago_por_dia !== undefined) updateFields.pago_por_dia = toPagoPorDiaEnum(pago_por_dia);
+        const setClauses = Object.keys(updateFields).map((k) => `${k}=?`).join(',');
         const result = await exec.query(
-            'UPDATE SERVICIO SET nombre=?,descripcion=?,precio_regular=?,condicional_precio=?,observaciones=?,Estado=? WHERE ID_Servicio=?',
-            [nombre, descripcion, precio_regular, condicional_precio, observaciones, Estado, req.params.id],
+            `UPDATE SERVICIO SET ${setClauses} WHERE ID_Servicio=?`,
+            [...Object.values(updateFields), req.params.id],
         );
         if (result.affectedRows === 0) {
             await conn.rollback();
             conn.release();
             return res.status(404).json({ error: 'No encontrado' });
         }
-        const flujo = await mergeFlujoOnServicioUpdate(exec, req.params.id, { etapas, subservicios });
+        const flujoSync = await mergeFlujoOnServicioUpdate(exec, req.params.id, { etapas, subservicios });
         await conn.commit();
         conn.release();
+        const rows = await db.query('SELECT * FROM SERVICIO WHERE ID_Servicio = ?', [req.params.id]);
+        const detalle = await buildServicioDetalleFlujo(db, req.params.id, fechaInicio);
         res.json({
             message: 'Servicio actualizado',
-            ...flujo,
+            ...mapServicioRow(rows[0]),
+            ...detalle,
+            ...flujoSync,
         });
     } catch (e) {
         try { await conn.rollback(); } catch (_) {}
@@ -345,7 +386,8 @@ exports.deleteInventarioRequerido = async (req, res) => {
 // ── GET plantilla principal (catálogo) ────────────────────────────────────────
 exports.getPrincipal = async (req, res) => {
     try {
-        const template = await buildPrincipalTemplate(db, req.params.id);
+        const fechaInicio = resolveFechaInicioProyecto(req.body, req.query);
+        const template = await buildPrincipalTemplate(db, req.params.id, fechaInicio);
         if (!template) return res.status(404).json({ error: 'Servicio no encontrado' });
         res.json(template);
     } catch (e) { res.status(500).json({ error: e.message }); }
