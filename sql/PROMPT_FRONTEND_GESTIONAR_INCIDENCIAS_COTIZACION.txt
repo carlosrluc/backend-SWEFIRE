@@ -40,11 +40,23 @@ Cambios requeridos en la UI "Gestionar incidencias"
        }
      }
      Tipos válidos: "involucrado" | "empresa" | "no_especificado"
-   - Respuesta 201 incluye:
-     - id, version, nombre, DNI_O_RUC, destinatario, precio_total
-     - presupuesto_autorrellenado: líneas Material Directo con la DIFERENCIA (costo_real vs presupuestado)
-       del presupuesto del proyecto original, filtradas por ID_Incidencia
-     - servicios: [] (vacío al crear; el usuario los agrega después)
+   - Respuesta 201 incluye el ID en la raíz del JSON (campos canónicos: `id`, `ID`, `id_cotizacion`, `ID_Cotizacion`):
+     {
+       "message": "Cotización de incidencia creada",
+       "id": 123,
+       "ID": 123,
+       "id_cotizacion": 123,
+       "version": 1,
+       "nombre": "...",
+       "DNI_O_RUC": "...",
+       "destinatario": { ... },
+       "precio_total": 0,
+       "presupuesto_autorrellenado": [ ... ],
+       "servicios": [],
+       "Id_incidencia": 5,
+       "esCotizacionIncidencia": true,
+       "cotizacion": { ... mismo objeto ... }
+     }
    - Redirigir o abrir editor de cotización con el ID devuelto.
 
 4) Listado de cotizaciones de la incidencia
@@ -75,7 +87,9 @@ Cambios requeridos en la UI "Gestionar incidencias"
    - Tras crear cotización, considerar actualizar estado de incidencia si aplica (ej. "Cotizacion sin respuesta").
    - El campo `cotizacion_remuneracion` en INCIDENCIA es distinto de `Id_incidencia` en COTIZACION_COMERCIAL;
      no confundirlos. Una incidencia puede tener varias cotizaciones vía Id_incidencia.
-
+8) la pantalla principal de indicencias
+ recuerda que las cotizaciones son segun incidencias en la pantalla principal hay un listado de las incidencias de este proyecto que se listan con GET /api/incidencias/proyecto/:id_proyecto
+ en este apartado que al precionar en el listado una incidencia , que los botones de abajo que habren modales (como el objetos relacionados, gastos etc) respondan y boten el modal con la informacion segun tal incidencia tocada , igual con el "crear cotizacion" que esta al principio
 Resumen de endpoints nuevos
 ---------------------------
 GET  /api/incidencias/:id/cotizaciones/destinatarios
@@ -83,9 +97,6 @@ GET  /api/incidencias/:id/cotizaciones
 POST /api/incidencias/:id/cotizaciones
 GET  /api/servicios/incidencia/catalogo
 
-Migración SQL (ejecutar en BD antes de probar)
-----------------------------------------------
-sql/migrate_cotizacion_incidencia_flujo.sql
 
 Notas sobre cliente dummy
 -------------------------

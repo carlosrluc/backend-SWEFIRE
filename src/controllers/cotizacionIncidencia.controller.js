@@ -33,6 +33,7 @@ exports.createCotizacionIncidencia = async (req, res) => {
         const result = await createCotizacionIncidencia(Number(req.params.id), req.body);
         res.status(201).json({
             message: 'Cotización de incidencia creada',
+            ...result,
             cotizacion: result,
         });
     } catch (e) { handleError(res, e); }

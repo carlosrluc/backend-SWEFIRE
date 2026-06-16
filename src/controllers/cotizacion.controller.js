@@ -500,7 +500,7 @@ exports.getDetalles = async (req, res) => {
         }
 
         // Obtener datos base de la cotización comercial
-        const baseQuery = `SELECT comentario_cliente, fecha_emision, fecha_vigencia, observacion FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`;
+        const baseQuery = `SELECT comentario_cliente, fecha_emision, fecha_vigencia, observacion FROM COTIZACION_COMERCIAL WHERE ID = ? AND (${COTIZACION_VIGENTE_SQL} OR Id_incidencia IS NOT NULL)`;
         const baseResult = await db.query(baseQuery, [cotizacionId]);
         if (!baseResult.length) return res.status(404).json({ error: 'Cotización no encontrada' });
 
@@ -601,7 +601,7 @@ exports.getDetallesFranco = async (req, res) => {
         }
 
         const { estado: estadoFiltro, nombre: nombreFiltro } = req.query;
-        let baseQuery = `SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`;
+        let baseQuery = `SELECT * FROM COTIZACION_COMERCIAL WHERE ID = ? AND (${COTIZACION_VIGENTE_SQL} OR Id_incidencia IS NOT NULL)`;
         const baseArgs = [cotizacionId];
         if (estadoFiltro) {
             baseQuery += ' AND estado = ?';

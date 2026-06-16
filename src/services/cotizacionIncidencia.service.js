@@ -12,6 +12,15 @@ function httpError(status, message) {
     return err;
 }
 
+async function resolveInsertId(exec, insertResult) {
+    const direct = Number(insertResult?.insertId);
+    if (direct > 0) return direct;
+    const rows = await exec.query('SELECT LAST_INSERT_ID() AS id');
+    const fallback = Number(rows[0]?.id);
+    if (fallback > 0) return fallback;
+    throw httpError(500, 'No se pudo obtener el ID de la cotización creada');
+}
+
 async function isServicioPermitidoIncidencia(exec, idServicio) {
     const id = Number(idServicio);
     if (id === ENVIO_SERVICIO_ID) return true;
@@ -171,34 +180,23 @@ async function resolveDestinatarioCliente(exec, idIncidencia, destinatario) {
 }
 
 async function getPresupuestoDiferenciasIncidencia(exec, idIncidencia) {
-    const incRows = await exec.query(
-        'SELECT id_proyecto, nombre_incidencia FROM INCIDENCIA WHERE id_incidencia = ?',
-        [idIncidencia],
-    );
-    if (!incRows.length || !incRows[0].id_proyecto) return [];
-
-    const projRows = await exec.query(
-        'SELECT id_cotizacion FROM PROYECTO WHERE id_Proyecto = ?',
-        [incRows[0].id_proyecto],
-    );
-    if (!projRows.length || !projRows[0].id_cotizacion) return [];
-
-    const idCotProyecto = projRows[0].id_cotizacion;
     const presRows = await exec.query(
-        `SELECT *
-         FROM PRESUPUESTO
-         WHERE ID_Cotizacion = ?
-           AND tipo = 'Material Directo'
-           AND costo_real IS NOT NULL
-           AND ID_Incidencia = ?`,
-        [idCotProyecto, idIncidencia],
+        `SELECT P.*
+         FROM PRESUPUESTO P
+         INNER JOIN PROYECTO PR ON PR.id_cotizacion = P.ID_Cotizacion
+         INNER JOIN INCIDENCIA INC ON INC.id_proyecto = PR.id_Proyecto
+         WHERE INC.id_incidencia = ?
+           AND P.tipo = 'Material Directo'
+           AND P.costo_real IS NOT NULL
+           AND P.ID_Incidencia = ?`,
+        [idIncidencia, idIncidencia],
     );
 
     return presRows
         .map((row) => {
             const presupuestado = Number(row.costo_total) || 0;
             const real = Number(row.costo_real) || 0;
-            const diferencia = row.diferencia != null
+            const diferencia = row.diferencia != null && row.diferencia !== ''
                 ? Number(row.diferencia)
                 : (real - presupuestado);
             return {
@@ -210,18 +208,19 @@ async function getPresupuestoDiferenciasIncidencia(exec, idIncidencia) {
                 diferencia,
             };
         })
-        .filter((row) => row.diferencia !== 0);
+        .filter((row) => Math.abs(row.diferencia) > 0);
 }
 
 async function insertPresupuestoDiferencias(exec, idCotizacion, idIncidencia, diferencias) {
     const inserted = [];
     for (const item of diferencias) {
-        const monto = Math.abs(item.diferencia);
+        const monto = Math.round(Math.abs(item.diferencia) * 100) / 100;
+        const diferencia = Math.round(item.diferencia * 100) / 100;
         const result = await exec.query(
             `INSERT INTO PRESUPUESTO
                 (ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto, costo_unitario, cantidad,
-                 costo_total, moneda, ID_Incidencia, razon)
-             VALUES (?, 'Material Directo', 'durante servicio', ?, ?, 1, ?, ?, ?, ?)`,
+                 costo_total, moneda, ID_Incidencia, diferencia, razon)
+             VALUES (?, 'Material Directo', 'durante servicio', ?, ?, 1, ?, ?, ?, ?, ?)`,
             [
                 idCotizacion,
                 `${item.nombre_gasto || 'Material directo'} (diferencia incidencia)`,
@@ -229,10 +228,23 @@ async function insertPresupuestoDiferencias(exec, idCotizacion, idIncidencia, di
                 monto,
                 item.moneda || 'soles',
                 idIncidencia,
-                `Autorrellenado desde presupuesto #${item.presupuesto_origen_id}. Diferencia: ${item.diferencia}`,
+                diferencia,
+                `Autorrellenado desde presupuesto #${item.presupuesto_origen_id}. Diferencia: ${diferencia}`,
             ],
         );
-        inserted.push({ id: result.insertId, ...item, monto_cotizado: monto });
+        const presupuestoId = await resolveInsertId(exec, result);
+        inserted.push({
+            id: presupuestoId,
+            ID: presupuestoId,
+            ID_Cotizacion: idCotizacion,
+            tipo: 'Material Directo',
+            nombre_gasto: `${item.nombre_gasto || 'Material directo'} (diferencia incidencia)`,
+            costo_total: monto,
+            diferencia,
+            ID_Incidencia: idIncidencia,
+            ...item,
+            monto_cotizado: monto,
+        });
     }
     return inserted;
 }
@@ -400,12 +412,15 @@ async function createCotizacionIncidencia(idIncidencia, body) {
             ],
         );
 
-        const newId = result.insertId;
+        const newId = await resolveInsertId(exec, result);
         const presupuestoInsertado = await insertPresupuestoDiferencias(exec, newId, idIncidencia, diferencias);
         const serviciosInsertados = await insertServiciosIncidencia(exec, newId, serviciosList);
 
         return {
             id: newId,
+            ID: newId,
+            id_cotizacion: newId,
+            ID_Cotizacion: newId,
             version: versionNum,
             nombre,
             DNI_O_RUC: cliente.DNI_O_RUC,
@@ -418,6 +433,7 @@ async function createCotizacionIncidencia(idIncidencia, body) {
             presupuesto_autorrellenado: presupuestoInsertado,
             servicios: serviciosInsertados,
             Id_incidencia: idIncidencia,
+            esCotizacionIncidencia: true,
             id_solicitud: null,
         };
     });
