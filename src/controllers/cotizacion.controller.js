@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const catchAsync = require('../utils/catchAsync');
 const { aggregateInventarioPorCotizacion } = require('../services/inventarioPorServicio.service');
 const { syncProyectoEtapasFromCotizacion } = require('../services/proyectoEtapas.service');
 const {
@@ -65,7 +66,7 @@ const INVENTARIO_COTIZACION_SELECT = `
     LEFT JOIN COTIZACION_SERVICIO CS ON CI.servicio_a_alquilar = CS.id
 `;
 const COTIZACION_VIGENTE_SQL = `desactualizado = '${DESACTUALIZADO_VIGENTE}'`;
-const approveQuotation = require('./approveQuotation.prototype');
+const { approveCotizacionById } = require('../services/approveCotizacion.service');
 
 async function recalcularCotizacionFechasYPrecio(executor, cotizacionId, {
     fechaInicioProyecto,
@@ -371,7 +372,11 @@ exports.formatQuotation = (row, rol) => {
         DNI_O_RUC: row.DNI_O_RUC,
         Id_incidencia: row.Id_incidencia ?? null,
         desactualizado: row.desactualizado ?? DESACTUALIZADO_VIGENTE,
-        Tasa_Cambio: row.Tasa_Cambio
+        Tasa_Cambio: row.Tasa_Cambio,
+        ordenCompra: row.Orden_compra || null,
+        pendienteAprobacionOrden: Boolean(
+            row.Orden_compra && row.estado === 'Pendiente',
+        ),
     };
 
     if (rol !== 'cliente' && row.Cliente_Nombre) {
@@ -393,7 +398,7 @@ exports.getAll = async (req, res) => {
         let args = [];
         let countArgs = [];
 
-        const { estado, nombre } = req.query;
+        const { estado, nombre, con_orden_compra, pendiente_aprobacion } = req.query;
         let whereClauses = [`C_C.${COTIZACION_VIGENTE_SQL}`];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -417,6 +422,17 @@ exports.getAll = async (req, res) => {
             whereClauses.push('C_C.nombre LIKE ?');
             args.push(`%${nombre}%`);
             countArgs.push(`%${nombre}%`);
+        }
+
+        const hasOrdenCompraSql = "(C_C.Orden_compra IS NOT NULL AND C_C.Orden_compra != '')";
+        if (con_orden_compra === 'true' || con_orden_compra === '1') {
+            whereClauses.push(hasOrdenCompraSql);
+        }
+        if (pendiente_aprobacion === 'true' || pendiente_aprobacion === '1') {
+            whereClauses.push(hasOrdenCompraSql);
+            whereClauses.push('C_C.estado = ?');
+            args.push('Pendiente');
+            countArgs.push('Pendiente');
         }
 
         if (whereClauses.length > 0) {
@@ -1233,8 +1249,13 @@ exports.remove = async (req, res) => {
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
-// TODO: verificar funcionamiento y mover a SP todo comando transaccional
-exports.approve = approveQuotation
+exports.approve = catchAsync(async (req, res) => {
+    const result = await approveCotizacionById(req.params.id);
+    res.status(201).json({
+        message: 'Cotización aprobada y proyecto creado',
+        ...result,
+    });
+});
 
 // ── COTIZACION_SERVICIO ───────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
@@ -1654,7 +1675,6 @@ exports.sendChatMessage = async (req, res) => {
 // ── ORDEN DE COMPRA (PDF) ───────────────────────────────────────────────────────
 const path = require('path');
 const fs = require('fs');
-const catchAsync = require('../utils/catchAsync');
 const { getQuotationByID, upsertPurchaseOrderFileURL } = require('../repositories/quotation.repository');
 const deleteFile = require('../utils/deleteFile');
 const { QuotationStatus } = require('../enums/quotation.enums');
@@ -1672,15 +1692,21 @@ exports.uploadOrdenCompra = catchAsync(async (req, res) => {
     }
 
     if (quotation.estado !== QuotationStatus.PENDING) {
+        fs.unlinkSync(req.file.path);
         return res.status(401).json({ error: `Solo se pueden subir ordenes de compra para cotizaciones con el estado: ${QuotationStatus.PENDING}` });
     }
 
-    // Borrar PDF viejo de orden de compra
-    const OldRelativePurchaseOrderFileUrl = quotation.Orden_compra;
-    deleteFile(OldRelativePurchaseOrderFileUrl);
+    // Borrar PDF viejo de orden de compra (si existe)
+    if (quotation.Orden_compra) {
+        deleteFile(quotation.Orden_compra);
+    }
     // Actualizar nueva URL relativa en la base de datos
     const NewRelativeUrl = await upsertPurchaseOrderFileURL(req.file.filename, QuotationID);
-    res.status(200).json({ message: 'Orden de compra subida correctamente.', url: NewRelativeUrl });
+    res.status(200).json({
+        message: 'Orden de compra subida correctamente.',
+        url: NewRelativeUrl,
+        ruta: NewRelativeUrl,
+    });
 })
 
 exports.getOrdenCompra = async (req, res) => {
@@ -1694,6 +1720,13 @@ exports.getOrdenCompra = async (req, res) => {
         const fileUrl = rows[0].Orden_compra;
         if (!fileUrl) {
             return res.status(404).json({ error: 'No hay ninguna orden de compra guardada para esta cotización' });
+        }
+
+        if (req.query.format === 'json') {
+            return res.json({
+                cotizacionId: Number(req.params.id),
+                url: fileUrl,
+            });
         }
 
         // Redirigir a la URL pública (servida por express.static)

@@ -257,6 +257,14 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *       - $ref: '#/components/parameters/LimitQuery'
  *       - $ref: '#/components/parameters/CotizacionEstadoQuery'
  *       - $ref: '#/components/parameters/CotizacionNombreQuery'
+ *       - in: query
+ *         name: con_orden_compra
+ *         schema: { type: string, enum: ['true', '1'] }
+ *         description: Solo cotizaciones con orden de compra adjunta
+ *       - in: query
+ *         name: pendiente_aprobacion
+ *         schema: { type: string, enum: ['true', '1'] }
+ *         description: Orden de compra adjunta y estado Pendiente (listo para aprobar)
  *     responses:
  *       200:
  *         description: Lista de cotizaciones con metadatos de paginación
@@ -302,7 +310,7 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *                       id: { type: integer, description: id COTIZACION_SERVICIO }
  *                       index: { type: integer }
  */
-router.get('/', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getAll);
+router.get('/', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy', 'asistproy']), c.getAll);
 router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy']), c.create);
 
 /**
@@ -361,17 +369,18 @@ router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
  * /api/cotizaciones/{id}/aprobar:
  *   put:
  *     tags: [Cotización]
- *     summary: Aprobar cotización y generar proyecto
+ *     summary: Aprobar cotización (orden de compra) y generar proyecto
  *     description: |
- *       Crea un proyecto, trabajo, etapas/actividades y migra inventario,
- *       camiones y personal desde la cotización. Marca la cotización como aprobada.
+ *       Requiere que la cotización tenga orden de compra adjunta y estado Pendiente.
+ *       Crea un proyecto heredando inventario, servicios, camiones, etapas y trabajos.
+ *       Marca la cotización como aprobada. Roles gerente, asistproy y adminproy.
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
  *         schema: { type: integer }
  *     responses:
- *       200:
+ *       201:
  *         description: Proyecto creado exitosamente
  *         content:
  *           application/json:
@@ -383,16 +392,16 @@ router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
  *                   example: Proyecto creado correctamente
  *                 id_proyecto:
  *                   type: integer
- *                 id_trabajo:
+ *                 trabajos_creados:
  *                   type: integer
  *       400:
- *         description: El cliente aún no adjunta la orden de compra
+ *         description: Sin orden de compra o estado inválido
  *       409:
  *         description: La cotización ya fue aprobada
  *       404:
  *         description: Cotización no encontrada
  */
-router.put('/:id/aprobar', auth, permit(['adminproy']), c.approve)
+router.put('/:id/aprobar', auth, permit(['gerente', 'adminproy', 'asistproy']), c.approve);
 
 /**
  * @openapi
@@ -923,6 +932,9 @@ router.post('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.se
  *   get:
  *     tags: [Cotización - Documentos]
  *     summary: Descargar o visualizar la orden de compra
+ *     description: |
+ *       Por defecto redirige al PDF. Con `?format=json` devuelve `{ url, cotizacionId }`.
+ *       La URL relativa también viene en `ordenCompra` al listar cotizaciones.
  *     parameters:
  *       - in: path
  *         name: id
@@ -959,7 +971,7 @@ router.post('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.se
  *       200:
  *         description: Orden de compra subida correctamente
  */
-router.get('/:id/orden-compra', auth, c.getOrdenCompra);
+router.get('/:id/orden-compra', auth, permit(['cliente', 'gerente', 'adminproy', 'asistproy']), c.getOrdenCompra);
 router.post('/:id/orden-compra',
     auth,
     permit(['cliente', 'gerente', 'adminproy']),
