@@ -1,7 +1,7 @@
 const { getQuotationByID } = require('../repositories/quotation.repository');
 const { QuotationStatus } = require('../enums/quotation.enums');
 const { syncProyectoEtapasFromCotizacion } = require('./proyectoEtapas.service');
-const { generarTrabajosDesdeServiciosProyecto } = require('./proyectoTrabajo.service');
+const { generarTrabajosDesdeCotizacion } = require('./proyectoTrabajo.service');
 const db = require('../config/db');
 
 function httpError(status, message) {
@@ -12,7 +12,7 @@ function httpError(status, message) {
 
 /**
  * Aprueba una cotización con orden de compra adjunta y crea el proyecto heredando
- * inventario, servicios, camiones, etapas y trabajos desde la cotización.
+ * inventario, servicios, camiones, etapas, personal asignado y trabajos (TRABAJO) desde la cotización.
  */
 async function approveCotizacionById(quotationId) {
     const quotation = await getQuotationByID(quotationId);
@@ -151,7 +151,23 @@ async function approveCotizacionById(quotationId) {
             );
         }
 
-        const { trabajos_creados } = await generarTrabajosDesdeServiciosProyecto(exec, idProyecto, serviciosCot);
+        const { trabajos_creados, id_trabajo_principal } = await generarTrabajosDesdeCotizacion(
+            exec,
+            idProyecto,
+            quotationId,
+            serviciosCot,
+            {
+                fechaInicioFallback: fechaInicioProyecto,
+                fechaFinFallback: fechaFinProyecto,
+            },
+        );
+
+        if (id_trabajo_principal) {
+            await exec.query(
+                'UPDATE PROYECTO SET ID_Trabajo = ? WHERE id_Proyecto = ?',
+                [id_trabajo_principal, idProyecto],
+            );
+        }
 
         await exec.query(
             'UPDATE COTIZACION_COMERCIAL SET estado = ? WHERE ID = ? AND desactualizado = ?',
