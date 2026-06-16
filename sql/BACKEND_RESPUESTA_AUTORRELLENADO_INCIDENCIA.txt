@@ -1,0 +1,96 @@
+RESPUESTA BACKEND — Autorrellenado cotizaciones de incidencia
+=============================================================
+
+Pregunta directa
+----------------
+¿Al crear POST /api/incidencias/{id}/cotizaciones, las líneas de Material Directo
+derivadas del gasto real filtrado por ID_Incidencia quedan guardadas y son devueltas
+por GET /api/presupuestos/cotizacion/{id_nueva}?tipo=Material Directo?
+
+Respuesta: SÍ (tras los ajustes de este commit).
+
+Flujo implementado
+------------------
+1. POST crea COTIZACION_COMERCIAL con Id_incidencia = {id_incidencia}, id_solicitud = NULL.
+2. Busca en el presupuesto de la cotización del proyecto (PROYECTO.id_cotizacion):
+   - tipo = 'Material Directo'
+   - costo_real IS NOT NULL
+   - ID_Incidencia = incidencia actual
+   - diferencia ≠ 0 (usa campo diferencia o costo_real - costo_total)
+3. Inserta filas en PRESUPUESTO de la NUEVA cotización con:
+   - tipo: Material Directo
+   - realizacion_gastos: en preparacion
+   - estancia: para proyecto
+   - nombre_gasto: mismo nombre del ítem origen
+   - cantidad: 1, costo_unitario/costo_total: |diferencia|
+   - ID_Incidencia: incidencia actual
+   - diferencia: delta firmado del origen
+4. Relee desde BD las filas insertadas y las devuelve en presupuesto_autorrellenado.
+
+Contrato POST (201)
+-------------------
+{
+  "message": "Cotización de incidencia creada",
+  "id": 123,
+  "ID": 123,
+  "id_cotizacion": 123,
+  "Id_incidencia": 45,
+  "esCotizacionIncidencia": true,
+  "presupuesto_autorrellenado": [ /* mismas filas que GET presupuesto */ ],
+  "servicios": [],
+  "cotizacion": { ... }
+}
+
+GET presupuesto (fuente principal del editor)
+---------------------------------------------
+GET /api/presupuestos/cotizacion/{id}?tipo=Material Directo
+
+Devuelve array directo con campos:
+ID, ID_Cotizacion, tipo, nombre_gasto, costo_unitario, cantidad, costo_total,
+realizacion_gastos, moneda, estancia, ID_Incidencia, diferencia
+
+GET detalles-franco
+-------------------
+GET /api/cotizaciones/{id}/detalles-franco
+
+Incluye:
+- id
+- Id_incidencia / id_incidencia
+- esCotizacionIncidencia: true
+- productos: []  ← esperado para cotizaciones de incidencia (no usa COTIZACION_INVENTARIO)
+
+Lo que NO es bug
+----------------
+- productos vacío en detalles-franco: correcto; el material directo vive en PRESUPUESTO.
+- presupuesto_autorrellenado vacío: válido si no hay gastos reales con ID_Incidencia
+  y diferencia > 0 en la cotización del proyecto.
+
+Verificación curl
+-----------------
+# 1. Origen (proyecto) — debe tener ítems con costo_real e ID_Incidencia
+curl -H "Authorization: Bearer TOKEN" \
+  "/api/presupuestos/cotizacion/{C_proyecto}/real?tipo=Material%20Directo&ID_Incidencia=45"
+
+# 2. Crear cotización de incidencia
+curl -X POST -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
+  "/api/incidencias/45/cotizaciones" \
+  -d '{"destinatario":{"tipo":"no_especificado"}}'
+
+# 3. Presupuesto nueva cotización (debe coincidir con presupuesto_autorrellenado del POST)
+curl -H "Authorization: Bearer TOKEN" \
+  "/api/presupuestos/cotizacion/123?tipo=Material%20Directo"
+
+# 4. Detalles-franco
+curl -H "Authorization: Bearer TOKEN" \
+  "/api/cotizaciones/123/detalles-franco"
+
+Checklist backend
+-----------------
+[x] POST devuelve id > 0 en raíz
+[x] Líneas persistidas en PRESUPUESTO
+[x] GET presupuesto devuelve mismas líneas tras F5
+[x] detalles-franco expone Id_incidencia
+[x] productos vacío en detalles-franco es intencional
+[x] Autorrellenado no depende del destinatario
+[x] PUT aprobar rechaza cotizaciones de incidencia
+[x] No aparecen en GET /api/cotizaciones (listado general)

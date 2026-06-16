@@ -8,7 +8,7 @@ exports.getByCotizacion = async (req, res) => {
         const idCotizacion = req.params.id;
         const tipo = req.query.tipo;
         
-        let query = 'SELECT ID, ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto, costo_unitario, cantidad, costo_total, moneda, costo_x_hora, hora_total, dias_trabajados, estancia FROM PRESUPUESTO WHERE ID_Cotizacion = ?';
+        let query = 'SELECT ID, ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto, costo_unitario, cantidad, costo_total, moneda, costo_x_hora, hora_total, dias_trabajados, estancia, ID_Incidencia, diferencia FROM PRESUPUESTO WHERE ID_Cotizacion = ?';
         const params = [idCotizacion];
         
         if (tipo) {

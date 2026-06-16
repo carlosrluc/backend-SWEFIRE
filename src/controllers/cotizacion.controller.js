@@ -801,6 +801,9 @@ exports.getDetallesFranco = async (req, res) => {
         res.json({
             id: base.ID,
             id_solicitud: base.id_solicitud ?? null,
+            Id_incidencia: base.Id_incidencia ?? null,
+            id_incidencia: base.Id_incidencia ?? null,
+            esCotizacionIncidencia: Boolean(base.Id_incidencia),
             ...upsertDto,
             // Legacy (compatibilidad con consumidores existentes)
             nombre: base.nombre || '',

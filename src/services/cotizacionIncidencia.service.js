@@ -211,19 +211,43 @@ async function getPresupuestoDiferenciasIncidencia(exec, idIncidencia) {
         .filter((row) => Math.abs(row.diferencia) > 0);
 }
 
+const PRESUPUESTO_ITEM_SELECT = `
+    ID, ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto, costo_unitario, cantidad,
+    costo_total, moneda, estancia, ID_Incidencia, diferencia
+`;
+
+async function loadPresupuestoMaterialDirecto(exec, idCotizacion) {
+    return exec.query(
+        `SELECT ${PRESUPUESTO_ITEM_SELECT}
+         FROM PRESUPUESTO
+         WHERE ID_Cotizacion = ? AND tipo = 'Material Directo'
+         ORDER BY ID ASC`,
+        [idCotizacion],
+    );
+}
+
+function cleanPresupuestoRow(row) {
+    const cleanRow = {};
+    for (const key in row) {
+        if (row[key] !== null && row[key] !== undefined) {
+            cleanRow[key] = row[key];
+        }
+    }
+    return cleanRow;
+}
+
 async function insertPresupuestoDiferencias(exec, idCotizacion, idIncidencia, diferencias) {
-    const inserted = [];
     for (const item of diferencias) {
         const monto = Math.round(Math.abs(item.diferencia) * 100) / 100;
         const diferencia = Math.round(item.diferencia * 100) / 100;
-        const result = await exec.query(
+        await exec.query(
             `INSERT INTO PRESUPUESTO
                 (ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto, costo_unitario, cantidad,
-                 costo_total, moneda, ID_Incidencia, diferencia, razon)
-             VALUES (?, 'Material Directo', 'durante servicio', ?, ?, 1, ?, ?, ?, ?, ?)`,
+                 costo_total, moneda, estancia, ID_Incidencia, diferencia, razon)
+             VALUES (?, 'Material Directo', 'en preparacion', ?, ?, 1, ?, ?, 'para proyecto', ?, ?, ?)`,
             [
                 idCotizacion,
-                `${item.nombre_gasto || 'Material directo'} (diferencia incidencia)`,
+                item.nombre_gasto || 'Material directo',
                 monto,
                 monto,
                 item.moneda || 'soles',
@@ -232,21 +256,9 @@ async function insertPresupuestoDiferencias(exec, idCotizacion, idIncidencia, di
                 `Autorrellenado desde presupuesto #${item.presupuesto_origen_id}. Diferencia: ${diferencia}`,
             ],
         );
-        const presupuestoId = await resolveInsertId(exec, result);
-        inserted.push({
-            id: presupuestoId,
-            ID: presupuestoId,
-            ID_Cotizacion: idCotizacion,
-            tipo: 'Material Directo',
-            nombre_gasto: `${item.nombre_gasto || 'Material directo'} (diferencia incidencia)`,
-            costo_total: monto,
-            diferencia,
-            ID_Incidencia: idIncidencia,
-            ...item,
-            monto_cotizado: monto,
-        });
     }
-    return inserted;
+    const rows = await loadPresupuestoMaterialDirecto(exec, idCotizacion);
+    return rows.map(cleanPresupuestoRow);
 }
 
 async function insertServiciosIncidencia(exec, idCotizacion, serviciosList) {
@@ -470,4 +482,6 @@ module.exports = {
     getServiciosCatalogoIncidencia,
     isCotizacionIncidencia,
     getPresupuestoDiferenciasIncidencia,
+    loadPresupuestoMaterialDirecto,
+    cleanPresupuestoRow,
 };
