@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const c = require('../controllers/incidencia.controller');
+const ci = require('../controllers/cotizacionIncidencia.controller');
 const auth = require('../middlewares/auth.middleware');
 const { permit } = require('../middlewares/role.middleware');
 
@@ -324,5 +325,27 @@ router.post('/:id/involucrados', auth, permit(['abogado', 'gerente', 'adminproy'
  *         description: Eliminado
  */
 router.delete('/:id/involucrados/:ivid', auth, permit(['gerente', 'adminproy']), c.deleteInvolucrado);
+
+/**
+ * @openapi
+ * /api/incidencias/{id}/cotizaciones/destinatarios:
+ *   get:
+ *     tags: [Incidencias]
+ *     summary: Opciones de destinatario para crear cotización de incidencia
+ */
+router.get('/:id/cotizaciones/destinatarios', auth, permit(['abogado', 'gerente', 'adminproy', 'supervisorcampo']), ci.getDestinatariosCotizacion);
+
+/**
+ * @openapi
+ * /api/incidencias/{id}/cotizaciones:
+ *   get:
+ *     tags: [Incidencias]
+ *     summary: Listar cotizaciones asociadas a la incidencia (incluye versiones desactualizadas)
+ *   post:
+ *     tags: [Incidencias]
+ *     summary: Crear cotización de incidencia
+ */
+router.get('/:id/cotizaciones', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy', 'supervisorcampo']), ci.getCotizacionesByIncidencia);
+router.post('/:id/cotizaciones', auth, permit(['abogado', 'gerente', 'adminproy', 'supervisorcampo']), ci.createCotizacionIncidencia);
 
 module.exports = router;

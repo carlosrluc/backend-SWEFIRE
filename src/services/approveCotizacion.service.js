@@ -25,6 +25,9 @@ async function approveCotizacionById(quotationId) {
     if (!quotation.Orden_compra) {
         throw httpError(400, 'La cotización no cuenta con orden de compra adjunta.');
     }
+    if (quotation.Id_incidencia) {
+        throw httpError(400, 'Las cotizaciones de incidencia no se aprueban mediante este flujo.');
+    }
     if (quotation.estado !== QuotationStatus.PENDING) {
         throw httpError(400, `Solo se pueden aprobar cotizaciones en estado ${QuotationStatus.PENDING}.`);
     }

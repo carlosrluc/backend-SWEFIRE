@@ -17,6 +17,7 @@ const {
     toPagoPorDiaEnum,
 } = require('../services/servicioFechas.service');
 const { toDateOnly } = require('../services/cotizacionDto.service');
+const { getServiciosCatalogoIncidencia } = require('../services/cotizacionIncidencia.service');
 
 function mapServicioRow(row) {
     if (!row) return row;
@@ -64,6 +65,14 @@ exports.getAll = async (req, res) => {
                 totalPages: Math.ceil(total / limit)
             }
         });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+/** Catálogo para cotizaciones de incidencia (servicios de incidencia + envío PK 7) */
+exports.getIncidenciaCatalogo = async (req, res) => {
+    try {
+        const rows = await getServiciosCatalogoIncidencia();
+        res.json({ data: rows });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 

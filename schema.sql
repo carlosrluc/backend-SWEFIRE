@@ -65,6 +65,7 @@ CREATE TABLE "SERVICIO" (
   "condicional_precio" text COLLATE utf8mb4_unicode_ci,
   "observaciones" text COLLATE utf8mb4_unicode_ci,
   "Estado" enum('Activo','Desactivado') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "servicio_de_incidencia" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
   "foto" varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY ("ID_Servicio")
 );
@@ -532,7 +533,7 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
   "version" int DEFAULT '1',
   "desactualizado" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
   "nombre" varchar(150) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  "id_solicitud" int NOT NULL,
+  "id_solicitud" int DEFAULT NULL,
   "DNI_O_RUC" varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   "precio_total" decimal(14,2) DEFAULT NULL,
   "estado" enum('aprobado','rechazado por cliente','descartada','Pendiente') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,

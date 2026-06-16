@@ -231,6 +231,7 @@ const { uploadServicioFoto } = require('../middlewares/upload.middleware');
  *         description: Servicio creado (incluye conteo de etapas y subservicios si se enviaron)
  */
 router.get('/', c.getAll);
+router.get('/incidencia/catalogo', c.getIncidenciaCatalogo);
 router.post('/', c.create);
 
 /**

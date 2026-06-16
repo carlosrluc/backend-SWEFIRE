@@ -1,0 +1,93 @@
+PROMPT PARA FRONTEND — Adaptar pantalla "Gestionar incidencias" (cotizaciones de incidencia)
+============================================================================================
+
+Contexto de negocio
+-------------------
+Una cotización con `Id_incidencia` (FK a INCIDENCIA) sirve para cotizar gastos derivados de una incidencia.
+El monto NO debe igualar automáticamente el gasto real del presupuesto del proyecto; es independiente
+(puede ser mayor o menor). Esas cotizaciones NO aparecen en los listados generales de cotizaciones
+(igual que las desactualizadas en el listado normal).
+
+Cambios requeridos en la UI "Gestionar incidencias"
+---------------------------------------------------
+
+1) Botón "Crear cotización de incidencia"
+   - Visible en el detalle/gestión de cada incidencia (roles: abogado, gerente, adminproy, supervisorcampo).
+   - Al hacer clic, abrir modal/popup con título: "¿A quién estará destinada esta cotización?"
+
+2) Modal — selector de destinatario
+   - Llamar: GET /api/incidencias/{id_incidencia}/cotizaciones/destinatarios
+   - Respuesta:
+     {
+       "incidencia": { ... },
+       "opciones": [
+         { "tipo": "involucrado", "involucrado_id": 1, "label": "Juan Pérez", "dni": "12345678", "tiene_perfil": true },
+         { "tipo": "empresa", "dni_o_ruc": "20123456789", "label": "Empresa XYZ" },
+         { "tipo": "no_especificado", "dni_o_ruc": "00000000000", "label": "Cliente no especificado" }
+       ]
+     }
+   - Mostrar un combobox con `label` de cada opción.
+   - Incluir involucrados (nombre/apellido desde PERFIL si tienen DNI; si no, campo `nombre` del involucrado),
+     la empresa del proyecto/incidencia, y la opción "Cliente no especificado".
+
+3) Crear cotización
+   - Al confirmar destinatario, POST /api/incidencias/{id_incidencia}/cotizaciones
+   - Body ejemplo:
+     {
+       "destinatario": {
+         "tipo": "involucrado",
+         "involucrado_id": 1
+       }
+     }
+     Tipos válidos: "involucrado" | "empresa" | "no_especificado"
+   - Respuesta 201 incluye:
+     - id, version, nombre, DNI_O_RUC, destinatario, precio_total
+     - presupuesto_autorrellenado: líneas Material Directo con la DIFERENCIA (costo_real vs presupuestado)
+       del presupuesto del proyecto original, filtradas por ID_Incidencia
+     - servicios: [] (vacío al crear; el usuario los agrega después)
+   - Redirigir o abrir editor de cotización con el ID devuelto.
+
+4) Listado de cotizaciones de la incidencia
+   - GET /api/incidencias/{id_incidencia}/cotizaciones
+   - Lista TODAS las versiones, incluidas desactualizadas (`desactualizado: "YES"`).
+   - Mostrar en la pantalla de incidencia una tabla/sección "Cotizaciones de esta incidencia" con:
+     ID, nombre, version, desactualizado, estado, precioTotal, destinatario (nombreCliente), fecha emisión.
+   - Campo `esCotizacionIncidencia: true` en cada item.
+
+5) Editor de cotización de incidencia
+   - Usar los endpoints existentes de cotización por ID (GET /api/cotizaciones/:id, presupuesto, servicios, etc.).
+   - GET /api/cotizaciones/:id funciona también para versiones desactualizadas si tienen Id_incidencia.
+   - Servicios permitidos SOLO desde catálogo de incidencia:
+     GET /api/servicios/incidencia/catalogo
+     Devuelve: REPARACION, MANTENIMIENTO, TRASLADO, RETRIBUCION DE COSTE DE PRODUCTO,
+     ACCIONES MEDICAS, y ENVÍO (PK 7).
+   - NINGÚN servicio puede ser Principal (Principal siempre NO). No mostrar selector de servicio principal.
+   - El backend rechaza servicios fuera del catálogo al crear/actualizar servicios en la cotización.
+   - Presupuesto: las líneas autorrellenadas aparecen como PRESUPUESTO tipo "Material Directo"
+     (GET /api/presupuesto/cotizacion/:id). El usuario puede agregar más productos/servicios manualmente.
+
+6) Lo que NO debe hacer el front en cotizaciones de incidencia
+   - No listarlas en "Gestionar cotizaciones" general (el backend ya las excluye del GET /api/cotizaciones).
+   - No ofrecer flujo de aprobar → crear proyecto (PUT /api/cotizaciones/:id/aprobar devuelve error).
+   - No exigir id_solicitud (es null en estas cotizaciones).
+
+7) Estados de incidencia (opcional / sugerido)
+   - Tras crear cotización, considerar actualizar estado de incidencia si aplica (ej. "Cotizacion sin respuesta").
+   - El campo `cotizacion_remuneracion` en INCIDENCIA es distinto de `Id_incidencia` en COTIZACION_COMERCIAL;
+     no confundirlos. Una incidencia puede tener varias cotizaciones vía Id_incidencia.
+
+Resumen de endpoints nuevos
+---------------------------
+GET  /api/incidencias/:id/cotizaciones/destinatarios
+GET  /api/incidencias/:id/cotizaciones
+POST /api/incidencias/:id/cotizaciones
+GET  /api/servicios/incidencia/catalogo
+
+Migración SQL (ejecutar en BD antes de probar)
+----------------------------------------------
+sql/migrate_cotizacion_incidencia_flujo.sql
+
+Notas sobre cliente dummy
+-------------------------
+Si el involucrado no tiene DNI en PERFIL, se usa CLIENTE DNI_O_RUC = "00000000000"
+("Cliente no especificado"). El nombre del involucrado queda en observación de la cotización.

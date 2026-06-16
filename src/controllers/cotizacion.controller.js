@@ -66,6 +66,11 @@ const INVENTARIO_COTIZACION_SELECT = `
     LEFT JOIN COTIZACION_SERVICIO CS ON CI.servicio_a_alquilar = CS.id
 `;
 const COTIZACION_VIGENTE_SQL = `desactualizado = '${DESACTUALIZADO_VIGENTE}'`;
+const COTIZACION_LISTADO_NORMAL_SQL = `${COTIZACION_VIGENTE_SQL} AND Id_incidencia IS NULL`;
+const {
+    isServicioPermitidoIncidencia,
+    isCotizacionIncidencia,
+} = require('../services/cotizacionIncidencia.service');
 const { approveCotizacionById } = require('../services/approveCotizacion.service');
 
 async function recalcularCotizacionFechasYPrecio(executor, cotizacionId, {
@@ -371,6 +376,7 @@ exports.formatQuotation = (row, rol) => {
         id_solicitud: row.id_solicitud,
         DNI_O_RUC: row.DNI_O_RUC,
         Id_incidencia: row.Id_incidencia ?? null,
+        esCotizacionIncidencia: Boolean(row.Id_incidencia),
         desactualizado: row.desactualizado ?? DESACTUALIZADO_VIGENTE,
         Tasa_Cambio: row.Tasa_Cambio,
         ordenCompra: row.Orden_compra || null,
@@ -399,7 +405,7 @@ exports.getAll = async (req, res) => {
         let countArgs = [];
 
         const { estado, nombre, con_orden_compra, pendiente_aprobacion } = req.query;
-        let whereClauses = [`C_C.${COTIZACION_VIGENTE_SQL}`];
+        let whereClauses = [`C_C.${COTIZACION_LISTADO_NORMAL_SQL}`];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
             const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
@@ -457,7 +463,7 @@ exports.getAll = async (req, res) => {
 
 exports.getById = async (req, res) => {
     try {
-        let query = `SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC WHERE C_C.ID = ? AND C_C.${COTIZACION_VIGENTE_SQL}`;
+        let query = `SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC WHERE C_C.ID = ? AND (C_C.${COTIZACION_VIGENTE_SQL} OR C_C.Id_incidencia IS NOT NULL)`;
         let args = [req.params.id];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
@@ -861,6 +867,11 @@ exports.create = async (req, res) => {
         ?? null;
 
     const Id_incidencia = req.body.Id_incidencia ?? normalized.Id_incidencia ?? null;
+    if (Id_incidencia) {
+        return res.status(400).json({
+            error: 'Use POST /api/incidencias/:id/cotizaciones para crear cotizaciones de incidencia',
+        });
+    }
 
     const solicitudParaFlujo = await loadSolicitudDataForCotizacion(db, id_solicitud);
     if (solicitudParaFlujo?.servicioPrincipal) {
@@ -1285,6 +1296,15 @@ exports.createServicio = async (req, res) => {
         if (req.body.Principal !== undefined) {
             return res.status(400).json({ error: 'Principal se asigna al crear la cotización, no al agregar servicios sueltos' });
         }
+        if (await isCotizacionIncidencia(db, req.params.id)) {
+            if (req.body.Principal === 'YES') {
+                return res.status(400).json({ error: 'Las cotizaciones de incidencia no pueden tener servicio principal' });
+            }
+            const permitido = await isServicioPermitidoIncidencia(db, s.ID_Servicio);
+            if (!permitido) {
+                return res.status(400).json({ error: 'Servicio no permitido en cotizaciones de incidencia' });
+            }
+        }
         const result = await db.query(
             `INSERT INTO COTIZACION_SERVICIO
                 (ID_Cotizacion, ID_Servicio, fecha_inicio, fecha_finalizacion, jornada_comienzo, jornada_final, precio_comercial, Principal, indicaciones, id_servicio_subservicio)
@@ -1301,6 +1321,12 @@ exports.updateServicio = async (req, res) => {
     }
     const s = normalizeServiceItem(req.body);
     try {
+        if (await isCotizacionIncidencia(db, req.params.id)) {
+            const permitido = await isServicioPermitidoIncidencia(db, s.ID_Servicio);
+            if (!permitido) {
+                return res.status(400).json({ error: 'Servicio no permitido en cotizaciones de incidencia' });
+            }
+        }
         const result = await db.query(
             `UPDATE COTIZACION_SERVICIO
              SET ID_Servicio=?, fecha_inicio=?, fecha_finalizacion=?, jornada_comienzo=?, jornada_final=?, precio_comercial=?, indicaciones=?, id_servicio_subservicio=?
