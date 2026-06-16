@@ -1,13 +1,8 @@
-const { enumerateDaysInclusive } = require('../utils/jornada.utils');
+const { enumerateDaysInclusive, toDateOnly } = require('../utils/jornada.utils');
 const { normalizeProfesionClasificacion } = require('../constants/profesionClasificacion');
 
 const JORNADA_DEFAULT_INICIO = '08:00:00';
 const JORNADA_DEFAULT_FIN = '17:00:00';
-
-function toDateOnly(value) {
-    if (!value) return null;
-    return String(value).slice(0, 10);
-}
 
 function resolveServiceDates(svc, fechaInicioFallback, fechaFinFallback) {
     return {

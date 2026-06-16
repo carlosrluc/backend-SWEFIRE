@@ -49,10 +49,28 @@ function formatJornadaSchedule(inicio, fin) {
     return a || b || '';
 }
 
+function toDateOnly(value) {
+    if (value === undefined || value === null || value === '') return null;
+    if (value instanceof Date) {
+        if (Number.isNaN(value.getTime())) return null;
+        return value.toISOString().slice(0, 10);
+    }
+    const raw = String(value).trim();
+    const isoMatch = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) return isoMatch[1];
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10);
+    return null;
+}
+
 function enumerateDaysInclusive(fechaInicio, fechaFin) {
-    if (!fechaInicio || !fechaFin) return [];
-    const start = new Date(`${String(fechaInicio).slice(0, 10)}T00:00:00`);
-    const end = new Date(`${String(fechaFin).slice(0, 10)}T00:00:00`);
+    const startStr = toDateOnly(fechaInicio);
+    let endStr = toDateOnly(fechaFin);
+    if (!startStr) return [];
+    if (!endStr) endStr = startStr;
+
+    const start = new Date(`${startStr}T00:00:00`);
+    const end = new Date(`${endStr}T00:00:00`);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return [];
     const dias = [];
     const cursor = new Date(start);
@@ -68,5 +86,6 @@ module.exports = {
     parseJornadaRange,
     resolveJornadaFromItem,
     formatJornadaSchedule,
+    toDateOnly,
     enumerateDaysInclusive,
 };
