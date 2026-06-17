@@ -561,6 +561,20 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
 );
 
 
+-- swefire_db.COTIZACION_PLAZO_PAGO definition
+
+CREATE TABLE "COTIZACION_PLAZO_PAGO" (
+  "id" int NOT NULL AUTO_INCREMENT,
+  "ID_Cotizacion" int NOT NULL,
+  "porcentaje" decimal(5,2) NOT NULL,
+  "plazo_de_pago" int NOT NULL DEFAULT '0',
+  "orden" int NOT NULL DEFAULT '1',
+  PRIMARY KEY ("id"),
+  KEY "idx_cotizacion_plazo_cotizacion" ("ID_Cotizacion"),
+  CONSTRAINT "COTIZACION_PLAZO_PAGO_ibfk_1" FOREIGN KEY ("ID_Cotizacion") REFERENCES "COTIZACION_COMERCIAL" ("ID") ON DELETE CASCADE
+);
+
+
 -- swefire_db.COTIZACION_ETAPA definition
 
 CREATE TABLE "COTIZACION_ETAPA" (
@@ -801,6 +815,8 @@ CREATE TABLE "INFORME" (
   "id_proyecto_etapa" int DEFAULT NULL,
   "id_proyecto_actividad" int DEFAULT NULL,
   "id_Proyecto" int NOT NULL,
+  "implicancia" enum('ninguno','colateral','principal') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'ninguno',
+  "tiempo_perdido" decimal(8,2) DEFAULT NULL,
   "fecha_registro" datetime DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY ("id"),
   KEY "INFORME_idx_proyecto" ("id_Proyecto"),

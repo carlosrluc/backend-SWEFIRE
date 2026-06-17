@@ -467,6 +467,34 @@ router.put('/:id/inventario/:iid', auth, permit(['supervisorcampo', 'trabajcampo
 
 /**
  * @openapi
+ * /api/proyectos/{id}/informe-etapas:
+ *   get:
+ *     tags: [Proyecto - Informe etapas]
+ *     summary: Informe consolidado de etapas, incidencias y pagos del proyecto
+ */
+router.get(
+    '/:id/informe-etapas',
+    auth,
+    permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy', 'supervisorcampo']),
+    c.getInformeEtapas,
+);
+
+/**
+ * @openapi
+ * /api/proyectos/{id}/incidencias/resumen-gastos:
+ *   get:
+ *     tags: [Proyecto - Incidencias]
+ *     summary: Resumen de gastos reales vs presupuestado por incidencia (suma de gastos)
+ */
+router.get(
+    '/:id/incidencias/resumen-gastos',
+    auth,
+    permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy', 'supervisorcampo']),
+    c.getResumenGastosIncidencias,
+);
+
+/**
+ * @openapi
  * /api/proyectos/{id}/incidencias:
  *   get:
  *     tags: [Proyecto - Incidencias]

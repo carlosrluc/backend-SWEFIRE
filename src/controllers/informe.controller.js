@@ -2,6 +2,22 @@ const db = require('../config/db');
 const fs = require('fs');
 const path = require('path');
 const { validarEtapaActividadProyecto, recalcFechasEtapasDesdeInformes } = require('../services/proyectoEtapas.service');
+
+const IMPLICANCIAS = new Set(['ninguno', 'colateral', 'principal']);
+
+const parseImplicancia = (value, fallback = 'ninguno') => {
+    if (value === undefined || value === null || value === '') return fallback;
+    const v = String(value).toLowerCase();
+    if (!IMPLICANCIAS.has(v)) throw new Error('implicancia inválida: use ninguno, colateral o principal');
+    return v;
+};
+
+const parseTiempoPerdido = (value) => {
+    if (value === undefined || value === null || value === '') return null;
+    const n = Number(value);
+    if (Number.isNaN(n) || n < 0) throw new Error('tiempo_perdido inválido');
+    return Math.round(n * 100) / 100;
+};
 const catchAsync = require('../utils/catchAsync');
 const { getAll } = require('../repositories/reports.repository');
 
@@ -29,6 +45,8 @@ const SELECT_INFORME = `
 const mapInforme = (row) => ({
     ...row,
     relacion: row.id_incidencia ? String(row.id_incidencia) : 'ninguna',
+    implicancia: row.implicancia ?? 'ninguno',
+    tiempo_perdido: row.tiempo_perdido != null ? Number(row.tiempo_perdido) : null,
     autor_nombre: [row.Autor_Nombre, row.Autor_Apellido].filter(Boolean).join(' ').trim() || null,
     etapa: row.id_proyecto_etapa ? {
         id: row.id_proyecto_etapa,
@@ -119,6 +137,7 @@ exports.createInforme = async (req, res) => {
         nombre, fecha, hora, descripcion, ubicacion,
         relacion, id_incidencia,
         id_proyecto_etapa, id_proyecto_actividad,
+        implicancia, tiempo_perdido,
     } = req.body;
 
     try {
@@ -142,11 +161,17 @@ exports.createInforme = async (req, res) => {
         const idActividad = parseOptionalId(id_proyecto_actividad, 'id_proyecto_actividad');
         await validarEtapaActividadProyecto(db, id_Proyecto, idEtapa, idActividad);
 
+        const implicanciaFinal = parseImplicancia(
+            implicancia,
+            idInc ? 'principal' : 'ninguno',
+        );
+        const tiempoPerdidoFinal = parseTiempoPerdido(tiempo_perdido);
+
         const result = await db.query(
             `INSERT INTO INFORME
-                (nombre, fecha, hora, DNI_autor, descripcion, ubicacion, id_incidencia, id_proyecto_etapa, id_proyecto_actividad, id_Proyecto)
-             VALUES (?,?,?,?,?,?,?,?,?,?)`,
-            [nombreFinal, fechaOcurrencia, hora, DNI_autor, descripcion || null, ubicacion || null, idInc, idEtapa, idActividad, id_Proyecto]
+                (nombre, fecha, hora, DNI_autor, descripcion, ubicacion, id_incidencia, id_proyecto_etapa, id_proyecto_actividad, id_Proyecto, implicancia, tiempo_perdido)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [nombreFinal, fechaOcurrencia, hora, DNI_autor, descripcion || null, ubicacion || null, idInc, idEtapa, idActividad, id_Proyecto, implicanciaFinal, tiempoPerdidoFinal]
         );
 
         await recalcFechasEtapasDesdeInformes(db, id_Proyecto);
@@ -168,6 +193,7 @@ exports.updateInforme = async (req, res) => {
         nombre, fecha, hora, descripcion, ubicacion,
         relacion, id_incidencia,
         id_proyecto_etapa, id_proyecto_actividad,
+        implicancia, tiempo_perdido,
     } = req.body;
 
     try {
@@ -196,10 +222,17 @@ exports.updateInforme = async (req, res) => {
             ? parseFechaOcurrencia(fecha) || cur.fecha
             : cur.fecha;
 
+        const implicanciaFinal = implicancia !== undefined
+            ? parseImplicancia(implicancia, idInc ? 'principal' : 'ninguno')
+            : cur.implicancia;
+        const tiempoPerdidoFinal = tiempo_perdido !== undefined
+            ? parseTiempoPerdido(tiempo_perdido)
+            : cur.tiempo_perdido;
+
         const result = await db.query(
             `UPDATE INFORME
              SET nombre=?, fecha=?, hora=?, descripcion=?, ubicacion=?, id_incidencia=?,
-                 id_proyecto_etapa=?, id_proyecto_actividad=?
+                 id_proyecto_etapa=?, id_proyecto_actividad=?, implicancia=?, tiempo_perdido=?
              WHERE id=? AND id_Proyecto=?`,
             [
                 nombre !== undefined ? nombre : cur.nombre,
@@ -210,6 +243,8 @@ exports.updateInforme = async (req, res) => {
                 idInc,
                 idEtapa,
                 idActividad,
+                implicanciaFinal,
+                tiempoPerdidoFinal,
                 id,
                 id_Proyecto,
             ],

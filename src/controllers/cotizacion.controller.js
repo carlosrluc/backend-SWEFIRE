@@ -71,6 +71,11 @@ const {
     isServicioPermitidoIncidencia,
     isCotizacionIncidencia,
 } = require('../services/cotizacionIncidencia.service');
+const {
+    listPlazosByCotizacion,
+    replacePlazosCotizacion,
+    getPagoInicial,
+} = require('../services/cotizacionPlazoPago.service');
 const { approveCotizacionById } = require('../services/approveCotizacion.service');
 
 async function recalcularCotizacionFechasYPrecio(executor, cotizacionId, {
@@ -392,6 +397,19 @@ exports.formatQuotation = (row, rol) => {
     return quotation;
 };
 
+async function attachPlazosPago(quotation, cotizacionId) {
+    const plazos = await listPlazosByCotizacion(cotizacionId);
+    quotation.plazos_pago = plazos.map((p) => ({
+        id: p.id,
+        porcentaje: Number(p.porcentaje),
+        plazo_de_pago: Number(p.plazo_de_pago),
+        orden: p.orden,
+    }));
+    quotation.pago_inicial = getPagoInicial(quotation.plazos_pago);
+    quotation.requiere_confirmacion_pago_inicial = Boolean(quotation.pago_inicial);
+    return quotation;
+}
+
 // ── COTIZACION_COMERCIAL ──────────────────────────────────────────────────────
 exports.getAll = async (req, res) => {
     try {
@@ -477,7 +495,9 @@ exports.getById = async (req, res) => {
 
         const rows = await db.query(query, args);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
-        res.json(exports.formatQuotation(rows[0], req.user ? req.user.rolNormalizado : null));
+        const quotation = exports.formatQuotation(rows[0], req.user ? req.user.rolNormalizado : null);
+        await attachPlazosPago(quotation, req.params.id);
+        res.json(quotation);
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
 
@@ -797,6 +817,7 @@ exports.getDetallesFranco = async (req, res) => {
         });
 
         const phaseSummary = etapasTree.length ? summarizePhases(etapasTree) : null;
+        const plazosPayload = await attachPlazosPago({}, base.ID);
 
         res.json({
             id: base.ID,
@@ -804,6 +825,9 @@ exports.getDetallesFranco = async (req, res) => {
             Id_incidencia: base.Id_incidencia ?? null,
             id_incidencia: base.Id_incidencia ?? null,
             esCotizacionIncidencia: Boolean(base.Id_incidencia),
+            plazos_pago: plazosPayload.plazos_pago,
+            pago_inicial: plazosPayload.pago_inicial,
+            requiere_confirmacion_pago_inicial: plazosPayload.requiere_confirmacion_pago_inicial,
             ...upsertDto,
             // Legacy (compatibilidad con consumidores existentes)
             nombre: base.nombre || '',
@@ -1763,5 +1787,32 @@ exports.getOrdenCompra = async (req, res) => {
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
+};
+
+exports.getPlazosPago = async (req, res) => {
+    try {
+        const cotizacionId = Number(req.params.id);
+        const rows = await db.query(
+            `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND (desactualizado = 'NO' OR Id_incidencia IS NOT NULL)`,
+            [cotizacionId],
+        );
+        if (!rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
+        const payload = await attachPlazosPago({}, cotizacionId);
+        res.json(payload);
+    } catch (e) { res.status(500).json({ error: e.message }); }
+};
+
+exports.setPlazosPago = async (req, res) => {
+    try {
+        const cotizacionId = Number(req.params.id);
+        const rows = await db.query(
+            `SELECT ID FROM COTIZACION_COMERCIAL WHERE ID = ? AND desactualizado = 'NO'`,
+            [cotizacionId],
+        );
+        if (!rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
+        const plazos = await replacePlazosCotizacion(cotizacionId, req.body.plazos_pago ?? req.body);
+        const payload = await attachPlazosPago({}, cotizacionId);
+        res.json({ message: 'Plazos de pago actualizados', plazos_pago: plazos, ...payload });
+    } catch (e) { res.status(400).json({ error: e.message }); }
 };
 

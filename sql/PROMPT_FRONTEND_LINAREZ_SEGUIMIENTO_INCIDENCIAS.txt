@@ -1,0 +1,100 @@
+PROMPT FRONTEND — Seguimiento incidencias (Linarez) + plazos de pago
+======================================================================
+
+Migración SQL requerida en BD antes de probar:
+  sql/migrate_linarez_seguimiento_incidencias.sql
+
+──────────────────────────────────────────────────────────────────────────────
+1) INFORME — implicancia + tiempo perdido
+──────────────────────────────────────────────────────────────────────────────
+
+Al crear/editar sucesos del proyecto (POST/PUT /api/proyectos/{id}/informes):
+
+Campos nuevos:
+  implicancia: "ninguno" | "colateral" | "principal"  (default: ninguno)
+  tiempo_perdido: number (horas aproximadas, opcional)
+
+Reglas de negocio (UI):
+  - ninguno: suceso sin relación con incidencia
+  - principal: evento que origina o representa la incidencia (ej. el choque, el mal uso)
+  - colateral: tiempo perdido por consecuencia (ej. ir a comprar repuesto)
+  - Si hay id_incidencia y no se envía implicancia, el backend defaultea a "principal" al crear
+
+GET informes devuelve implicancia y tiempo_perdido en cada ítem.
+
+──────────────────────────────────────────────────────────────────────────────
+2) COTIZACIÓN — plazos de pago (porcentaje + plazo)
+──────────────────────────────────────────────────────────────────────────────
+
+Tabla COTIZACION_PLAZO_PAGO: una cotización puede tener VARIOS plazos.
+Ejemplo estándar del seed:
+  - 30% con plazo_de_pago = 0  → pago ANTES de iniciar el proyecto
+  - 70% con plazo_de_pago = 30 → 30 días DESPUÉS de fecha_fin del proyecto
+
+Endpoints:
+  GET  /api/cotizaciones/{id}/plazos-pago
+  PUT  /api/cotizaciones/{id}/plazos-pago
+       Body: { "plazos_pago": [ { "porcentaje": 30, "plazo_de_pago": 0, "orden": 1 }, ... ] }
+       La suma de porcentajes debe ser 100.
+
+También vienen en:
+  GET /api/cotizaciones/{id}
+  GET /api/cotizaciones/{id}/detalles-franco
+
+Campos útiles para UI:
+  plazos_pago: [{ id, porcentaje, plazo_de_pago, orden }]
+  pago_inicial: { porcentaje, plazo_de_pago: 0 } | null
+  requiere_confirmacion_pago_inicial: boolean
+
+CAMBIO popup "Orden de compra" (Gestionar cotización):
+  - Si pago_inicial existe (plazo_de_pago === 0):
+      Preguntar: "¿La persona ha pagado el {porcentaje}% de la cotización ya?"
+  - Si NO hay pago inicial (todos los plazos > 0):
+      Mantener confirmación genérica "¿Está seguro?"
+
+──────────────────────────────────────────────────────────────────────────────
+3) INFORME DE ETAPAS — botón en Gestionar proyectos
+──────────────────────────────────────────────────────────────────────────────
+
+Endpoint principal (todo en uno):
+  GET /api/proyectos/{id}/informe-etapas
+
+Respuesta incluye:
+  - etapa_mas_reciente: último suceso registrado o etapa_actual del proyecto
+  - comparativa_etapas[]: por etapa del plan
+      { nombre, dias_cotizados, dias_reales, diferencia_dias, estado, fechas }
+  - incidencias_implicancia_principal[]: breakdown de sucesos "principal"
+      con etapa, actividad, incidencia, tiempo_perdido
+  - tiempo_perdido_por_incidencia[]: suma de horas por incidencia
+  - resumen_gastos_incidencias: totales y detalle por incidencia
+  - pagos:
+      cotizacion_proyecto.plazos_pago + dias_hasta_pago_completo
+      cotizaciones_incidencia[] con plazos y proximo_pago
+
+Endpoint auxiliar (solo suma de gastos, mismo bloque resumen_gastos):
+  GET /api/proyectos/{id}/incidencias/resumen-gastos
+
+UI sugerida para el botón "Informe de etapas":
+  [ ] Etapa más reciente
+  [ ] Tabla comparativa días cotizados vs reales por etapa
+  [ ] Listado incidencias (implicancia principal) por etapa/actividad
+  [ ] Horas perdidas por incidencia
+  [ ] Estadísticas suma de gastos (presupuestado / real / diferencia)
+  [ ] Días hasta pago completo del proyecto
+  [ ] Días hasta pago de cotizaciones de incidencia del proyecto
+
+Notas pagos:
+  - plazo_de_pago = 0 → fecha_pago_estimada = fecha_inicio del proyecto
+  - plazo_de_pago > 0 → fecha_pago_estimada = fecha_fin + N días
+  - dias_faltantes: negativo = vencido
+
+──────────────────────────────────────────────────────────────────────────────
+4) Checklist de prueba frontend
+──────────────────────────────────────────────────────────────────────────────
+
+[ ] Crear informe con implicancia colateral + tiempo_perdido en horas
+[ ] GET informes muestra los campos nuevos
+[ ] GET cotización muestra plazos_pago y pago_inicial
+[ ] Popup orden de compra cambia texto si hay pago_inicial
+[ ] Pantalla informe-etapas carga GET /proyectos/{id}/informe-etapas
+[ ] Resumen gastos coincide con gestionar incidencias

@@ -972,6 +972,8 @@ router.post('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.se
  *         description: Orden de compra subida correctamente
  */
 router.get('/:id/orden-compra', auth, permit(['cliente', 'gerente', 'adminproy', 'asistproy']), c.getOrdenCompra);
+router.get('/:id/plazos-pago', auth, permit(['cliente', 'gerente', 'adminproy', 'asistproy']), c.getPlazosPago);
+router.put('/:id/plazos-pago', auth, permit(['gerente', 'adminproy', 'asistproy']), c.setPlazosPago);
 router.post('/:id/orden-compra',
     auth,
     permit(['cliente', 'gerente', 'adminproy']),

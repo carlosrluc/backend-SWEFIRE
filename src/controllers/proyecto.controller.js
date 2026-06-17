@@ -595,3 +595,26 @@ exports.updateInventario = async (req, res) => {
         res.json({ message: 'Inventario actualizado' });
     } catch (e) { res.status(500).json({ error: e.message }); }
 };
+
+const {
+    getInformeEtapas,
+    getResumenGastosIncidencias,
+} = require('../services/proyectoInformeEtapas.service');
+
+exports.getInformeEtapas = async (req, res) => {
+    try {
+        const data = await getInformeEtapas(Number(req.params.id));
+        res.json(data);
+    } catch (e) {
+        res.status(e.status || 500).json({ error: e.message });
+    }
+};
+
+exports.getResumenGastosIncidencias = async (req, res) => {
+    try {
+        const data = await getResumenGastosIncidencias(Number(req.params.id));
+        res.json(data);
+    } catch (e) {
+        res.status(e.status || 500).json({ error: e.message });
+    }
+};
