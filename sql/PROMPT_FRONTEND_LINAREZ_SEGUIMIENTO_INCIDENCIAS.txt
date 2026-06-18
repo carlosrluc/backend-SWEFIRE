@@ -34,7 +34,11 @@ Ejemplo estándar del seed:
 Endpoints:
   GET  /api/cotizaciones/{id}/plazos-pago
   PUT  /api/cotizaciones/{id}/plazos-pago
-       Body: { "plazos_pago": [ { "porcentaje": 30, "plazo_de_pago": 0, "orden": 1 }, ... ] }
+  POST /api/cotizaciones  (opcional: plazos_pago en body)
+  PUT  /api/cotizaciones/{id}  (opcional: plazos_pago en body)
+
+Body plazos_pago (POST, PUT cotización o PUT plazos-pago):
+  { "plazos_pago": [ { "porcentaje": 30, "plazo_de_pago": 0, "orden": 1 }, ... ] }
        La suma de porcentajes debe ser 100.
 
 También vienen en:

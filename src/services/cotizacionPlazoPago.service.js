@@ -18,8 +18,8 @@ function parseTiempoPerdido(value) {
     return Math.round(n * 100) / 100;
 }
 
-async function listPlazosByCotizacion(cotizacionId) {
-    return db.query(
+async function listPlazosByCotizacion(cotizacionId, executor = db) {
+    return executor.query(
         `SELECT id, ID_Cotizacion, porcentaje, plazo_de_pago, orden
          FROM COTIZACION_PLAZO_PAGO
          WHERE ID_Cotizacion = ?
@@ -28,7 +28,7 @@ async function listPlazosByCotizacion(cotizacionId) {
     );
 }
 
-async function replacePlazosCotizacion(cotizacionId, plazos) {
+async function replacePlazosCotizacion(cotizacionId, plazos, executor = db) {
     if (!Array.isArray(plazos)) {
         throw new Error('plazos_pago debe ser un array');
     }
@@ -49,16 +49,16 @@ async function replacePlazosCotizacion(cotizacionId, plazos) {
         throw new Error(`La suma de porcentajes debe ser 100 (actual: ${totalPct})`);
     }
 
-    await db.query('DELETE FROM COTIZACION_PLAZO_PAGO WHERE ID_Cotizacion = ?', [cotizacionId]);
+    await executor.query('DELETE FROM COTIZACION_PLAZO_PAGO WHERE ID_Cotizacion = ?', [cotizacionId]);
     for (let i = 0; i < plazos.length; i++) {
         const p = plazos[i];
-        await db.query(
+        await executor.query(
             `INSERT INTO COTIZACION_PLAZO_PAGO (ID_Cotizacion, porcentaje, plazo_de_pago, orden)
              VALUES (?,?,?,?)`,
             [cotizacionId, p.porcentaje, p.plazo_de_pago ?? 0, p.orden ?? (i + 1)],
         );
     }
-    return listPlazosByCotizacion(cotizacionId);
+    return listPlazosByCotizacion(cotizacionId, executor);
 }
 
 function addDays(dateStr, days) {

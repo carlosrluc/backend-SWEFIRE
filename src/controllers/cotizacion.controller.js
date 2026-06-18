@@ -1007,6 +1007,13 @@ exports.create = async (req, res) => {
             costoRecojo,
         });
 
+        let plazosPayload = null;
+        const plazosPago = req.body.plazos_pago ?? normalized.plazos_pago;
+        if (plazosPago !== undefined) {
+            const plazosGuardados = await replacePlazosCotizacion(newId, plazosPago);
+            plazosPayload = await attachPlazosPago({}, newId);
+        }
+
         res.status(201).json({
             message: 'Cotización creada',
             ID: newId,
@@ -1020,6 +1027,7 @@ exports.create = async (req, res) => {
                 id_servicio_subservicio: s.id_servicio_subservicio,
             })),
             importado_desde_solicitud: true,
+            ...(plazosPayload || {}),
         });
     } catch (e) {
         if (e.statusCode === 400) return res.status(400).json({ error: e.message });
@@ -1242,8 +1250,18 @@ exports.update = async (req, res) => {
             precioFinal = recalculo.precioTotal;
         }
 
+        const plazosPago = req.body.plazos_pago ?? normalized.plazos_pago;
+        if (plazosPago !== undefined) {
+            await replacePlazosCotizacion(cotizacionId, plazosPago, exec);
+        }
+
         await conn.commit();
         conn.release();
+
+        let plazosPayload = null;
+        if (plazosPago !== undefined) {
+            plazosPayload = await attachPlazosPago({}, cotizacionId);
+        }
 
         const response = {
             message: 'Cotización actualizada',
@@ -1262,6 +1280,11 @@ exports.update = async (req, res) => {
                 id_servicio_subservicio: s.id_servicio_subservicio,
             }));
             response.nota_servicios = 'Si reemplazaste services[], los id de COTIZACION_SERVICIO cambiaron; usa servicios_insertados o serviceIndex en trucks.';
+        }
+        if (plazosPayload) {
+            response.plazos_pago = plazosPayload.plazos_pago;
+            response.pago_inicial = plazosPayload.pago_inicial;
+            response.requiere_confirmacion_pago_inicial = plazosPayload.requiere_confirmacion_pago_inicial;
         }
         res.json(response);
     } catch (e) {
