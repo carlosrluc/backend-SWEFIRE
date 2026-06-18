@@ -224,10 +224,10 @@ exports.updateInforme = async (req, res) => {
 
         const implicanciaFinal = implicancia !== undefined
             ? parseImplicancia(implicancia, idInc ? 'principal' : 'ninguno')
-            : cur.implicancia;
+            : (idInc ? (cur.implicancia ?? 'ninguno') : 'ninguno');
         const tiempoPerdidoFinal = tiempo_perdido !== undefined
             ? parseTiempoPerdido(tiempo_perdido)
-            : cur.tiempo_perdido;
+            : (idInc ? cur.tiempo_perdido : null);
 
         const result = await db.query(
             `UPDATE INFORME

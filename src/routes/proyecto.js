@@ -583,6 +583,8 @@ router.get(
  *                       id_incidencia: { type: integer, nullable: true, example: 5 }
  *                       id_actividad: { type: integer, nullable: true, example: 12 }
  *                       id_etapa: { type: integer, nullable: true, example: 7 }
+ *                       implicancia: { type: string, enum: [ninguno, colateral, principal], example: "ninguno" }
+ *                       tiempo_perdido: { type: number, nullable: true, example: 2.5, description: "Horas aproximadas perdidas" }
  *                 pagination:
  *                   type: object
  *                   properties:
@@ -615,6 +617,8 @@ router.get(
  *               id_incidencia: { type: integer, description: "Alternativa a relacion" }
  *               id_proyecto_etapa: { type: integer, description: "ID de PROYECTO_ETAPA (etapa del proyecto)" }
  *               id_proyecto_actividad: { type: integer, description: "ID de PROYECTO_ACTIVIDAD (actividad dentro de la etapa)" }
+ *               implicancia: { type: string, enum: [ninguno, colateral, principal], default: ninguno }
+ *               tiempo_perdido: { type: number, nullable: true, description: "Horas aproximadas perdidas en el suceso" }
  *     description: DNI_autor se toma automáticamente del usuario logueado (JWT)
  *     responses:
  *       201:
@@ -665,6 +669,8 @@ router.post('/:id/informes', auth, permit(['supervisorcampo', 'trabajcampo', 'ab
  *                 id_incidencia: { type: integer, nullable: true, example: 5 }
  *                 id_actividad: { type: integer, nullable: true, example: 12 }
  *                 id_etapa: { type: integer, nullable: true, example: 7 }
+ *                 implicancia: { type: string, enum: [ninguno, colateral, principal], example: "ninguno" }
+ *                 tiempo_perdido: { type: number, nullable: true, example: 2.5, description: "Horas aproximadas perdidas" }
  *       404:
  *         description: Informe no encontrado
  *   put:
@@ -695,6 +701,8 @@ router.post('/:id/informes', auth, permit(['supervisorcampo', 'trabajcampo', 'ab
  *               id_incidencia: { type: integer }
  *               id_proyecto_etapa: { type: integer }
  *               id_proyecto_actividad: { type: integer }
+ *               implicancia: { type: string, enum: [ninguno, colateral, principal] }
+ *               tiempo_perdido: { type: number, nullable: true, description: "Horas aproximadas perdidas en el suceso" }
  *     responses:
  *       200:
  *         description: Informe actualizado (PUT parcial)
