@@ -91,7 +91,19 @@ const swaggerOptions = {
                     name: 'estado',
                     schema: { type: 'string' },
                     description:
-                        'Filtra por estado exacto en BD (ej. Pendiente, aprobado, rechazado por cliente, descartada)',
+                        'Filtra por estado exacto en BD (ej. Pendiente, No aprobado, aprobado, Incidencia Pagada, rechazado por cliente, descartada)',
+                },
+                CotizacionAprobadoQuery: {
+                    in: 'query',
+                    name: 'aprobado',
+                    schema: { type: 'string', enum: ['YES', 'NO'] },
+                    description: 'Filtra por aprobación interna. Cliente siempre recibe solo YES.',
+                },
+                CotizacionDeIncidenciaQuery: {
+                    in: 'query',
+                    name: 'cotizacion_de_incidencia',
+                    schema: { type: 'string', enum: ['YES', 'NO'] },
+                    description: 'YES = solo cotizaciones ligadas a incidencia (Id_incidencia). Abogado las ve por defecto.',
                 },
                 CotizacionNombreQuery: {
                     in: 'query',

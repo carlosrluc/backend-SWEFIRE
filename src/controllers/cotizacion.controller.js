@@ -77,6 +77,13 @@ const {
     getPagoInicial,
 } = require('../services/cotizacionPlazoPago.service');
 const { approveCotizacionById } = require('../services/approveCotizacion.service');
+const {
+    resolveAprobacionOnCreate,
+    aprobarCotizacionInterna,
+    marcarIncidenciaPagada,
+    getCotizacionOriginalDeIncidencia,
+} = require('../services/cotizacionAprobacion.service');
+const { QuotationStatus } = require('../enums/quotation.enums');
 
 async function recalcularCotizacionFechasYPrecio(executor, cotizacionId, {
     fechaInicioProyecto,
@@ -357,6 +364,11 @@ exports.formatQuotation = (row, rol) => {
     let estadoFormateado = "pendiente";
     if (row.estado === "aprobado") estadoFormateado = "aprobado";
     else if (row.estado === "rechazado por cliente" || row.estado === "descartada") estadoFormateado = "rechazado";
+    else if (row.estado === QuotationStatus.NOT_APPROVED) estadoFormateado = "no_aprobado";
+    else if (row.estado === QuotationStatus.INCIDENCE_PAID) estadoFormateado = "incidencia_pagada";
+
+    const esIncidencia = Boolean(row.Id_incidencia);
+    const aprobado = row.aprobado || 'NO';
 
     const quotation = {
         ID: row.ID,
@@ -370,6 +382,10 @@ exports.formatQuotation = (row, rol) => {
             observaciones: row.observacion || ""
         },
         estado: estadoFormateado,
+        estado_bd: row.estado || null,
+        aprobado,
+        aprobado_por_abogado: row.aprobado_por_abogado || 'NO',
+        aprobado_por_gerente: row.aprobado_por_gerente || 'NO',
         tasaCambio: {
             tasaCompra: row.tacaCompra || 0,
             tasaVenta: row.tasaVenta || 0
@@ -377,17 +393,21 @@ exports.formatQuotation = (row, rol) => {
         mensajes: {
             comentarioCliente: row.comentario_cliente || ""
         },
-        // Atributos originales no mencionados en el JSON
         id_solicitud: row.id_solicitud,
         DNI_O_RUC: row.DNI_O_RUC,
         Id_incidencia: row.Id_incidencia ?? null,
-        esCotizacionIncidencia: Boolean(row.Id_incidencia),
+        esCotizacionIncidencia: esIncidencia,
+        cotizacion_de_incidencia: esIncidencia ? 'YES' : 'NO',
         desactualizado: row.desactualizado ?? DESACTUALIZADO_VIGENTE,
         Tasa_Cambio: row.Tasa_Cambio,
         ordenCompra: row.Orden_compra || null,
+        tieneOrdenCompra: Boolean(row.Orden_compra),
         pendienteAprobacionOrden: Boolean(
-            row.Orden_compra && row.estado === 'Pendiente',
+            row.Orden_compra && row.estado === QuotationStatus.PENDING,
         ),
+        requiere_aprobacion_abogado: esIncidencia && row.aprobado_por_abogado !== 'YES',
+        requiere_aprobacion_gerente: esIncidencia && row.aprobado_por_gerente !== 'YES',
+        aprobacion_completa: aprobado === 'YES',
     };
 
     if (rol !== 'cliente' && row.Cliente_Nombre) {
@@ -411,19 +431,43 @@ async function attachPlazosPago(quotation, cotizacionId) {
 }
 
 // ── COTIZACION_COMERCIAL ──────────────────────────────────────────────────────
+function resolveListadoBaseFilter(rol, cotizacionDeIncidencia) {
+    const incParam = (cotizacionDeIncidencia || '').toString().toUpperCase();
+    if (rol === 'abogado') {
+        return `${COTIZACION_VIGENTE_SQL} AND C_C.Id_incidencia IS NOT NULL`;
+    }
+    if (incParam === 'YES' || incParam === 'TRUE' || incParam === '1') {
+        return `${COTIZACION_VIGENTE_SQL} AND C_C.Id_incidencia IS NOT NULL`;
+    }
+    if (incParam === 'NO' || incParam === 'FALSE' || incParam === '0') {
+        return COTIZACION_LISTADO_NORMAL_SQL;
+    }
+    return COTIZACION_LISTADO_NORMAL_SQL;
+}
+
+function resolveAprobadoFilter(rol, aprobadoQuery) {
+    const normalized = aprobadoQuery ? aprobadoQuery.toString().toUpperCase() : null;
+    if (normalized === 'YES' || normalized === 'NO') return normalized;
+    if (rol === 'cliente') return 'YES';
+    if (rol === 'abogado') return null;
+    if (['gerente', 'adminproy', 'asistproy', 'trabajtaller'].includes(rol)) return 'YES';
+    return null;
+}
+
 exports.getAll = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
         const offset = (page - 1) * limit;
+        const rol = req.user ? req.user.rolNormalizado : null;
 
         let query = 'SELECT C_C.*, C.nombre_comercial as Cliente_Nombre FROM COTIZACION_COMERCIAL C_C LEFT JOIN CLIENTE C ON C_C.DNI_O_RUC = C.DNI_O_RUC';
         let countQuery = 'SELECT COUNT(*) as total FROM COTIZACION_COMERCIAL C_C';
         let args = [];
         let countArgs = [];
 
-        const { estado, nombre, con_orden_compra, pendiente_aprobacion } = req.query;
-        let whereClauses = [`C_C.${COTIZACION_LISTADO_NORMAL_SQL}`];
+        const { estado, nombre, con_orden_compra, pendiente_aprobacion, aprobado, cotizacion_de_incidencia } = req.query;
+        let whereClauses = [`C_C.${resolveListadoBaseFilter(rol, cotizacion_de_incidencia)}`];
 
         if (req.user && req.user.rolNormalizado === 'cliente') {
             const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
@@ -434,6 +478,13 @@ exports.getAll = async (req, res) => {
             whereClauses.push(`(C_C.DNI_O_RUC IN (${placeholders}) OR C_C.id_solicitud IN (SELECT ID FROM SOLICITUD WHERE Id_Cliente IN (${placeholders})))`);
             args.push(...clientIds, ...clientIds);
             countArgs.push(...clientIds, ...clientIds);
+        }
+
+        const aprobadoFilter = resolveAprobadoFilter(rol, aprobado);
+        if (aprobadoFilter) {
+            whereClauses.push('C_C.aprobado = ?');
+            args.push(aprobadoFilter);
+            countArgs.push(aprobadoFilter);
         }
 
         if (estado) {
@@ -455,8 +506,8 @@ exports.getAll = async (req, res) => {
         if (pendiente_aprobacion === 'true' || pendiente_aprobacion === '1') {
             whereClauses.push(hasOrdenCompraSql);
             whereClauses.push('C_C.estado = ?');
-            args.push('Pendiente');
-            countArgs.push('Pendiente');
+            args.push(QuotationStatus.PENDING);
+            countArgs.push(QuotationStatus.PENDING);
         }
 
         if (whereClauses.length > 0) {
@@ -495,6 +546,9 @@ exports.getById = async (req, res) => {
 
         const rows = await db.query(query, args);
         if (!rows.length) return res.status(404).json({ error: 'No encontrado' });
+        if (req.user?.rolNormalizado === 'cliente' && rows[0].aprobado !== 'YES') {
+            return res.status(403).json({ error: 'Esta cotización aún no está disponible para el cliente' });
+        }
         const quotation = exports.formatQuotation(rows[0], req.user ? req.user.rolNormalizado : null);
         await attachPlazosPago(quotation, req.params.id);
         res.json(quotation);
@@ -639,6 +693,8 @@ exports.getDetallesFranco = async (req, res) => {
         let estado = 'pendiente';
         if (base.estado === 'aprobado') estado = 'aprobado';
         else if (base.estado === 'rechazado por cliente' || base.estado === 'descartada') estado = 'rechazado';
+        else if (base.estado === QuotationStatus.NOT_APPROVED) estado = 'no_aprobado';
+        else if (base.estado === QuotationStatus.INCIDENCE_PAID) estado = 'incidencia_pagada';
 
         // Obtener información del cliente
         const clienteResult = await db.query(
@@ -926,13 +982,19 @@ exports.create = async (req, res) => {
         });
 
         const estadoCot = 'Pendiente';
+        const aprobacionInicial = resolveAprobacionOnCreate(
+            req.user?.rolNormalizado || null,
+            false,
+        );
+
         const result = await db.query(
             `INSERT INTO COTIZACION_COMERCIAL
                 (version, desactualizado, nombre, id_solicitud, DNI_O_RUC, precio_total, estado,
+                 aprobado, aprobado_por_abogado, aprobado_por_gerente,
                  comentario_cliente, fecha_emision, fecha_vigencia, observacion,
                  Tasa_Cambio, condiciones, tacaCompra, tasaVenta,
                  etapas, duracion_etapa, etapas_detalle, direccion_recojo, Id_incidencia)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
                 version || 1,
                 DESACTUALIZADO_VIGENTE,
@@ -940,7 +1002,10 @@ exports.create = async (req, res) => {
                 id_solicitud,
                 DNI_O_RUC || null,
                 precioTotal,
-                estadoCot,
+                aprobacionInicial.estado,
+                aprobacionInicial.aprobado,
+                aprobacionInicial.aprobado_por_abogado,
+                aprobacionInicial.aprobado_por_gerente,
                 comentario_cliente || null,
                 cond?.fechaEmision || null,
                 cond?.fechaVigencia || null,
@@ -1019,6 +1084,8 @@ exports.create = async (req, res) => {
             ID: newId,
             precio_total: precioFinal,
             fecha_inicio_proyecto: fechaInicioProyecto,
+            aprobado: aprobacionInicial.aprobado,
+            estado: aprobacionInicial.estado,
             servicios_insertados: serviciosInsertados.map((s) => ({
                 id: s.id,
                 index: s.index,
@@ -1038,6 +1105,18 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     const normalized = normalizeCotizacionPayload(req.body);
     const cotizacionId = req.params.id;
+    const rol = req.user?.rolNormalizado || null;
+
+    if (rol === 'abogado') {
+        const incCheck = await db.query(
+            'SELECT Id_incidencia FROM COTIZACION_COMERCIAL WHERE ID = ? AND desactualizado = ?',
+            [cotizacionId, DESACTUALIZADO_VIGENTE],
+        );
+        if (!incCheck.length || !incCheck[0].Id_incidencia) {
+            return res.status(403).json({ error: 'El abogado solo puede editar cotizaciones de incidencia' });
+        }
+    }
+
     const {
         id_solicitud,
         id_camion,
@@ -1317,6 +1396,62 @@ exports.approve = catchAsync(async (req, res) => {
         ...result,
     });
 });
+
+exports.aprobarInterna = catchAsync(async (req, res) => {
+    const result = await aprobarCotizacionInterna(
+        Number(req.params.id),
+        req.user?.rolNormalizado || null,
+    );
+    res.json({
+        message: result.aprobacion_completa
+            ? 'Cotización aprobada internamente'
+            : 'Aprobación parcial registrada; falta la otra firma requerida',
+        ...result,
+    });
+});
+
+exports.pagarIncidencia = catchAsync(async (req, res) => {
+    const result = await marcarIncidenciaPagada(Number(req.params.id));
+    res.json({
+        message: 'Cotización marcada como Incidencia Pagada',
+        ...result,
+    });
+});
+
+exports.getCotizacionOriginal = async (req, res) => {
+    try {
+        const meta = await getCotizacionOriginalDeIncidencia(Number(req.params.id));
+        const savedId = req.params.id;
+        req.params.id = String(meta.id_cotizacion_original);
+
+        let detalles = null;
+        let errorStatus = null;
+        const collector = {
+            status(code) {
+                errorStatus = code;
+                return this;
+            },
+            json(data) {
+                detalles = data;
+            },
+        };
+
+        await exports.getDetallesFranco(req, collector);
+        req.params.id = savedId;
+
+        if (errorStatus === 404 || !detalles) {
+            return res.status(404).json({ error: 'Cotización original no encontrada' });
+        }
+
+        res.json({
+            ...meta,
+            cotizacion_original: detalles,
+        });
+    } catch (e) {
+        const status = e.status || 500;
+        res.status(status).json({ error: e.message });
+    }
+};
 
 // ── COTIZACION_SERVICIO ───────────────────────────────────────────────────────
 exports.getServicios = async (req, res) => {
@@ -1753,7 +1888,6 @@ const path = require('path');
 const fs = require('fs');
 const { getQuotationByID, upsertPurchaseOrderFileURL } = require('../repositories/quotation.repository');
 const deleteFile = require('../utils/deleteFile');
-const { QuotationStatus } = require('../enums/quotation.enums');
 
 exports.uploadOrdenCompra = catchAsync(async (req, res) => {
     const QuotationID = req.params.id;
@@ -1762,28 +1896,49 @@ exports.uploadOrdenCompra = catchAsync(async (req, res) => {
     }
     const quotation = await getQuotationByID(QuotationID);
     if (!quotation) {
-        // Si la cotización no existe, borrar el archivo recién subido
         fs.unlinkSync(req.file.path);
         return res.status(404).json({ error: 'Cotización no encontrada' });
     }
 
-    if (quotation.estado !== QuotationStatus.PENDING) {
+    const isIncidencia = Boolean(quotation.Id_incidencia);
+    const rol = req.user?.rolNormalizado || '';
+    const staffIncidencia = ['gerente', 'adminproy', 'asistproy'].includes(rol);
+
+    const estadosPermitidos = isIncidencia
+        ? [QuotationStatus.PENDING, QuotationStatus.NOT_APPROVED, QuotationStatus.INCIDENCE_PAID]
+        : [QuotationStatus.PENDING];
+
+    if (!estadosPermitidos.includes(quotation.estado)) {
         fs.unlinkSync(req.file.path);
-        return res.status(401).json({ error: `Solo se pueden subir ordenes de compra para cotizaciones con el estado: ${QuotationStatus.PENDING}` });
+        return res.status(400).json({
+            error: `No se puede subir orden de compra con estado "${quotation.estado}"`,
+        });
     }
 
-    // Borrar PDF viejo de orden de compra (si existe)
+    if (!isIncidencia) {
+        if (quotation.aprobado !== 'YES') {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ error: 'La cotización debe estar aprobada internamente antes de subir orden de compra' });
+        }
+    } else if (rol === 'cliente' && quotation.aprobado !== 'YES') {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: 'La cotización de incidencia debe estar aprobada antes de que el cliente suba orden de compra' });
+    } else if (isIncidencia && !staffIncidencia && rol !== 'cliente') {
+        fs.unlinkSync(req.file.path);
+        return res.status(403).json({ error: 'Sin permiso para subir orden de compra en cotizaciones de incidencia' });
+    }
+
     if (quotation.Orden_compra) {
         deleteFile(quotation.Orden_compra);
     }
-    // Actualizar nueva URL relativa en la base de datos
     const NewRelativeUrl = await upsertPurchaseOrderFileURL(req.file.filename, QuotationID);
     res.status(200).json({
         message: 'Orden de compra subida correctamente.',
         url: NewRelativeUrl,
         ruta: NewRelativeUrl,
+        tieneOrdenCompra: true,
     });
-})
+});
 
 exports.getOrdenCompra = async (req, res) => {
     try {
@@ -1795,7 +1950,11 @@ exports.getOrdenCompra = async (req, res) => {
 
         const fileUrl = rows[0].Orden_compra;
         if (!fileUrl) {
-            return res.status(404).json({ error: 'No hay ninguna orden de compra guardada para esta cotización' });
+            return res.status(404).json({
+                error: 'No hay ninguna orden de compra guardada para esta cotización',
+                existe: false,
+                mensaje_ui: 'No existe orden de compra',
+            });
         }
 
         if (req.query.format === 'json') {

@@ -257,6 +257,8 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *       - $ref: '#/components/parameters/LimitQuery'
  *       - $ref: '#/components/parameters/CotizacionEstadoQuery'
  *       - $ref: '#/components/parameters/CotizacionNombreQuery'
+ *       - $ref: '#/components/parameters/CotizacionAprobadoQuery'
+ *       - $ref: '#/components/parameters/CotizacionDeIncidenciaQuery'
  *       - in: query
  *         name: con_orden_compra
  *         schema: { type: string, enum: ['true', '1'] }
@@ -315,6 +317,65 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
 
 /**
  * @openapi
+ * /api/cotizaciones/{id}/aprobar-interna:
+ *   put:
+ *     tags: [Cotización]
+ *     summary: Aprobar cotización internamente (antes de que el cliente la vea)
+ *     description: |
+ *       Cotizaciones comerciales: solo gerente/adminproy marca aprobado=YES y estado=Pendiente.
+ *       Cotizaciones de incidencia: requiere firma de abogado Y gerente; cada rol registra su aprobación parcial.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Aprobación registrada
+ */
+router.put('/:id/aprobar-interna', auth, permit(['abogado', 'gerente', 'adminproy']), c.aprobarInterna);
+
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/pagar-incidencia:
+ *   put:
+ *     tags: [Cotización]
+ *     summary: Marcar cotización de incidencia como pagada y finalizada
+ *     description: |
+ *       Solo cotizaciones con Id_incidencia y aprobado=YES. Establece estado=Incidencia Pagada.
+ *       No requiere orden de compra. No marca la incidencia como resuelta.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Estado actualizado
+ */
+router.put('/:id/pagar-incidencia', auth, permit(['gerente', 'adminproy', 'asistproy']), c.pagarIncidencia);
+
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/cotizacion-original:
+ *   get:
+ *     tags: [Cotización]
+ *     summary: Ver cotización original del proyecto (solo abogado, cotizaciones de incidencia)
+ *     description: |
+ *       Resuelve INCIDENCIA → PROYECTO → id_cotizacion y devuelve el payload de detalles-franco en solo lectura.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     responses:
+ *       200:
+ *         description: Metadatos + cotizacion_original (UpsertQuotationDTO)
+ */
+router.get('/:id/cotizacion-original', auth, permit(['abogado']), c.getCotizacionOriginal);
+
+/**
+ * @openapi
  * /api/cotizaciones/{id}:
  *   get:
  *     tags: [Cotización]
@@ -362,7 +423,7 @@ router.post('/', auth, permit(['abogado', 'trabajtaller', 'gerente', 'adminproy'
  *         description: Eliminada
  */
 router.get('/:id', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.getById);
-router.put('/:id', auth, permit(['cliente', 'trabajtaller', 'gerente', 'adminproy']), c.update);
+router.put('/:id', auth, permit(['cliente', 'abogado', 'trabajtaller', 'gerente', 'adminproy']), c.update);
 router.delete('/:id', auth, permit(['gerente', 'adminproy']), c.remove);
 /**
  * @openapi
@@ -976,7 +1037,7 @@ router.get('/:id/plazos-pago', auth, permit(['cliente', 'gerente', 'adminproy', 
 router.put('/:id/plazos-pago', auth, permit(['gerente', 'adminproy', 'asistproy']), c.setPlazosPago);
 router.post('/:id/orden-compra',
     auth,
-    permit(['cliente', 'gerente', 'adminproy']),
+    permit(['cliente', 'gerente', 'adminproy', 'asistproy']),
     uploadCotizacion.single('orden_compra'),
     requireFile,
     c.uploadOrdenCompra

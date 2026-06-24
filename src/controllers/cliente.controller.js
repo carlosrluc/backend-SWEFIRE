@@ -210,7 +210,7 @@ exports.getCotizaciones = async (req, res) => {
         const offset = (page - 1) * limit;
         const { estado, nombre } = req.query;
 
-        const filterClauses = ['C_C.DNI_O_RUC = ?', "C_C.desactualizado = 'NO'", 'C_C.Id_incidencia IS NULL'];
+        const filterClauses = ['C_C.DNI_O_RUC = ?', "C_C.desactualizado = 'NO'", 'C_C.Id_incidencia IS NULL', "C_C.aprobado = 'YES'"];
         const filterArgs = [req.params.id];
         if (estado) {
             filterClauses.push('C_C.estado = ?');

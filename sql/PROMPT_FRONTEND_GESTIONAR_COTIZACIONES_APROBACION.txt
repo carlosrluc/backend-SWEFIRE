@@ -1,0 +1,374 @@
+PROMPT PARA FRONTEND — Gestionar cotizaciones: aprobación interna, incidencias y flujos de pago
+=================================================================================================
+
+Contexto de negocio
+-------------------
+Se agregó el atributo `aprobado` (YES/NO) en COTIZACION_COMERCIAL. Una cotización recién creada
+queda con `aprobado=NO` y `estado='No aprobado'`, salvo que la cree un usuario con rol gerente
+(o adminproy), en cuyo caso queda `aprobado=YES` y `estado='Pendiente'`.
+
+El cliente SOLO ve sus cotizaciones con `aprobado=YES`.
+
+Las cotizaciones de incidencia (`cotizacion_de_incidencia` / `Id_incidencia` / `esCotizacionIncidencia`)
+requieren aprobación dual: una del rol abogado y otra del rol gerente. Hasta que ambas firmen,
+`aprobado` permanece en NO.
+
+Migración BD requerida en el servidor
+-------------------------------------
+Ejecutar: sql/migrate_cotizacion_aprobacion.sql
+
+Columnas nuevas en COTIZACION_COMERCIAL:
+- aprobado: enum YES/NO (default NO)
+- aprobado_por_abogado: enum YES/NO (default NO)
+- aprobado_por_gerente: enum YES/NO (default NO)
+
+Estados nuevos en enum `estado`:
+- 'No aprobado' — mientras aprobado=NO
+- 'Incidencia Pagada' — cierre de pago en cotizaciones de incidencia (sin resolver la incidencia)
+
+=================================================================================================
+1) CREAR COTIZACIÓN COMERCIAL (flujo normal)
+=================================================================================================
+
+POST /api/cotizaciones
+Roles: abogado, trabajtaller, gerente, adminproy
+Body: UpsertQuotationDTO (requiere id_solicitud)
+
+Comportamiento backend (automático según rol del JWT):
+- Si crea gerente/adminproy → aprobado=YES, estado='Pendiente'
+- Si crea otro rol → aprobado=NO, estado='No aprobado'
+
+Respuesta 201 (campos relevantes nuevos):
+{
+  "message": "Cotización creada",
+  "ID": 48,
+  "precio_total": 18500,
+  "aprobado": "NO",
+  "estado": "No aprobado",
+  ...
+}
+
+=================================================================================================
+2) LISTAR COTIZACIONES — GET /api/cotizaciones
+=================================================================================================
+
+Roles: cliente, abogado, trabajtaller, gerente, adminproy, asistproy
+
+Query params:
+| Parámetro                  | Valores    | Descripción |
+|----------------------------|------------|-------------|
+| page                       | int        | Default 1 |
+| limit                      | int        | Default 10 |
+| aprobado                   | YES / NO   | Filtra por aprobación interna |
+| cotizacion_de_incidencia   | YES / NO   | YES = solo Id_incidencia IS NOT NULL |
+| estado                     | string     | Valor exacto BD: Pendiente, No aprobado, aprobado, Incidencia Pagada, etc. |
+| nombre                     | string     | LIKE parcial |
+| con_orden_compra           | true / 1   | Solo con PDF de OC |
+| pendiente_aprobacion       | true / 1   | Tiene OC y estado=Pendiente |
+
+Defaults automáticos por rol (si NO envías `aprobado`):
+- cliente → fuerza aprobado=YES (solo ve las suyas aprobadas)
+- gerente, adminproy, asistproy, trabajtaller → aprobado=YES (listado normal)
+- abogado → sin filtro de aprobado (ve todas las de incidencia)
+
+Filtro base por rol:
+- Roles normales → cotizaciones comerciales vigentes (Id_incidencia IS NULL)
+- abogado → SOLO cotizaciones de incidencia vigentes (Id_incidencia IS NOT NULL)
+
+Respuesta de cada ítem (formatQuotation):
+{
+  "ID": 45,
+  "nombre": "...",
+  "precioTotal": "15000.00",
+  "estado": "no_aprobado",           // formateado para UI
+  "estado_bd": "No aprobado",        // valor exacto en BD
+  "aprobado": "NO",
+  "aprobado_por_abogado": "NO",
+  "aprobado_por_gerente": "NO",
+  "esCotizacionIncidencia": false,
+  "cotizacion_de_incidencia": "NO",  // alias YES/NO
+  "ordenCompra": null,
+  "tieneOrdenCompra": false,
+  "requiere_aprobacion_abogado": false,
+  "requiere_aprobacion_gerente": false,
+  "aprobacion_completa": false,
+  "pendienteAprobacionOrden": false,
+  ...
+}
+
+Valores de `estado` formateado para UI:
+- pendiente
+- aprobado
+- rechazado
+- no_aprobado        ← estado_bd 'No aprobado'
+- incidencia_pagada  ← estado_bd 'Incidencia Pagada'
+
+=================================================================================================
+3) UI "GESTIONAR COTIZACIONES" — GERENTE / ASISTPROY / ADMINPROY
+=================================================================================================
+
+Listado normal (cotizaciones comerciales aprobadas):
+  GET /api/cotizaciones?aprobado=YES
+  (o sin param — el backend ya defaultea a YES)
+
+Listado alterno "No aprobadas" (botón toggle, como en Gestionar proyectos):
+  GET /api/cotizaciones?aprobado=NO
+
+En el listado de no aprobadas, botón "APROBAR":
+  PUT /api/cotizaciones/{id}/aprobar-interna
+  Roles: gerente, adminproy (y abogado solo en incidencias)
+
+Respuesta 200:
+{
+  "message": "Cotización aprobada internamente",
+  "ID": 45,
+  "aprobado": "YES",
+  "aprobado_por_gerente": "YES",
+  "estado": "Pendiente",
+  "esCotizacionIncidencia": false,
+  "aprobacion_completa": true
+}
+
+Tras aprobar, la cotización pasa a estado 'Pendiente' y el cliente puede verla.
+
+=================================================================================================
+4) UI "GESTIONAR COTIZACIONES" — CLIENTE
+=================================================================================================
+
+GET /api/cotizaciones
+- El backend fuerza aprobado=YES y filtra por empresas del contacto.
+- Solo verá cotizaciones comerciales aprobadas que le pertenecen.
+- Las de incidencia NO aparecen aquí (Id_incidencia IS NULL en listado normal).
+
+GET /api/clientes/{dni}/cotizaciones
+- También filtra aprobado=YES.
+
+Si intenta GET /api/cotizaciones/{id} de una no aprobada → 403.
+
+=================================================================================================
+5) COTIZACIONES DE INCIDENCIA — CREAR
+=================================================================================================
+
+POST /api/incidencias/{id_incidencia}/cotizaciones
+Roles: abogado, gerente, adminproy, supervisorcampo
+
+Body ejemplo:
+{
+  "destinatario": { "tipo": "empresa" },
+  "servicios": [ { "id": "12", "unitPrice": 500, ... } ]
+}
+
+Al crear:
+- aprobado=NO, estado='No aprobado'
+- Si crea gerente → aprobado_por_gerente=YES (falta abogado)
+- Si crea abogado → aprobado_por_abogado=YES (falta gerente)
+
+Respuesta 201 incluye:
+{
+  "aprobado": "NO",
+  "aprobado_por_abogado": "NO",
+  "aprobado_por_gerente": "YES",
+  "estado": "No aprobado",
+  "cotizacion_de_incidencia": "YES",
+  "esCotizacionIncidencia": true,
+  ...
+}
+
+=================================================================================================
+6) UI "GESTIONAR COTIZACIONES" — ABOGADO
+=================================================================================================
+
+El abogado accede a Gestionar cotizaciones pero SOLO ve cotizaciones de incidencia.
+
+Listado principal (todas las de incidencia, aprobadas o no):
+  GET /api/cotizaciones
+  (backend filtra Id_incidencia IS NOT NULL; sin filtro aprobado por default)
+
+Listado alterno "No aprobadas":
+  GET /api/cotizaciones?aprobado=NO
+
+Puede EDITAR cotizaciones de incidencia:
+  PUT /api/cotizaciones/{id}
+  (403 si intenta editar una comercial sin Id_incidencia)
+
+Botón "APROBAR" en listado no aprobadas:
+  PUT /api/cotizaciones/{id}/aprobar-interna
+  Registra aprobado_por_abogado=YES. Si gerente ya aprobó → aprobado=YES, estado=Pendiente.
+
+Respuesta aprobación parcial (falta gerente):
+{
+  "message": "Aprobación parcial registrada; falta la otra firma requerida",
+  "aprobado": "NO",
+  "aprobado_por_abogado": "YES",
+  "aprobado_por_gerente": "NO",
+  "aprobacion_completa": false
+}
+
+Botón "COTIZACIÓN ORIGINAL" (SOLO rol abogado, SOLO en Gestionar cotizaciones):
+  GET /api/cotizaciones/{id}/cotizacion-original
+  Donde {id} es la cotización DE INCIDENCIA seleccionada.
+
+Resuelve: COTIZACION → INCIDENCIA → PROYECTO → id_cotizacion original del proyecto.
+
+Respuesta 200:
+{
+  "id_cotizacion_original": 12,
+  "id_proyecto": 5,
+  "proyecto_nombre": "Proyecto rociadores",
+  "id_incidencia": 8,
+  "solo_lectura": true,
+  "cotizacion_original": { ...payload igual a GET /detalles-franco... }
+}
+
+UI: mostrar con la pantalla de "editar cotización" pero en modo solo lectura
+(solo_lectura=true, deshabilitar inputs y botones de guardar).
+
+=================================================================================================
+7) ORDEN DE COMPRA
+=================================================================================================
+
+GET /api/cotizaciones/{id}/orden-compra
+- Sin archivo → 404:
+  {
+    "error": "No hay ninguna orden de compra guardada para esta cotización",
+    "existe": false,
+    "mensaje_ui": "No existe orden de compra"
+  }
+- Con ?format=json → { "cotizacionId": 45, "url": "/uploads/..." }
+
+POST /api/cotizaciones/{id}/orden-compra
+Content-Type: multipart/form-data
+Campo: orden_compra (PDF)
+Roles: cliente, gerente, adminproy, asistproy
+
+Reglas:
+- Cotización comercial: requiere aprobado=YES y estado=Pendiente
+- Cotización de incidencia + cliente: requiere aprobado=YES
+- Cotización de incidencia + gerente/adminproy/asistproy: pueden subir aunque no haya OC del cliente
+  (estados permitidos: Pendiente, No aprobado, Incidencia Pagada)
+
+En popup de cotización de incidencia sin OC:
+- Mostrar texto "No existe orden de compra"
+- Ofrecer subida a asistproy/gerente (POST orden-compra)
+
+El cliente TAMBIÉN puede enviar OC en cotizaciones de incidencia (opcional, no bloquea otros flujos).
+
+=================================================================================================
+8) POPUP DE PAGOS / PLAZOS
+=================================================================================================
+
+GET /api/cotizaciones/{id}/plazos-pago
+PUT /api/cotizaciones/{id}/plazos-pago
+Body: { "plazos_pago": [ { "porcentaje": 30, "plazo_de_pago": 0, "orden": 1 }, ... ] }
+
+Para cotizaciones de incidencia (`esCotizacionIncidencia=true`), agregar botón extra:
+"DAR COMO PAGADO Y FINALIZADO"
+
+  PUT /api/cotizaciones/{id}/pagar-incidencia
+  Roles: gerente, adminproy, asistproy
+  Requiere: aprobado=YES, Id_incidencia NOT NULL
+  NO requiere orden de compra
+  Efecto: estado='Incidencia Pagada' (NO marca incidencia como resuelta)
+
+Respuesta 200:
+{
+  "message": "Cotización marcada como Incidencia Pagada",
+  "ID": 55,
+  "estado": "Incidencia Pagada",
+  "esCotizacionIncidencia": true
+}
+
+Botón "CREAR PROYECTO" en el mismo popup:
+  PUT /api/cotizaciones/{id}/aprobar
+  Roles: gerente, adminproy, asistproy
+  Requiere OBLIGATORIAMENTE:
+    - aprobado=YES
+    - orden de compra subida (Orden_compra NOT NULL)
+    - estado=Pendiente
+    - no exista ya un proyecto con id_cotizacion
+
+Respuesta 201:
+{
+  "message": "Cotización aprobada y proyecto creado",
+  "id_proyecto": 22,
+  "trabajos_creados": 5
+}
+
+IMPORTANTE: PUT /aprobar crea PROYECTO. PUT /aprobar-interna solo aprueba para visibilidad/flujo.
+No confundir ambos endpoints.
+
+=================================================================================================
+9) DETALLE Y EDICIÓN (campos útiles en GET)
+=================================================================================================
+
+GET /api/cotizaciones/{id}
+GET /api/cotizaciones/{id}/detalles-franco  ← usar para editor completo
+
+Campos nuevos a leer en el front:
+- aprobado, aprobado_por_abogado, aprobado_por_gerente
+- estado_bd (valor crudo)
+- cotizacion_de_incidencia / esCotizacionIncidencia
+- tieneOrdenCompra
+- requiere_aprobacion_abogado / requiere_aprobacion_gerente
+- aprobacion_completa
+
+PUT /api/cotizaciones/{id} — actualizar cotización (UpsertQuotationDTO)
+Roles: cliente (sus cotizaciones), abogado (solo incidencia), trabajtaller, gerente, adminproy
+
+=================================================================================================
+10) RESUMEN DE ENDPOINTS (nuevos o modificados)
+=================================================================================================
+
+GET    /api/cotizaciones?aprobado=YES|NO&cotizacion_de_incidencia=YES|NO
+POST   /api/cotizaciones                              → setea aprobado según rol
+PUT    /api/cotizaciones/:id/aprobar-interna          → NUEVO: aprobación interna
+PUT    /api/cotizaciones/:id/pagar-incidencia         → NUEVO: estado Incidencia Pagada
+GET    /api/cotizaciones/:id/cotizacion-original      → NUEVO: solo abogado
+PUT    /api/cotizaciones/:id/aprobar                  → crear proyecto (requiere OC)
+POST   /api/cotizaciones/:id/orden-compra             → asistproy ahora permitido
+GET    /api/cotizaciones/:id/orden-compra             → 404 con existe:false si no hay PDF
+POST   /api/incidencias/:id/cotizaciones              → aprobado dual desde creación
+GET    /api/clientes/:id/cotizaciones                 → solo aprobado=YES
+
+=================================================================================================
+11) MATRIZ DE UI SUGERIDA POR ROL
+=================================================================================================
+
+GERENTE — Gestionar cotizaciones:
+  [Listado normal] GET ?aprobado=YES
+  [Toggle "No aprobadas"] GET ?aprobado=NO → botón APROBAR → PUT aprobar-interna
+  Popup pagos incidencia: subir OC, pagar-incidencia, crear proyecto (OC obligatoria)
+
+ABOGADO — Gestionar cotizaciones:
+  [Listado] GET (solo incidencia, todas)
+  [Toggle "No aprobadas"] GET ?aprobado=NO → botón APROBAR → PUT aprobar-interna
+  [Botón "Cotización original"] GET cotizacion-original → UI editar en solo lectura
+  Puede PUT editar cotizaciones de incidencia
+
+CLIENTE — Gestionar cotizaciones:
+  GET (solo aprobadas, automático)
+  Puede subir OC en comerciales e incidencias aprobadas
+
+ASISTPROY:
+  Igual que gerente en listados, subir OC en incidencias, pagar-incidencia, crear proyecto
+
+=================================================================================================
+12) ERRORES COMUNES
+=================================================================================================
+
+403 — Cliente intenta ver cotización no aprobada
+403 — Abogado intenta editar cotización comercial
+403 — Rol sin permiso en aprobar-interna
+400 — Crear proyecto sin orden de compra
+400 — Subir OC en cotización comercial no aprobada internamente
+409 — Aprobar dos veces la misma firma (ej. abogado ya aprobó)
+409 — pagar-incidencia cuando ya está en Incidencia Pagada
+
+=================================================================================================
+13) NOTAS TÉCNICAS
+=================================================================================================
+
+- En BD el campo es `aprobado` (no confundir con estado 'aprobado' que significa proyecto creado).
+- `cotizacion_de_incidencia` en API = Boolean(Id_incidencia) expresado como YES/NO.
+- El middleware de roles (permit) puede estar bypassed en dev; la lógica de negocio en controllers sí aplica.
+- Ejecutar migración antes de desplegar el front, o los INSERT fallarán por columnas faltantes.

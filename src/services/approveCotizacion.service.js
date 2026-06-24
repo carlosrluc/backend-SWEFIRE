@@ -19,17 +19,17 @@ async function approveCotizacionById(quotationId) {
     if (!quotation) {
         throw httpError(404, 'Cotización no encontrada');
     }
+    if (quotation.aprobado !== 'YES') {
+        throw httpError(400, 'La cotización debe estar aprobada internamente antes de crear el proyecto.');
+    }
     if (quotation.estado === QuotationStatus.APPROVED) {
-        throw httpError(409, `La cotización con ID ${quotationId} ya fue aprobada.`);
+        throw httpError(409, `La cotización con ID ${quotationId} ya fue aprobada y tiene proyecto asociado.`);
     }
     if (!quotation.Orden_compra) {
-        throw httpError(400, 'La cotización no cuenta con orden de compra adjunta.');
-    }
-    if (quotation.Id_incidencia) {
-        throw httpError(400, 'Las cotizaciones de incidencia no se aprueban mediante este flujo.');
+        throw httpError(400, 'La cotización no cuenta con orden de compra adjunta. Es obligatoria para crear el proyecto.');
     }
     if (quotation.estado !== QuotationStatus.PENDING) {
-        throw httpError(400, `Solo se pueden aprobar cotizaciones en estado ${QuotationStatus.PENDING}.`);
+        throw httpError(400, `Solo se pueden crear proyectos desde cotizaciones en estado ${QuotationStatus.PENDING}.`);
     }
 
     const existingProyecto = await db.query(

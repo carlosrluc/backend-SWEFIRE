@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { withTx } = require('./inventarioStock.service');
+const { resolveAprobacionOnCreate } = require('./cotizacionAprobacion.service');
 const { normalizeServiceItem } = require('./cotizacionDto.service');
 
 const DUMMY_CLIENT_DNI = '00000000000';
@@ -352,7 +353,7 @@ async function listCotizacionesByIncidencia(idIncidencia) {
     return rows;
 }
 
-async function createCotizacionIncidencia(idIncidencia, body) {
+async function createCotizacionIncidencia(idIncidencia, body, rolNormalizado = null) {
     return withTx(db, async (exec) => {
         const incRows = await exec.query(
             'SELECT id_incidencia, nombre_incidencia FROM INCIDENCIA WHERE id_incidencia = ?',
@@ -393,13 +394,16 @@ async function createCotizacionIncidencia(idIncidencia, body) {
                 : cliente.observacionExtra;
         }
 
+        const aprobacionInicial = resolveAprobacionOnCreate(rolNormalizado, true);
+
         const result = await exec.query(
             `INSERT INTO COTIZACION_COMERCIAL
                 (version, desactualizado, nombre, id_solicitud, DNI_O_RUC, precio_total, estado,
+                 aprobado, aprobado_por_abogado, aprobado_por_gerente,
                  comentario_cliente, fecha_emision, fecha_vigencia, observacion,
                  Tasa_Cambio, condiciones, tacaCompra, tasaVenta,
                  etapas, duracion_etapa, etapas_detalle, direccion_recojo, Id_incidencia)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
                 versionNum,
                 DESACTUALIZADO_VIGENTE,
@@ -407,7 +411,10 @@ async function createCotizacionIncidencia(idIncidencia, body) {
                 null,
                 cliente.DNI_O_RUC,
                 precioTotal,
-                'Pendiente',
+                aprobacionInicial.estado,
+                aprobacionInicial.aprobado,
+                aprobacionInicial.aprobado_por_abogado,
+                aprobacionInicial.aprobado_por_gerente,
                 body.comentario_cliente || null,
                 body.fecha_emision || hoy,
                 body.fecha_vigencia || null,
@@ -442,10 +449,15 @@ async function createCotizacionIncidencia(idIncidencia, body) {
                 involucrado_id: cliente.involucrado_id ?? null,
             },
             precio_total: precioTotal,
+            aprobado: aprobacionInicial.aprobado,
+            aprobado_por_abogado: aprobacionInicial.aprobado_por_abogado,
+            aprobado_por_gerente: aprobacionInicial.aprobado_por_gerente,
+            estado: aprobacionInicial.estado,
             presupuesto_autorrellenado: presupuestoInsertado,
             servicios: serviciosInsertados,
             Id_incidencia: idIncidencia,
             esCotizacionIncidencia: true,
+            cotizacion_de_incidencia: 'YES',
             id_solicitud: null,
         };
     });

@@ -30,7 +30,11 @@ exports.getCotizacionesByIncidencia = async (req, res) => {
 
 exports.createCotizacionIncidencia = async (req, res) => {
     try {
-        const result = await createCotizacionIncidencia(Number(req.params.id), req.body);
+        const result = await createCotizacionIncidencia(
+            Number(req.params.id),
+            req.body,
+            req.user?.rolNormalizado || null,
+        );
         res.status(201).json({
             message: 'Cotización de incidencia creada',
             ...result,
