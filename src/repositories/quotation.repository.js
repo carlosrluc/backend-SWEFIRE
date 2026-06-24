@@ -12,16 +12,36 @@ const QuotationRepository = {
     },
 
     async upsertPurchaseOrderFileURL(filename, QuotationID) {
-        // Guardar URL relativa en la base de datos (ej: /uploads/cotizaciones/orden_compra_xxx.pdf)
         const RelativePurchaseOrderFileUrl = `/uploads/cotizaciones/${filename}`;
         await db.query(`
             UPDATE COTIZACION_COMERCIAL 
-            SET Orden_compra = (?) 
+            SET Orden_compra = (?),
+                orden_compra_rechazada = 'NO',
+                motivo_rechazo_orden_compra = NULL
             WHERE ID = (?) AND desactualizado = 'NO'
         `, [RelativePurchaseOrderFileUrl, QuotationID]);
 
         return RelativePurchaseOrderFileUrl;
-    }
+    },
+
+    async rejectPurchaseOrder(quotationID, motivo) {
+        const quotation = await QuotationRepository.getQuotationByID(quotationID);
+        if (!quotation) return null;
+
+        if (quotation.Orden_compra) {
+            deleteFile(quotation.Orden_compra);
+        }
+
+        await db.query(`
+            UPDATE COTIZACION_COMERCIAL
+            SET Orden_compra = NULL,
+                orden_compra_rechazada = 'YES',
+                motivo_rechazo_orden_compra = ?
+            WHERE ID = ? AND desactualizado = 'NO'
+        `, [motivo, quotationID]);
+
+        return QuotationRepository.getQuotationByID(quotationID);
+    },
 };
 
 module.exports = QuotationRepository;

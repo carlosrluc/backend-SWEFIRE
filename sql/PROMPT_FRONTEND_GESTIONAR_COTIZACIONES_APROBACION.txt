@@ -372,3 +372,98 @@ ASISTPROY:
 - `cotizacion_de_incidencia` en API = Boolean(Id_incidencia) expresado como YES/NO.
 - El middleware de roles (permit) puede estar bypassed en dev; la lógica de negocio en controllers sí aplica.
 - Ejecutar migración antes de desplegar el front, o los INSERT fallarán por columnas faltantes.
+
+=================================================================================================
+14) RECHAZO DE ORDEN DE COMPRA
+=================================================================================================
+
+Migración BD: sql/migrate_cotizacion_rechazo_orden_compra.sql
+Columnas nuevas:
+- orden_compra_rechazada: enum YES/NO (default NO)
+- motivo_rechazo_orden_compra: text nullable
+
+ENDPOINT
+-------
+PUT /api/cotizaciones/{id}/orden-compra/rechazar
+Roles: gerente, adminproy, asistproy, abogado (abogado SOLO si Id_incidencia NOT NULL)
+
+Body (obligatorio):
+{
+  "motivo": "El PDF no coincide con la cotización"
+}
+
+Respuesta 200:
+{
+  "message": "Orden de compra rechazada",
+  "ID": 45,
+  "orden_compra_rechazada": "YES",
+  "motivo_rechazo_orden_compra": "El PDF no coincide con la cotización",
+  "tieneOrdenCompra": false,
+  "pendienteAprobacionOrden": false,
+  "mensaje_rechazo_orden_compra": "Su orden de compra fue rechazada: El PDF no coincide..."
+}
+
+Comportamiento backend:
+- Elimina el archivo PDF del disco (si existe)
+- Limpia Orden_compra en BD
+- orden_compra_rechazada = YES, guarda motivo
+- Cotización permanece en estado Pendiente (sin proyecto)
+- No permite rechazar si ya existe PROYECTO con id_cotizacion (409)
+- No permite rechazar si no hay Orden_compra adjunta (400)
+
+REENVÍO POR EL CLIENTE
+----------------------
+POST /api/cotizaciones/{id}/orden-compra (multipart, campo orden_compra)
+Al subir de nuevo:
+- orden_compra_rechazada = NO
+- motivo_rechazo_orden_compra = NULL
+- tieneOrdenCompra = true
+
+Respuesta 200 incluye orden_compra_rechazada: "NO".
+
+CAMPOS EN LISTADO Y DETALLE (formatQuotation)
+---------------------------------------------
+{
+  "orden_compra_rechazada": "YES",
+  "motivo_rechazo_orden_compra": "El PDF no coincide con la cotización",
+  "mensaje_rechazo_orden_compra": "Su orden de compra fue rechazada: El PDF no coincide...",
+  "tieneOrdenCompra": false,
+  "pendienteAprobacionOrden": false
+}
+
+UI CLIENTE:
+- Badge "OC rechazada" cuando orden_compra_rechazada === "YES"
+- Al abrir "Enviar orden de compra" mostrar motivo_rechazo_orden_compra / mensaje_rechazo_orden_compra
+- Permitir reenviar si cotización vigente (desactualizado=NO) y estado=Pendiente
+
+GET /api/cotizaciones/{id}/orden-compra — respuestas 404 diferenciadas
+-----------------------------------------------------------------------
+Nunca hubo OC:
+{
+  "error": "...",
+  "existe": false,
+  "archivo_disponible": false,
+  "mensaje_ui": "No existe orden de compra",
+  "orden_compra_rechazada": "YES",   // si fue rechazada
+  "motivo_rechazo_orden_compra": "...",
+  "mensaje_rechazo_orden_compra": "..."
+}
+
+Ruta en BD pero archivo borrado/corrupto:
+{
+  "error": "...",
+  "existe": true,
+  "archivo_disponible": false,
+  "mensaje_ui": "El archivo de orden de compra no está disponible",
+  "url": "/uploads/cotizaciones/orden_compra_xxx.pdf"
+}
+
+El front puede usar tieneOrdenCompra del listado vs archivo_disponible del GET para detectar archivo corrupto.
+
+ERRORES
+-------
+400 — motivo vacío
+400 — Sin OC adjunta para rechazar
+400 — Estado distinto de Pendiente
+403 — Abogado en cotización comercial
+409 — Ya existe proyecto asociado

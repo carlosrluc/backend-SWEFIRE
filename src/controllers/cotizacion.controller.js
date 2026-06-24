@@ -369,6 +369,9 @@ exports.formatQuotation = (row, rol) => {
 
     const esIncidencia = Boolean(row.Id_incidencia);
     const aprobado = row.aprobado || 'NO';
+    const ordenCompraRechazada = row.orden_compra_rechazada || 'NO';
+    const motivoRechazoOc = row.motivo_rechazo_orden_compra || null;
+    const tieneOrdenCompra = Boolean(row.Orden_compra);
 
     const quotation = {
         ID: row.ID,
@@ -401,9 +404,14 @@ exports.formatQuotation = (row, rol) => {
         desactualizado: row.desactualizado ?? DESACTUALIZADO_VIGENTE,
         Tasa_Cambio: row.Tasa_Cambio,
         ordenCompra: row.Orden_compra || null,
-        tieneOrdenCompra: Boolean(row.Orden_compra),
+        tieneOrdenCompra,
+        orden_compra_rechazada: ordenCompraRechazada,
+        motivo_rechazo_orden_compra: motivoRechazoOc,
+        mensaje_rechazo_orden_compra: ordenCompraRechazada === 'YES' && motivoRechazoOc
+            ? `Su orden de compra fue rechazada: ${motivoRechazoOc}`
+            : null,
         pendienteAprobacionOrden: Boolean(
-            row.Orden_compra && row.estado === QuotationStatus.PENDING,
+            tieneOrdenCompra && row.estado === QuotationStatus.PENDING,
         ),
         requiere_aprobacion_abogado: esIncidencia && row.aprobado_por_abogado !== 'YES',
         requiere_aprobacion_gerente: esIncidencia && row.aprobado_por_gerente !== 'YES',
@@ -1886,8 +1894,18 @@ exports.sendChatMessage = async (req, res) => {
 // ── ORDEN DE COMPRA (PDF) ───────────────────────────────────────────────────────
 const path = require('path');
 const fs = require('fs');
-const { getQuotationByID, upsertPurchaseOrderFileURL } = require('../repositories/quotation.repository');
+const { getQuotationByID, upsertPurchaseOrderFileURL, rejectPurchaseOrder } = require('../repositories/quotation.repository');
 const deleteFile = require('../utils/deleteFile');
+
+function resolveOrdenCompraAbsolutePath(relativeUrl) {
+    const normalized = (relativeUrl || '').replace(/^\/+/, '');
+    return path.join(global.__basedir || path.join(__dirname, '..'), normalized);
+}
+
+function ordenCompraArchivoDisponible(relativeUrl) {
+    if (!relativeUrl) return false;
+    return fs.existsSync(resolveOrdenCompraAbsolutePath(relativeUrl));
+}
 
 exports.uploadOrdenCompra = catchAsync(async (req, res) => {
     const QuotationID = req.params.id;
@@ -1937,23 +1955,106 @@ exports.uploadOrdenCompra = catchAsync(async (req, res) => {
         url: NewRelativeUrl,
         ruta: NewRelativeUrl,
         tieneOrdenCompra: true,
+        orden_compra_rechazada: 'NO',
+        motivo_rechazo_orden_compra: null,
+        pendienteAprobacionOrden: quotation.estado === QuotationStatus.PENDING,
+    });
+});
+
+exports.rechazarOrdenCompra = catchAsync(async (req, res) => {
+    const cotizacionId = Number(req.params.id);
+    const motivo = (req.body?.motivo ?? '').toString().trim();
+    const rol = req.user?.rolNormalizado || '';
+
+    if (!motivo) {
+        return res.status(400).json({ error: 'motivo es obligatorio' });
+    }
+
+    const quotation = await getQuotationByID(cotizacionId);
+    if (!quotation) {
+        return res.status(404).json({ error: 'Cotización no encontrada' });
+    }
+
+    const isIncidencia = Boolean(quotation.Id_incidencia);
+    if (rol === 'abogado' && !isIncidencia) {
+        return res.status(403).json({ error: 'El abogado solo puede rechazar órdenes de compra en cotizaciones de incidencia' });
+    }
+
+    const rolesPermitidos = ['gerente', 'adminproy', 'asistproy', 'abogado'];
+    if (!rolesPermitidos.includes(rol)) {
+        return res.status(403).json({ error: 'Sin permiso para rechazar órdenes de compra' });
+    }
+
+    if (quotation.estado !== QuotationStatus.PENDING) {
+        return res.status(400).json({
+            error: `Solo se puede rechazar la orden de compra cuando la cotización está en estado ${QuotationStatus.PENDING}`,
+        });
+    }
+
+    if (!quotation.Orden_compra) {
+        return res.status(400).json({ error: 'No hay orden de compra adjunta para rechazar' });
+    }
+
+    const proyectoExistente = await db.query(
+        'SELECT id_Proyecto FROM PROYECTO WHERE id_cotizacion = ? LIMIT 1',
+        [cotizacionId],
+    );
+    if (proyectoExistente.length) {
+        return res.status(409).json({ error: 'No se puede rechazar la orden de compra: ya existe un proyecto asociado' });
+    }
+
+    const updated = await rejectPurchaseOrder(cotizacionId, motivo);
+    if (!updated) {
+        return res.status(404).json({ error: 'Cotización no encontrada' });
+    }
+
+    res.status(200).json({
+        message: 'Orden de compra rechazada',
+        ID: cotizacionId,
+        orden_compra_rechazada: 'YES',
+        motivo_rechazo_orden_compra: motivo,
+        tieneOrdenCompra: false,
+        pendienteAprobacionOrden: false,
+        mensaje_rechazo_orden_compra: `Su orden de compra fue rechazada: ${motivo}`,
     });
 });
 
 exports.getOrdenCompra = async (req, res) => {
     try {
         const rows = await db.query(
-            `SELECT Orden_compra FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`,
+            `SELECT Orden_compra, orden_compra_rechazada, motivo_rechazo_orden_compra
+             FROM COTIZACION_COMERCIAL WHERE ID = ? AND ${COTIZACION_VIGENTE_SQL}`,
             [req.params.id],
         );
         if (!rows.length) return res.status(404).json({ error: 'Cotización no encontrada' });
 
-        const fileUrl = rows[0].Orden_compra;
+        const { Orden_compra: fileUrl, orden_compra_rechazada, motivo_rechazo_orden_compra } = rows[0];
+
         if (!fileUrl) {
-            return res.status(404).json({
+            const payload = {
                 error: 'No hay ninguna orden de compra guardada para esta cotización',
                 existe: false,
+                archivo_disponible: false,
                 mensaje_ui: 'No existe orden de compra',
+            };
+            if (orden_compra_rechazada === 'YES') {
+                payload.orden_compra_rechazada = 'YES';
+                payload.motivo_rechazo_orden_compra = motivo_rechazo_orden_compra;
+                payload.mensaje_rechazo_orden_compra = motivo_rechazo_orden_compra
+                    ? `Su orden de compra fue rechazada: ${motivo_rechazo_orden_compra}`
+                    : null;
+            }
+            return res.status(404).json(payload);
+        }
+
+        const archivoDisponible = ordenCompraArchivoDisponible(fileUrl);
+        if (!archivoDisponible) {
+            return res.status(404).json({
+                error: 'La ruta de orden de compra existe en la base de datos pero el archivo no está disponible',
+                existe: true,
+                archivo_disponible: false,
+                mensaje_ui: 'El archivo de orden de compra no está disponible',
+                url: fileUrl,
             });
         }
 
@@ -1961,10 +2062,10 @@ exports.getOrdenCompra = async (req, res) => {
             return res.json({
                 cotizacionId: Number(req.params.id),
                 url: fileUrl,
+                archivo_disponible: true,
             });
         }
 
-        // Redirigir a la URL pública (servida por express.static)
         res.redirect(fileUrl);
     } catch (e) {
         res.status(500).json({ error: e.message });

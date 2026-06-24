@@ -549,6 +549,8 @@ CREATE TABLE "COTIZACION_COMERCIAL" (
   "tacaCompra" float DEFAULT NULL,
   "tasaVenta" float DEFAULT NULL,
   "Orden_compra" varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  "orden_compra_rechazada" enum('YES','NO') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'NO',
+  "motivo_rechazo_orden_compra" text COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "duracion_etapa" varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   "etapas" int DEFAULT NULL,
   "etapas_detalle" json DEFAULT NULL,

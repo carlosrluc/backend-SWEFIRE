@@ -1033,6 +1033,35 @@ router.post('/:id/chat', auth, permit(['cliente', 'gerente', 'adminproy']), c.se
  *         description: Orden de compra subida correctamente
  */
 router.get('/:id/orden-compra', auth, permit(['cliente', 'gerente', 'adminproy', 'asistproy']), c.getOrdenCompra);
+/**
+ * @openapi
+ * /api/cotizaciones/{id}/orden-compra/rechazar:
+ *   put:
+ *     tags: [Cotización - Documentos]
+ *     summary: Rechazar orden de compra adjunta
+ *     description: |
+ *       Elimina el PDF, marca orden_compra_rechazada=YES y guarda el motivo.
+ *       La cotización permanece en Pendiente sin proyecto. El cliente puede reenviar OC.
+ *       Roles gerente, adminproy, asistproy; abogado solo en cotizaciones de incidencia.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: integer }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [motivo]
+ *             properties:
+ *               motivo: { type: string, description: Motivo obligatorio del rechazo }
+ *     responses:
+ *       200:
+ *         description: Orden de compra rechazada
+ */
+router.put('/:id/orden-compra/rechazar', auth, permit(['gerente', 'adminproy', 'asistproy', 'abogado']), c.rechazarOrdenCompra);
 router.get('/:id/plazos-pago', auth, permit(['cliente', 'gerente', 'adminproy', 'asistproy']), c.getPlazosPago);
 router.put('/:id/plazos-pago', auth, permit(['gerente', 'adminproy', 'asistproy']), c.setPlazosPago);
 router.post('/:id/orden-compra',
