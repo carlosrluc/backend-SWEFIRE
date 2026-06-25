@@ -127,7 +127,7 @@ function normalizeTruckItem(item, index = 0) {
         ID_Servicio: item.ID_Servicio ?? item.idServicio ?? (hasServiceId ? Number(item.serviceId) : null),
         id_servicio_subservicio: item.id_servicio_subservicio ?? item.id_subservicio ?? null,
         Principal: item.Principal ?? item.principal ?? null,
-        PrecioUnit: item.PrecioUnit ?? item.precioUnit ?? item.unitPrice ?? item.preciounit ?? 0,
+        PrecioUnit: null,
         model: item.model ?? item.modelo ?? null,
         color: item.color ?? null,
         maintenanceDate: toDateOnly(item.maintenanceDate ?? item.fecha_prox_revision ?? item.fechaProximaRevision),
@@ -292,7 +292,12 @@ function normalizePhases(body) {
 
     const items = raw.items ?? (Array.isArray(raw) ? raw : []);
     if (!items.length) {
-        return { etapas: null, duracion_etapa: null, etapas_detalle: null };
+        return {
+            etapas: null,
+            duracion_etapa: null,
+            etapas_detalle: null,
+            phases: { items: [] },
+        };
     }
 
     const normalizedItems = items.map((item) => ({
@@ -400,9 +405,7 @@ function calcularPrecioTotal({ productos, servicios, camiones, costoRecojo }) {
             0,
         );
     }
-    if (Array.isArray(camiones)) {
-        precioTotal += camiones.reduce((sum, c) => sum + Number(c.PrecioUnit ?? 0), 0);
-    }
+    // Los camiones no aportan precio: el costo va en el servicio vinculado (campo uso).
     if (costoRecojo?.costo) {
         precioTotal += Number(costoRecojo.costo);
     }
@@ -520,7 +523,7 @@ function buildUpsertQuotationResponse({
         // Para PUT: id de COTIZACION_SERVICIO (ya existe tras el POST)
         uso: row.uso ?? row.idCotizacionServicio ?? null,
         idCotizacionServicio: row.uso ?? row.idCotizacionServicio ?? null,
-        unitPrice: Number(row.precioUnit ?? row.PrecioUnit ?? row.unitPrice ?? 0),
+        serviceIndex: null,
         fechaEntrada: row.fechaEntrada ?? row.fecha_hora_entrada ?? null,
         fechaSalida: row.fechaSalida ?? row.fecha_hora_salida ?? null,
     }));

@@ -227,7 +227,8 @@ async function insertarCamionesCotizacion(dbConn, cotizacionId, camionesList, se
 
         await updateCamionMetadataIfPresent(dbConn, normalized);
 
-        const PrecioUnit = normalized.PrecioUnit ?? null;
+        const PrecioUnit = null;
+
         const svcLocal = resolverServicioCotizacionParaCamion(
             normalized, i, serviciosInsertados, { toPrincipalEnum },
         );
@@ -931,6 +932,12 @@ exports.create = async (req, res) => {
         return res.status(400).json({ error: 'id_solicitud es requerido para crear una cotización' });
     }
 
+    if (!normalized.phasesProvided) {
+        return res.status(400).json({
+            error: 'phases es requerido: envíe { items: [...] } con todas las etapas y actividades de la cotización',
+        });
+    }
+
     const { merged, solicitudFound } = await mergeSolicitudIntoCotizacionCreate(
         db, id_solicitud, normalized, req.body,
     );
@@ -1061,16 +1068,7 @@ exports.create = async (req, res) => {
             await db.query(`UPDATE SOLICITUD SET estado = 'aceptado' WHERE ID = ?`, [id_solicitud]);
         }
 
-        if (merged.phasesProvided) {
-            await syncCotizacionEtapasFromPhases(db, newId, merged.phases ?? { items: [] });
-        } else {
-            const flujo = await aplicarFlujoDesdeSolicitud(
-                db, newId, id_solicitud, serviciosList, false,
-            );
-            if (!flujo.imported && merged.etapas_detalle) {
-                await ensureCotizacionEtapasFromJson(db, newId);
-            }
-        }
+        await syncCotizacionEtapasFromPhases(db, newId, merged.phases ?? { items: [] });
 
         const fechaInicioProyecto = resolverFechaInicioCotizacion(merged, serviciosList);
         const { precioTotal: precioFinal } = await recalcularCotizacionFechasYPrecio(db, newId, {
@@ -1289,16 +1287,6 @@ exports.update = async (req, res) => {
 
         if (normalized.phasesProvided) {
             await syncCotizacionEtapasFromPhases(exec, cotizacionId, normalized.phases ?? { items: [] });
-        } else if (normalized.servicios !== undefined) {
-            const cotRow = currentRows[0];
-            const flujo = await aplicarFlujoDesdeSolicitud(
-                exec, cotizacionId, cotRow.id_solicitud, normalized.servicios, false,
-            );
-            if (!flujo.imported && normalized.etapas_detalle !== undefined) {
-                await ensureCotizacionEtapasFromJson(exec, cotizacionId);
-            }
-        } else if (normalized.etapas_detalle !== undefined) {
-            await ensureCotizacionEtapasFromJson(exec, cotizacionId);
         }
 
         if (normalized.costoRecojo !== undefined) {
@@ -1562,7 +1550,7 @@ exports.getCamiones = async (req, res) => {
 exports.createCamion = async (req, res) => {
     const truck = normalizeTruckItem(req.body, 0);
     const Placa = truck.Placa;
-    const precio = truck.PrecioUnit ?? null;
+    const precio = null;
     try {
         await updateCamionMetadataIfPresent(db, truck);
         const svcRows = await db.query(
@@ -1602,7 +1590,7 @@ exports.createCamion = async (req, res) => {
 exports.updateCamion = async (req, res) => {
     const truck = normalizeTruckItem(req.body, 0);
     const Placa = truck.Placa;
-    const precio = truck.PrecioUnit ?? null;
+    const precio = null;
     try {
         await updateCamionMetadataIfPresent(db, truck);
         const svcRows = await db.query(

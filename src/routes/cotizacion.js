@@ -134,13 +134,12 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *         serviceIndex: { type: integer, description: 'Índice en services[] del mismo POST (recomendado al crear)' }
  *         ID_Servicio: { type: integer, description: 'ID del catálogo SERVICIO (alternativa a serviceIndex)' }
  *         id_servicio_subservicio: { type: integer, description: 'Desambigua si hay varios servicios con el mismo ID_Servicio' }
- *         unitPrice: { type: number, description: 'Legacy — PrecioUnit' }
  *     UpsertQuotationDTO:
  *       type: object
- *       required: [name, id_solicitud]
+ *       required: [name, id_solicitud, phases]
  *       properties:
  *         name: { type: string }
- *         id_solicitud: { type: integer, description: 'Requerido al crear. Importa servicios, productos y flujo desde la solicitud.' }
+ *         id_solicitud: { type: integer, description: 'Requerido al crear. Importa servicios y productos desde la solicitud.' }
  *         fecha_inicio_proyecto: { type: string, format: date, example: "2026-06-16", description: 'Inicio del proyecto; calcula fechas de servicios según duración de etapas' }
  *         DNI_O_RUC: { type: string, description: 'Opcional si viene de la solicitud' }
  *         inventory:
@@ -173,8 +172,10 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *         phases:
  *           type: object
  *           description: |
- *             Etapas/actividades de la cotización. Al guardar se persisten en COTIZACION_ETAPA y COTIZACION_ACTIVIDAD.
- *             También se acepta el alias legacy `etapas_detalle` (mismo JSON que antes iba solo a la columna JSON).
+ *             **Requerido al crear.** Única fuente de etapas/actividades de la cotización.
+ *             El front debe enviar TODAS las fases y actividades (reemplazo completo, no solo las nuevas).
+ *             No se importan etapas del servicio principal ni metas del catálogo.
+ *             También acepta el alias legacy `etapas_detalle` (mismo JSON).
  *           properties:
  *             items:
  *               type: array
@@ -244,6 +245,22 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *             Principal: false
  *             id_servicio_subservicio: 1
  *             indicaciones: "Subservicio recomendado: grupo electrógeno."
+ *         phases:
+ *           items:
+ *             - id: "fase-instalacion"
+ *               name: "Instalación"
+ *               description: "Montaje de detectores, cableado y central"
+ *               duration: 3
+ *               activities:
+ *                 - { id: "act-tendido-cable", name: "Tendido de cableado" }
+ *                 - { id: "act-montaje-detectores", name: "Montaje de detectores" }
+ *             - id: "fase-configuracion"
+ *               name: "Configuración y pruebas"
+ *               description: "Programación de zonas y pruebas funcionales"
+ *               duration: 2
+ *               activities:
+ *                 - { id: "act-programacion", name: "Programación de zonas" }
+ *                 - { id: "act-prueba-detectores", name: "Prueba de detectores" }
  */
 
 /**
@@ -274,18 +291,18 @@ const { uploadCotizacion, requireFile } = require('../middlewares/upload.middlew
  *     tags: [Cotización]
  *     summary: Crear cotización (UpsertQuotationDTO o formato legacy)
  *     description: |
- *       Acepta el payload del frontend (`name`, `inventory`, `services`, `trucks`, etc.)
+ *       Acepta el payload del frontend (`name`, `inventory`, `services`, `trucks`, `phases`, etc.)
  *       y también el formato legacy (`nombre`, `productos`, `servicios`, `camiones`, etc.).
- *       **Requiere `id_solicitud`.** Si se envía, importa automáticamente:
+ *       **Requiere `id_solicitud` y `phases`.**
+ *       Si se envía `id_solicitud`, importa automáticamente desde la solicitud:
  *       - Servicios con `Principal`, `indicaciones` e `id_servicio_subservicio` desde `SOLICITUD_SERVICIO`
  *       - Productos desde `SOLICITUD_INVENTARIO`
  *       - Cliente, nombre, observaciones y `ubicacion` → `direccion_recojo`
- *       - Etapas/actividades del servicio principal a `COTIZACION_ETAPA` / `COTIZACION_ACTIVIDAD` (con `duracion` en días)
- *         (actividades de subservicio solo si están en la solicitud)
- *       - Con `fecha_inicio_proyecto`, calcula `fecha_inicio`/`fecha_finalizacion` de servicios según duración de etapas
- *       - Si `pago_por_dia` del servicio es true, el total usa `precio_comercial × días`; si no, solo `precio_comercial`
+ *       Las etapas/actividades **solo** provienen de `phases.items[]` (el front envía el listado completo).
+ *       Con `fecha_inicio_proyecto`, calcula `fecha_inicio`/`fecha_finalizacion` de servicios según duración de etapas.
+ *       Si `pago_por_dia` del servicio es true, el total usa `precio_comercial × días`; si no, solo `precio_comercial`.
+ *       Los camiones no tienen precio propio: se vinculan a un servicio (`serviceIndex` / `uso`) y el costo va en ese servicio.
  *       Los valores enviados en el body tienen prioridad sobre la solicitud.
- *       Si envías `phases` / `etapas_detalle`, se usa ese flujo en lugar del importado.
  *     requestBody:
  *       required: true
  *       content:
@@ -394,7 +411,8 @@ router.get('/:id/cotizacion-original', auth, permit(['abogado']), c.getCotizacio
  *     tags: [Cotización]
  *     summary: Actualizar cotización (UpsertQuotationDTO o formato legacy)
  *     description: |
- *       Reemplaza secciones enviadas (`inventory`, `services`, `trucks`, etc.).
+ *       Reemplaza secciones enviadas (`inventory`, `services`, `trucks`, `phases`, etc.).
+ *       Si envías `phases`, se sincroniza el listado completo de etapas/actividades (sin importar del catálogo).
  *       También acepta alias legacy (`productos`, `servicios`, `camiones`, ...).
  *     parameters:
  *       - in: path
@@ -646,7 +664,7 @@ router.delete('/:id/servicios/:sid', auth, permit(['gerente', 'adminproy']), c.d
  *             properties:
  *               Placa: { type: string }
  *               uso: { type: integer, description: id de COTIZACION_SERVICIO (fechas automáticas) }
- *               PrecioUnit: { type: number }
+ *               serviceIndex: { type: integer, description: 'Índice en services[] al crear la cotización' }
  *     responses:
  *       201:
  *         description: Camión asignado
@@ -678,7 +696,7 @@ router.post('/:id/camiones', auth, permit(['abogado', 'trabajtaller', 'gerente',
  *             properties:
  *               Placa: { type: string }
  *               uso: { type: integer, description: id de COTIZACION_SERVICIO }
- *               PrecioUnit: { type: number }
+ *               serviceIndex: { type: integer }
  *     responses:
  *       200:
  *         description: Camión actualizado

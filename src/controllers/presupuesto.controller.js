@@ -1,6 +1,6 @@
 const db = require('../config/db');
 const { withTx, getInventarioCantidad } = require('../services/inventarioStock.service');
-const { aggregateInventarioPorCotizacion } = require('../services/inventarioPorServicio.service');
+const { aggregateInventarioPorCotizacion, aggregateFaltantesInventarioCotizacion } = require('../services/inventarioPorServicio.service');
 
 // Obtener todos los items del presupuesto de una cotización (con filtro opcional por tipo)
 exports.getByCotizacion = async (req, res) => {
@@ -120,21 +120,17 @@ exports.exportFaltantesInventarioPorCotizacion = async (req, res) => {
         const idCotizacion = Number(req.params.id);
 
         const out = await withTx(db, async (conn) => {
-            const { cotizacion, items, servicios } = await aggregateInventarioPorCotizacion(conn, idCotizacion);
+            const { cotizacion, servicios } = await aggregateInventarioPorCotizacion(conn, idCotizacion);
             if (!cotizacion) return { notFound: true };
+
+            const faltantes = await aggregateFaltantesInventarioCotizacion(conn, idCotizacion);
 
             const lineasPresupuesto = [];
             let costoTotalPresupuesto = 0;
 
-            for (const item of items) {
-                if (item.estancia !== 'para inventario') continue;
-
-                const stock = await getInventarioCantidad(conn, item.id_inventario);
-                const faltante = Math.max(0, item.cantidad_requerida - stock);
-                if (faltante <= 0) continue;
-
+            for (const item of faltantes) {
                 const costoUnitario = item.precio_compra;
-                const costoTotal = Math.round(faltante * costoUnitario * 100) / 100;
+                const costoTotal = item.costo;
                 const pr = await conn.query(
                     `INSERT INTO PRESUPUESTO (
                         ID_Cotizacion, tipo, realizacion_gastos, nombre_gasto,
@@ -146,7 +142,7 @@ exports.exportFaltantesInventarioPorCotizacion = async (req, res) => {
                         'en preparacion',
                         item.nombre_objeto,
                         costoUnitario,
-                        faltante,
+                        item.faltante,
                         costoTotal,
                         'soles',
                         'para inventario',
@@ -157,7 +153,7 @@ exports.exportFaltantesInventarioPorCotizacion = async (req, res) => {
                     id_presupuesto: pr.insertId,
                     id_inventario: item.id_inventario,
                     nombre_objeto: item.nombre_objeto,
-                    cantidad: faltante,
+                    cantidad: item.faltante,
                     costo_unitario: costoUnitario,
                     costo_total: costoTotal,
                     moneda: 'soles',

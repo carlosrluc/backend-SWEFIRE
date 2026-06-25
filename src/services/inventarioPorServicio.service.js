@@ -1,3 +1,5 @@
+const { getInventarioCantidad } = require('./inventarioStock.service');
+
 function mapFilasToItems(filas) {
     const mapa = new Map();
     for (const row of filas) {
@@ -130,7 +132,74 @@ async function aggregateInventarioPorCotizacion(executor, idCotizacion) {
     };
 }
 
+/**
+ * Combina requerimientos de SERVICIO_INVENTARIO_REQUERIDO y COTIZACION_INVENTARIO,
+ * y calcula el faltante de stock en taller por objeto.
+ */
+async function aggregateFaltantesInventarioCotizacion(executor, idCotizacion) {
+    const { items: servicioItems } = await aggregateInventarioPorCotizacion(executor, idCotizacion);
+
+    const cotizacionInventarioRows = await executor.query(
+        `SELECT ci.ID_Inventario, ci.cantidad, i.nombre_objeto, i.precio_compra
+         FROM COTIZACION_INVENTARIO ci
+         INNER JOIN INVENTARIO i ON i.Id_Objeto = ci.ID_Inventario
+         WHERE ci.ID_Cotizacion = ?`,
+        [idCotizacion],
+    );
+
+    const requeridoPorId = new Map();
+
+    for (const item of servicioItems) {
+        if (item.estancia !== 'para inventario') continue;
+        const id = item.id_inventario;
+        const prev = requeridoPorId.get(id) ?? {
+            id_inventario: id,
+            nombre_objeto: item.nombre_objeto,
+            precio_compra: item.precio_compra,
+            cantidad_requerida: 0,
+        };
+        prev.cantidad_requerida += item.cantidad_requerida;
+        requeridoPorId.set(id, prev);
+    }
+
+    for (const row of cotizacionInventarioRows) {
+        const id = row.ID_Inventario;
+        const cantidad = Number(row.cantidad) || 0;
+        if (cantidad <= 0) continue;
+        const prev = requeridoPorId.get(id) ?? {
+            id_inventario: id,
+            nombre_objeto: row.nombre_objeto,
+            precio_compra: Number(row.precio_compra) || 0,
+            cantidad_requerida: 0,
+        };
+        prev.cantidad_requerida += cantidad;
+        if (!prev.nombre_objeto) prev.nombre_objeto = row.nombre_objeto;
+        if (!prev.precio_compra) prev.precio_compra = Number(row.precio_compra) || 0;
+        requeridoPorId.set(id, prev);
+    }
+
+    const faltantes = [];
+
+    for (const item of requeridoPorId.values()) {
+        const stock = await getInventarioCantidad(executor, item.id_inventario);
+        const faltante = Math.max(0, item.cantidad_requerida - stock);
+        if (faltante <= 0) continue;
+        faltantes.push({
+            id_inventario: item.id_inventario,
+            nombre_objeto: item.nombre_objeto,
+            cantidad_requerida: item.cantidad_requerida,
+            cantidad_en_inventario: stock,
+            precio_compra: item.precio_compra,
+            faltante,
+            costo: Math.round(faltante * item.precio_compra * 100) / 100,
+        });
+    }
+
+    return faltantes.sort((a, b) => b.id_inventario - a.id_inventario);
+}
+
 module.exports = {
     aggregateInventarioPorProyecto,
     aggregateInventarioPorCotizacion,
+    aggregateFaltantesInventarioCotizacion,
 };
