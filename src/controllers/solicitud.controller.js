@@ -5,6 +5,11 @@ const {
     listarServiciosSolicitud,
     enriquecerFlujoSolicitud,
 } = require('../services/solicitudServicio.service');
+const {
+    parseInventarioInput,
+    insertarInventarioSolicitud,
+    listarInventarioSolicitud,
+} = require('../services/solicitudInventario.service');
 
 /** Acepta un objeto, un array, o { servicios: [...] } */
 const normalizarMatrizBody = (body, claveEnvoltorio) => {
@@ -190,10 +195,20 @@ exports.create = async (req, res) => {
     const { Id_Cliente, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, Respuesta } = req.body;
     const estado = 'pendiente';
     const serviciosItems = parseServiciosInput(req.body);
+    const inventarioItems = parseInventarioInput(req.body);
+
+    const conn = await db.getConnection();
+    const exec = {
+        query: async (sql, params) => {
+            const [rows] = await conn.query(sql, params);
+            return rows;
+        },
+    };
+
     try {
         let clientIdToUse = Id_Cliente;
         if (req.user && req.user.rolNormalizado === 'cliente') {
-            const contactos = await db.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
+            const contactos = await exec.query('SELECT DNI_O_RUC FROM CLIENTE_CONTACTO WHERE DNI_perfil = ?', [req.user.dni_perfil]);
             if (contactos.length > 0) {
                 clientIdToUse = contactos[0].DNI_O_RUC;
             } else {
@@ -201,26 +216,42 @@ exports.create = async (req, res) => {
             }
         }
 
-        const result = await db.query(
+        await conn.beginTransaction();
+
+        const result = await exec.query(
             'INSERT INTO SOLICITUD (Id_Cliente,descripcion,ubicacion,ProductoEnvio,CamionesEnvio,ObsGenerales,ObsEleccion,estado,Respuesta) VALUES (?,?,?,?,?,?,?,?,?)',
-            [clientIdToUse, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta]
+            [clientIdToUse, descripcion, ubicacion, productoenvio, camionesenvio, obsgenerales, obseleccion, estado, Respuesta],
         );
         const newId = result.insertId;
 
         let serviciosInsertados = [];
         if (serviciosItems.length) {
-            await insertarServiciosSolicitud(db, newId, serviciosItems);
-            serviciosInsertados = await listarServiciosSolicitud(db, newId);
+            await insertarServiciosSolicitud(exec, newId, serviciosItems);
+            serviciosInsertados = await listarServiciosSolicitud(exec, newId);
         }
+
+        if (inventarioItems.length) {
+            await insertarInventarioSolicitud(exec, newId, inventarioItems);
+        }
+
+        await conn.commit();
+
+        const inventarioInsertado = inventarioItems.length
+            ? await listarInventarioSolicitud(db, newId)
+            : [];
 
         res.status(201).json({
             message: 'Solicitud creada',
             ID: newId,
             servicios: serviciosInsertados,
+            inventario: inventarioInsertado,
         });
     } catch (e) {
+        await conn.rollback();
         if (e.statusCode === 400) return res.status(400).json({ error: e.message });
         res.status(500).json({ error: e.message });
+    } finally {
+        conn.release();
     }
 };
 
@@ -383,14 +414,19 @@ exports.getInventario = async (req, res) => {
 };
 
 exports.createInventario = async (req, res) => {
-    const { ID_Inventario, cantidad, intencion, dias_alquilados } = req.body;
+    const items = normalizarMatrizBody(req.body, 'inventario');
     try {
-        const result = await db.query(
-            'INSERT INTO SOLICITUD_INVENTARIO (ID_Solicitud,ID_Inventario,cantidad,intencion,dias_alquilados) VALUES (?,?,?,?,?)',
-            [req.params.id, ID_Inventario, cantidad, intencion, dias_alquilados]
-        );
-        res.status(201).json({ message: 'Inventario en solicitud creado', id: result.insertId });
-    } catch (e) { res.status(500).json({ error: e.message }); }
+        const insertados = await insertarInventarioSolicitud(db, req.params.id, items.length ? items : [req.body]);
+        const inventario = await listarInventarioSolicitud(db, req.params.id);
+        res.status(201).json({
+            message: items.length > 1 ? 'Inventario en solicitud creado' : 'Inventario en solicitud creado',
+            ids: insertados.map((r) => r.id),
+            inventario,
+        });
+    } catch (e) {
+        if (e.statusCode === 400) return res.status(400).json({ error: e.message });
+        res.status(500).json({ error: e.message });
+    }
 };
 
 exports.updateInventario = async (req, res) => {

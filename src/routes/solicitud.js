@@ -32,22 +32,63 @@ const c = require('../controllers/solicitud.controller');
  *             id: { type: integer, example: 42 }
  *             ID_Solicitud: { type: integer, example: 115 }
  *             nombre: { type: string, example: "Instalación de Sistema de Rociadores (Sprinklers)" }
+ *     SolicitudInventarioInput:
+ *       type: object
+ *       required: [ID_Inventario, cantidad, intencion]
+ *       description: |
+ *         Ítem de SOLICITUD_INVENTARIO. Columnas en BD: ID_Inventario, cantidad, intencion, dias_alquilados.
+ *         Acepta alias `id` o `Id_Objeto` en lugar de ID_Inventario, y `diasAlquilados` en lugar de dias_alquilados.
+ *       properties:
+ *         ID_Inventario:
+ *           type: integer
+ *           example: 1
+ *           description: FK a INVENTARIO.Id_Objeto
+ *         id:
+ *           type: integer
+ *           description: Alias de ID_Inventario
+ *         Id_Objeto:
+ *           type: integer
+ *           description: Alias de ID_Inventario
+ *         cantidad:
+ *           type: integer
+ *           minimum: 1
+ *           example: 10
+ *         intencion:
+ *           type: string
+ *           enum: [comprar, alquilar]
+ *           example: comprar
+ *         dias_alquilados:
+ *           type: integer
+ *           minimum: 1
+ *           description: Requerido cuando intencion es alquilar
+ *           example: 5
+ *     SolicitudInventarioResponse:
+ *       allOf:
+ *         - $ref: '#/components/schemas/SolicitudInventarioInput'
+ *         - type: object
+ *           properties:
+ *             id: { type: integer, example: 88, description: PK de SOLICITUD_INVENTARIO }
+ *             ID_Solicitud: { type: integer, example: 115 }
+ *             nombre: { type: string, example: "Rociador upright" }
+ *             precio_unitario: { type: number, example: 45.50 }
  *     SolicitudCreateConServicios:
  *       type: object
  *       description: |
- *         Crear solicitud con servicios en un solo paso.
+ *         Crear solicitud con servicios e inventario en un solo paso.
  *         Acepta `servicios[]` o el formato devuelto por GET /servicios/{id}/principal
  *         (`servicio_principal` + `servicios_secundarios`).
+ *         El inventario puede enviarse como `inventario[]` o `productos[]` (alias compatible con cotización).
  *       required: [Id_Cliente]
  *       properties:
  *         Id_Cliente: { type: string, example: "20501234567" }
  *         descripcion: { type: string, example: "Instalación de rociadores zona expansión" }
  *         ubicacion: { type: string, example: "Av. Javier Prado Este 4200, San Borja" }
- *         productoenvio: { type: string }
- *         camionesenvio: { type: string }
- *         obsgenerales: { type: string }
- *         obseleccion: { type: string }
- *         Respuesta: { type: string }
+ *         productoenvio:
+ *           type: string
+ *           description: Texto libre sobre envío de productos (columna SOLICITUD.ProductoEnvio)
+ *         obsgenerales: { type: string, description: Observaciones generales (SOLICITUD.ObsGenerales) }
+ *         obseleccion: { type: string, description: Observaciones de elección de servicios (SOLICITUD.ObsEleccion) }
+ *         Respuesta: { type: string, description: Respuesta del taller al cliente, si aplica }
  *         servicios:
  *           type: array
  *           items:
@@ -58,15 +99,26 @@ const c = require('../controllers/solicitud.controller');
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/SolicitudServicioInput'
+ *         inventario:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudInventarioInput'
+ *         productos:
+ *           type: array
+ *           description: Alias de inventario[] (mismo formato)
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudInventarioInput'
  *       example:
  *         Id_Cliente: "20501234567"
  *         descripcion: "Instalación de rociadores"
  *         ubicacion: "San Borja, Lima"
+ *         productoenvio: "Entrega en almacén central del cliente"
  *         servicio_principal:
  *           ID_Servicio: 1
  *           Principal: true
  *           indicaciones: "Servicio principal del proyecto"
  *           fecha_inicio_servicio: "2026-06-10"
+ *           fecha_fin_servicio: "2026-06-20"
  *           horario_servicio: "08:00 - 17:00"
  *         servicios_secundarios:
  *           - ID_Servicio: 8
@@ -78,6 +130,14 @@ const c = require('../controllers/solicitud.controller');
  *             Principal: false
  *             id_subservicio: 2
  *             ubicacion_etapa: { id: 2, nombre: "fase de instalacion", orden: 2 }
+ *         inventario:
+ *           - ID_Inventario: 1
+ *             cantidad: 20
+ *             intencion: comprar
+ *           - ID_Inventario: 24
+ *             cantidad: 1
+ *             intencion: alquilar
+ *             dias_alquilados: 10
  *     SolicitudActividadFlujo:
  *       type: object
  *       properties:
@@ -125,6 +185,10 @@ const c = require('../controllers/solicitud.controller');
  *           type: array
  *           items:
  *             $ref: '#/components/schemas/SolicitudServicioResponse'
+ *         inventario:
+ *           type: array
+ *           items:
+ *             $ref: '#/components/schemas/SolicitudInventarioResponse'
  */
 
 /**
@@ -162,11 +226,15 @@ const c = require('../controllers/solicitud.controller');
  *         description: Lista de solicitudes con metadatos de paginación
  *   post:
  *     tags: [Solicitud]
- *     summary: Crear una solicitud (opcionalmente con servicios principal y secundarios)
+ *     summary: Crear solicitud (cabecera, servicios e inventario en un solo paso)
  *     description: |
- *       Puede crear solo la cabecera de la solicitud, o incluir servicios en el mismo POST.
- *       Los servicios pueden enviarse como `servicios[]` o como `servicio_principal` + `servicios_secundarios`
- *       (formato alineado con GET /api/servicios/{id}/principal).
+ *       Crea la solicitud en estado `pendiente`. Opcionalmente incluye en el mismo body:
+ *       - **Servicios**: `servicios[]` o `servicio_principal` + `servicios_secundarios`
+ *         (formato alineado con GET /api/servicios/{id}/principal).
+ *       - **Inventario**: `inventario[]` o `productos[]` → filas en SOLICITUD_INVENTARIO.
+ *
+ *       Campos de SOLICITUD_INVENTARIO soportados: `ID_Inventario`, `cantidad`, `intencion`
+ *       (`comprar` | `alquilar`), `dias_alquilados` (obligatorio si intencion es alquilar).
  *     requestBody:
  *       required: true
  *       content:
@@ -175,7 +243,7 @@ const c = require('../controllers/solicitud.controller');
  *             $ref: '#/components/schemas/SolicitudCreateConServicios'
  *     responses:
  *       201:
- *         description: Solicitud creada (incluye `servicios` si se enviaron)
+ *         description: Solicitud creada (incluye servicios e inventario si se enviaron)
  *         content:
  *           application/json:
  *             schema:
@@ -187,6 +255,10 @@ const c = require('../controllers/solicitud.controller');
  *                   type: array
  *                   items:
  *                     $ref: '#/components/schemas/SolicitudServicioResponse'
+ *                 inventario:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/SolicitudInventarioResponse'
  */
 router.get('/', c.getAll);
 router.post('/', c.create);
