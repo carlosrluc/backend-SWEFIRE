@@ -1,0 +1,804 @@
+================================================================================
+SWEFIRE — INFORMACIÓN DE ARQUITECTURA BACKEND PARA FRONTEND / DIAGRAMA
+================================================================================
+
+1. VISIÓN GENERAL Y STACK
+--------------------------------------------------------------------------------
+
+Arquitectura:        MONOLITO — un solo proceso Node.js (REST + WebSocket + job interno)
+Lenguaje/Framework:  Node.js + Express 5
+Base de datos:       MariaDB (driver mysql2/promise)
+Auth:                JWT (jsonwebtoken) + bcrypt
+WebSocket:           Socket.io 4
+Uploads:             Multer (disco local)
+Documentación API:   OpenAPI 3.0 + Swagger UI (swagger-jsdoc + swagger-ui-express)
+
+Servicios desplegados: 1 solo servicio web (swefire-backend en Render).
+                       No hay microservicios, workers ni colas externas separadas.
+                       En el mismo proceso corre:
+                         - API REST (/api/*)
+                         - Socket.io (chat de cotizaciones)
+                         - Job interno setInterval (retornos automáticos de inventario)
+
+Documentación OpenAPI/Swagger: SÍ
+  - URL prod:  https://swefire.onrender.com/api-docs
+  - URL local: http://localhost:3000/api-docs
+  - Generada desde comentarios @openapi en src/routes/*.js
+  - No hay colección Postman en el repo; Swagger es la fuente de verdad
+
+URLs de referencia:
+  - API prod:  https://swefire.onrender.com/api
+  - API local: http://localhost:3000/api
+
+
+2. INFRAESTRUCTURA Y DESPLIEGUE
+--------------------------------------------------------------------------------
+
+Dónde corre:         Render (render.yaml, plan free, servicio "swefire-backend")
+Base de datos prod:  MariaDB/MySQL externa (variables DB_HOST, DB_USER, DB_PASSWORD,
+                     DB_NAME, DB_PORT=3306, DB_SSL=true)
+
+Entornos:
+  - Dev local:  npm run dev  →  http://localhost:3000
+  - Prod:       Render       →  https://swefire.onrender.com
+  - Staging:    NO definido en el repo
+
+CDN / Nginx / Load Balancer: NO configurados en el proyecto.
+                             Render actúa como reverse proxy implícito.
+
+Frontend vs Backend:
+  - Dominios DISTINTOS (frontend React separado, backend en swefire.onrender.com)
+  - CORS habilitado con origin: '*' (cualquier origen permitido)
+
+Variables de entorno relevantes:
+  PORT, NODE_ENV, JWT_SECRET, DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT,
+  DB_SSL, RENDER_EXTERNAL_URL, INVENTARIO_JOB_INTERVAL_MS (default 60000 ms)
+
+
+3. BASE DE DATOS Y PERSISTENCIA
+--------------------------------------------------------------------------------
+
+Motor:               MariaDB (una sola base: swefire_db)
+Esquema:             schema.sql (relacional, muchas tablas)
+¿Varias BDs?:        NO — una sola BD por dominio lógico
+Caché (Redis):       NO
+Almacenamiento:      DISCO LOCAL (carpeta uploads/), servido por express.static
+                     NO usa S3, Cloudinary ni almacenamiento externo
+
+Carpetas de uploads:
+  uploads/servicios/      → Fotos de catálogo de servicios
+  uploads/pdfs/           → CV, brevetes, certificaciones, camiones, RRHH
+  uploads/images/         → Fotos de perfil
+  uploads/cotizaciones/   → Órdenes de compra (PDF)
+  uploads/informes/       → Evidencia de informes de proyecto
+  uploads/pruebas_gastos/ → Comprobantes de gasto real (presupuesto)
+
+La BD guarda URLs relativas (ej: /uploads/pdfs/doc_123.pdf).
+Se sirven públicamente en:
+  GET /uploads/*
+  GET /api/uploads/servicios/*
+  GET /api/servicios/:id/foto
+  GET /api/servicios/:id/principal
+
+NOTA: En Render (plan free) el filesystem es EFÍMERO; uploads pueden perderse al redeploy.
+
+
+4. AUTENTICACIÓN Y AUTORIZACIÓN
+--------------------------------------------------------------------------------
+
+Emisión del JWT:
+  Endpoint:  POST /api/usuarios/login
+  Body:      { "correo": "...", "contrasena": "..." }
+             (también acepta username / password como alias)
+  Respuesta: {
+               "message": "Login exitoso",
+               "token": "eyJ...",
+               "access_token": "eyJ...",   ← mismo valor que token
+               "user": { idusuario, dni_perfil, rol, correo },
+               "nombre": "...",
+               "apellidos": "...",
+               "nuevo": "si" | "no"
+             }
+
+Payload del JWT:  { idusuario, dni_perfil, rol, correo }
+Expiración:       24 horas (expiresIn: '24h')
+Refresh token:    NO — solo access token
+Secret:           process.env.JWT_SECRET (fallback: 'secret_key_swefire')
+
+Uso en REST:
+  Header: Authorization: Bearer <token>
+
+Uso en Socket.io:
+  Mismo JWT en socket.handshake.auth.token al conectar
+
+Rutas PÚBLICAS (sin Bearer):
+  POST /api/usuarios/login
+  POST /api/usuarios
+  POST /api/usuarios/con-perfil
+  GET  /api/servicios/publicos
+  GET  /api/servicios/:id/foto
+  GET  /api/servicios/:id/principal
+  GET  /api/uploads/servicios/*
+  GET  /api/health
+  GET  /api/db-health
+
+Roles del sistema (campo USUARIO.rol, texto libre):
+  Se normalizan a minúsculas sin acentos ni espacios (rolNormalizado).
+  Ejemplo BD: "Gerente de Proyectos" → rolNormalizado: "gerentedeproyectos"
+
+Roles usados en permit() del código:
+  cliente, abogado, trabajtaller, gerente, adminproy, asistproy,
+  supervisorcampo, trabajcampo
+
+Superadmins declarados: gerente, adminproy (acceso total cuando permit() esté activo)
+
+IMPORTANTE — Autorización por rol:
+  El middleware permit() está DESHABILITADO (bypass temporal).
+  Actualmente solo se exige JWT válido en la mayoría de rutas.
+  La lógica de roles está declarada en cotizaciones/incidencias/proyectos
+  pero NO se aplica en runtime.
+
+
+5. SOCKET.IO — CHAT DE COTIZACIONES
+--------------------------------------------------------------------------------
+
+Conexión:
+  const socket = io('https://swefire.onrender.com', {
+    auth: { token: '<JWT>' }
+  });
+
+Eventos cliente → servidor:
+  join_room(cotizacionId)
+    - Une al socket a la sala con id = cotizacionId
+    - Si rol es cliente, valida que la cotización le pertenezca
+
+  send_message({ id_cotizacion, mensaje })
+    - Persiste en tabla COTIZACION_CHAT_MENSAJE
+    - Emite receive_message a todos en la sala
+
+Eventos servidor → cliente:
+  receive_message  → mensaje nuevo { id_mensaje, id_cotizacion, id_remitente,
+                                      id_cliente, tipo_remitente, nombre_remitente,
+                                      mensaje, fecha_hora }
+  error            → error de permisos o validación
+
+REST alternativo al chat (mismo dominio de cotizaciones):
+  GET  /api/cotizaciones/:id/chat   → historial
+  POST /api/cotizaciones/:id/chat   → enviar mensaje por HTTP
+
+
+6. API REST — CONTRATOS POR DOMINIO
+--------------------------------------------------------------------------------
+
+Prefijo base: /api
+Paginación común: ?page=1&limit=10
+Mayoría de rutas requieren: Authorization: Bearer <token>
+
+
+--- HEALTH / SISTEMA ---
+GET  /api/health      → { status, database, timestamp }
+GET  /api/db-health   → ping BD
+
+
+--- USUARIOS (/api/usuarios) ---
+POST   /login                    [PÚBLICO] emite JWT
+POST   /                         [PÚBLICO] crear usuario
+POST   /con-perfil               [PÚBLICO] crear perfil + usuario
+GET    /                         listar (paginado)
+GET    /:id                      obtener por id
+PUT    /:id                      actualizar
+DELETE /:id                      eliminar
+GET    /temp-pass/:correo        contraseña plana (solo dev, eliminar en prod)
+
+
+--- PERFILES (/api/perfiles) ---
+GET    /                                    listar
+POST   /                                    crear
+GET    /:dni                                obtener
+PUT    /:dni                                actualizar
+DELETE /:dni                                eliminar
+GET    /trabajadores/disponibles
+GET    /disponibles
+GET    /conductores/disponibles
+GET    /personal
+GET    /personal/:id
+POST   /personal/:id
+PUT    /personal/:id
+GET    /:dni/cv
+POST   /:dni/cv                             (multipart: cv PDF)
+GET    /:dni/foto
+POST   /:dni/foto                           (multipart: foto_perfil)
+GET    /:dni/educacion
+POST   /:dni/educacion
+PUT    /:dni/educacion/:id
+DELETE /:dni/educacion/:id
+GET    /:dni/brevetes
+POST   /:dni/brevetes
+GET    /:dni/brevetes/:id/pdf
+POST   /:dni/brevetes/:id/pdf               (multipart: pdf_brevete)
+PUT    /:dni/brevetes/:id
+DELETE /:dni/brevetes/:id
+GET    /:dni/certificaciones
+POST   /:dni/certificaciones
+GET    /:dni/certificaciones/:id/pdf
+POST   /:dni/certificaciones/:id/pdf        (multipart: pdf_certificacion)
+PUT    /:dni/certificaciones/:id
+DELETE /:dni/certificaciones/:id
+GET    /:dni/solicitudes
+GET    /:dni/cotizaciones
+GET    /:dni/proyectos
+GET    /:dni/incidencias
+GET    /:dni/trabajos_jornada
+GET    /:dni/trabajos_rrhh
+GET    /:dni/involucrado
+GET    /:dni/credenciales_rrhh
+GET    /:dni/empresas_contacto
+
+
+--- CLIENTES (/api/clientes) ---
+GET    /
+POST   /
+GET    /:id
+PUT    /:id
+DELETE /:id
+GET    /:id/contactos
+POST   /:id/contactos
+PUT    /:id/contactos/:cid
+DELETE /:id/contactos/:cid
+GET    /:id/telefonos-movil
+POST   /:id/telefonos-movil
+DELETE /:id/telefonos-movil/:cid
+GET    /:id/correos
+POST   /:id/correos
+DELETE /:id/correos/:cid
+GET    /:id/telefonos-fijo
+POST   /:id/telefonos-fijo
+DELETE /:id/telefonos-fijo/:cid
+GET    /:id/solicitudes
+GET    /:id/cotizaciones
+GET    /:id/proyectos
+GET    /:id/incidencias
+
+
+--- FABRICANTES (/api/fabricantes) ---
+GET    /
+POST   /
+GET    /:id
+PUT    /:id
+DELETE /:id
+GET    /:id/contactos
+POST   /:id/contactos
+PUT    /:id/contactos/:cid
+DELETE /:id/contactos/:cid
+
+
+--- INVENTARIO (/api/inventario) ---
+GET    /
+POST   /
+GET    /:id
+PUT    /:id
+DELETE /:id
+GET    /:id/ubicaciones
+GET    /:id/movimientos
+GET    /:id/usos
+POST   /:id/usos
+DELETE /:id/usos/:uid
+
+
+--- CAMIONES (/api/camiones) ---
+GET    /
+POST   /
+GET    /:placa
+PUT    /:placa
+DELETE /:placa
+GET    /:placa/revision-tecnica
+POST   /:placa/revision-tecnica          (multipart: revision_tecnica PDF)
+GET    /:placa/tarjeta-propiedad
+POST   /:placa/tarjeta-propiedad         (multipart: tarjeta_propiedad PDF)
+GET    /:placa/mantenimientos
+POST   /:placa/mantenimientos
+GET    /:placa/mantenimientos/:mid/pdf
+POST   /:placa/mantenimientos/:mid/pdf   (multipart: pdf_mantenimiento)
+DELETE /:placa/mantenimientos/:mid
+GET    /:placa/inventario
+POST   /:placa/inventario
+PUT    /:placa/inventario/:iid
+DELETE /:placa/inventario/:iid
+
+
+--- SERVICIOS — CATÁLOGO (/api/servicios) ---
+GET    /
+POST   /
+GET    /publicos                           [PÚBLICO]
+GET    /incidencia/catalogo
+GET    /:id
+PUT    /:id
+DELETE /:id
+GET    /:id/principal                      [PÚBLICO]
+GET    /:id/foto                           [PÚBLICO]
+POST   /:id/foto                           (multipart: foto)
+GET    /:id/personal
+POST   /:id/personal
+PUT    /:id/personal/:pid
+DELETE /:id/personal/:pid
+GET    /:id/inventario-requerido
+POST   /:id/inventario-requerido
+GET    /:id/inventario-requerido/:idObjeto
+PUT    /:id/inventario-requerido/:idObjeto
+DELETE /:id/inventario-requerido/:idObjeto
+GET    /:id/etapas
+POST   /:id/etapas
+PUT    /:id/etapas/:eid
+DELETE /:id/etapas/:eid
+GET    /:id/etapas/:eid/actividades
+POST   /:id/etapas/:eid/actividades
+PUT    /:id/etapas/:eid/actividades/:aid
+DELETE /:id/etapas/:eid/actividades/:aid
+GET    /:id/subservicios
+POST   /:id/subservicios
+PUT    /:id/subservicios/:sid
+DELETE /:id/subservicios/:sid
+
+
+--- SOLICITUDES (/api/solicitudes) ---
+GET    /
+POST   /
+GET    /estado/:estado
+GET    /:id
+PUT    /:id
+DELETE /:id
+GET    /:id/medios
+POST   /:id/medios
+PUT    /:id/medios/:mid
+DELETE /:id/medios/:mid
+GET    /:id/servicios
+POST   /:id/servicios
+PUT    /:id/servicios/:sid
+DELETE /:id/servicios/:sid
+GET    /:id/inventario
+POST   /:id/inventario
+PUT    /:id/inventario/:iid
+DELETE /:id/inventario/:iid
+GET    /:id/camiones
+POST   /:id/camiones
+PUT    /:id/camiones/:cid
+DELETE /:id/camiones/:cid
+
+
+--- COTIZACIONES (/api/cotizaciones) — núcleo + chat ---
+GET    /                                   filtros: ?estado, ?aprobado, ?cotizacion_de_incidencia, ?nombre
+POST   /
+PUT    /:id/aprobar-interna
+PUT    /:id/pagar-incidencia
+GET    /:id/cotizacion-original
+GET    /:id
+PUT    /:id
+DELETE /:id
+PUT    /:id/aprobar
+GET    /:id/detalles
+GET    /:id/detalles-franco
+GET    /:id/servicios
+POST   /:id/servicios
+PUT    /:id/servicios/:sid
+DELETE /:id/servicios/:sid
+GET    /:id/camiones
+POST   /:id/camiones
+PUT    /:id/camiones/:cid
+DELETE /:id/camiones/:cid
+GET    /:id/inventario-por-servicio
+GET    /:id/inventario
+POST   /:id/inventario
+PUT    /:id/inventario/:iid
+DELETE /:id/inventario/:iid
+GET    /:id/personal
+POST   /:id/personal
+PUT    /:id/personal/:pid
+DELETE /:id/personal/:pid
+GET    /:id/chat                           historial chat (REST)
+POST   /:id/chat                           enviar mensaje (REST)
+GET    /:id/orden-compra
+POST   /:id/orden-compra                   (multipart: orden_compra PDF)
+PUT    /:id/orden-compra/rechazar
+GET    /:id/plazos-pago
+PUT    /:id/plazos-pago
+
+
+--- PRESUPUESTOS (/api/presupuestos) ---
+GET    /cotizacion/:id
+GET    /cotizacion/:id/real
+POST   /cotizacion/:id
+POST   /cotizacion/:id/faltantes-inventario/exportar
+GET    /cotizacion/:id/totales
+PUT    /item/:idItem
+DELETE /item/:idItem
+PUT    /item/:idItem/gasto-real            (multipart: prueba)
+
+
+--- PROYECTOS (/api/proyectos) ---
+GET    /
+POST   /
+GET    /activos-completados
+GET    /:id
+GET    /:id/proyecto_todo
+PUT    /:id
+DELETE /:id
+GET    /:id/camiones
+POST   /:id/camiones
+PUT    /:id/camiones/:cid
+DELETE /:id/camiones/:cid
+GET    /:id/documentacion
+POST   /:id/documentacion
+DELETE /:id/documentacion/:did
+GET    /:id/inventario-por-servicio
+POST   /:id/inventario-por-servicio/exportar
+GET    /:id/inventario
+POST   /:id/inventario
+GET    /:id/inventario/:iid
+PUT    /:id/inventario/:iid
+GET    /:id/informe-etapas
+GET    /:id/incidencias/resumen-gastos
+GET    /:id/informes
+POST   /:id/informes
+GET    /:id/informes/:iid
+PUT    /:id/informes/:iid
+DELETE /:id/informes/:iid
+GET    /:id/informes/:iid/evidencia
+POST   /:id/informes/:iid/evidencia        (multipart: evidencia imagen)
+
+
+--- TRABAJOS (/api/trabajos) ---
+GET    /
+POST   /
+GET    /proyecto/:proyectoId
+GET    /:id
+PUT    /:id
+DELETE /:id
+GET    /:id/rrhh
+POST   /:id/rrhh
+DELETE /:id/rrhh/:rid
+GET    /:id/rrhh/:rid/pdf
+POST   /:id/rrhh/:rid/pdf                  (multipart: pdf_RRHH)
+
+
+--- INCIDENCIAS (/api/incidencias) ---
+GET    /
+POST   /
+GET    /proyecto/:id_proyecto
+GET    /:id
+PUT    /:id
+DELETE /:id
+GET    /:id/objetos
+POST   /:id/objetos
+DELETE /:id/objetos/:oid
+GET    /:id/involucrados
+POST   /:id/involucrados
+DELETE /:id/involucrados/:ivid
+GET    /:id/cotizaciones/destinatarios
+GET    /:id/cotizaciones
+POST   /:id/cotizaciones
+
+
+7. FLUJO CHATBOT — RESUMEN RÁPIDO
+--------------------------------------------------------------------------------
+
+1. Login:    POST https://swefire.onrender.com/api/usuarios/login
+2. Guardar:  token (24h) en localStorage / context
+3. REST:     Authorization: Bearer <token> en todas las peticiones
+4. Socket:   io(url, { auth: { token } })
+5. Chat:     join_room(cotizacionId) → send_message({ id_cotizacion, mensaje })
+             escuchar receive_message
+6. Alt REST: GET/POST /api/cotizaciones/:id/chat
+7. Docs:     https://swefire.onrender.com/api-docs
+
+
+8. ENDPOINTS PÚBLICOS vs EXTRANET (CLIENTE) vs INTERNOS (STAFF)
+--------------------------------------------------------------------------------
+
+NOTA IMPORTANTE SOBRE SEGURIDAD ACTUAL:
+  - El middleware permit() por rol está DESHABILITADO (bypass).
+  - Cualquier usuario autenticado puede llamar técnicamente casi cualquier ruta.
+  - La separación real hoy viene de:
+      a) Rutas públicas explícitas (sin JWT)
+      b) Filtros en controladores cuando rolNormalizado === 'cliente'
+      c) Validaciones de negocio en servicios (aprobarInterna, orden de compra, etc.)
+
+A) RUTAS PÚBLICAS (sin JWT — acceso anónimo)
+  POST /api/usuarios/login
+  POST /api/usuarios
+  POST /api/usuarios/con-perfil
+  GET  /api/servicios/publicos
+  GET  /api/servicios/:id/foto
+  GET  /api/servicios/:id/principal
+  GET  /api/uploads/servicios/*
+  GET  /api/health
+  GET  /api/db-health
+  GET  /uploads/*  (archivos estáticos)
+
+B) EXTRANET — USO PREVISTO PARA CLIENTE (rol cliente)
+  Requiere JWT. El backend filtra datos al cliente según su DNI y empresas
+  vinculadas en CLIENTE_CONTACTO.
+
+  Lectura / consulta propia:
+    GET  /api/solicitudes              → solo solicitudes de sus clientes
+    GET  /api/solicitudes/estado/:estado
+    GET  /api/solicitudes/:id
+    GET  /api/cotizaciones               → solo sus cotizaciones + forzado aprobado=YES
+    GET  /api/cotizaciones/:id           → solo si aprobado=YES y le pertenece
+    GET  /api/cotizaciones/:id/detalles
+    GET  /api/cotizaciones/:id/detalles-franco
+    GET  /api/cotizaciones/:id/servicios|camiones|inventario|personal
+    GET  /api/cotizaciones/:id/orden-compra
+    GET  /api/cotizaciones/:id/plazos-pago
+    GET  /api/cotizaciones/:id/chat
+    GET  /api/clientes/:id/solicitudes|cotizaciones|proyectos|incidencias
+      (si conoce su DNI/RUC de cliente)
+    GET  /api/proyectos, /api/proyectos/:id  → hoy sin filtro por cliente en backend
+    GET  /api/incidencias                    → hoy sin filtro por cliente en backend
+
+  Escritura / acciones del cliente:
+    POST /api/solicitudes                  → crear solicitud de servicio
+    PUT  /api/solicitudes/:id              → actualizar su solicitud
+    PUT  /api/cotizaciones/:id             → actualizar (ej. comentario_cliente)
+    POST /api/cotizaciones/:id/orden-compra  → subir PDF orden de compra
+      (requiere cotización aprobada internamente; reglas distintas si es incidencia)
+    POST /api/cotizaciones/:id/chat        → enviar mensaje
+    Socket: join_room + send_message       → solo salas de cotizaciones propias
+
+  Catálogo previo al login:
+    GET /api/servicios/publicos
+    GET /api/servicios/:id/principal
+
+C) INTERNOS — OPERACIONES DE STAFF (intranet / backoffice)
+  Diseñadas para roles: gerente, adminproy, abogado, trabajtaller, asistproy,
+  supervisorcampo, trabajcampo. Hoy accesibles con cualquier JWT válido salvo
+  donde el servicio valida el rol explícitamente.
+
+  Gestión maestra / RRHH / flota / catálogo:
+    CRUD completo: /api/perfiles, /api/usuarios, /api/inventario, /api/camiones,
+                   /api/servicios, /api/fabricantes, /api/clientes
+    Uploads documentales: CV, brevetes, certificaciones, mantenimientos camión, RRHH
+
+  Flujo comercial interno:
+    POST /api/cotizaciones                   → crear cotización desde solicitud
+    PUT  /api/cotizaciones/:id/aprobar-interna  → aprobación gerente/abogado
+    PUT  /api/cotizaciones/:id/aprobar       → crear PROYECTO desde cotización + OC
+    PUT  /api/cotizaciones/:id/pagar-incidencia  → marcar incidencia pagada
+    PUT  /api/cotizaciones/:id/orden-compra/rechazar
+    PUT  /api/cotizaciones/:id/plazos-pago
+    GET  /api/cotizaciones/:id/cotizacion-original  → solo abogado (incidencias)
+    Todo /api/presupuestos/*                 → presupuesto y gastos reales (staff)
+
+  Proyectos y ejecución en campo:
+    POST/PUT/DELETE /api/proyectos/*
+    POST /api/proyectos/:id/inventario*
+    POST /api/proyectos/:id/inventario-por-servicio/exportar
+    POST /api/proyectos/:id/informes*
+    GET  /api/proyectos/:id/informe-etapas
+    GET  /api/proyectos/:id/incidencias/resumen-gastos
+    CRUD /api/trabajos/*
+
+  Incidencias:
+    POST /api/incidencias
+    POST /api/incidencias/:id/cotizaciones   → cotización de reparación
+    GET  /api/incidencias/:id/cotizaciones/destinatarios
+    CRUD objetos e involucrados
+
+  Dev / temporal (eliminar en prod):
+    GET /api/usuarios/temp-pass/:correo
+
+
+9. WEBHOOKS E INTEGRACIONES EXTERNAS (ENTRANTES/SALIENTES)
+--------------------------------------------------------------------------------
+
+Webhooks entrantes:     NO implementados (no hay endpoints /webhooks/*)
+Webhooks salientes:     NO (el backend no notifica a sistemas externos)
+Integraciones HTTP:     NO hay llamadas fetch/axios a APIs de terceros en src/
+Pagos online:           NO (Stripe, PayPal, etc. no existen)
+Email transaccional:    NO (SendGrid, SMTP, Nodemailer no existen)
+
+El backend es autocontenido: solo habla con MariaDB y sirve archivos locales.
+Cualquier notificación al cliente (email, WhatsApp, etc.) debería hacerse desde
+el frontend u otro servicio futuro; hoy no está en este repo.
+
+
+10. SEGURIDAD — CORS, RATE LIMITING, POLÍTICAS
+--------------------------------------------------------------------------------
+
+CORS:
+  - Express: app.use(cors()) → permite TODOS los orígenes (*)
+  - Socket.io: { cors: { origin: '*' } }
+  - No hay whitelist de dominios del frontend
+
+Rate limiting:
+  - NO implementado (no express-rate-limit ni equivalente)
+
+Headers de seguridad:
+  - NO helmet ni CSP configurados
+
+Autenticación:
+  - JWT Bearer en header Authorization
+  - Secret: JWT_SECRET (env; fallback inseguro 'secret_key_swefire' en dev)
+  - Expiración: 24h, sin refresh token
+  - Contraseñas: bcrypt (salt 10 al crear, 12 al actualizar)
+  - Endpoint inseguro dev: GET /api/usuarios/temp-pass/:correo expone contraseña plana
+
+Autorización por rol:
+  - auth.middleware.js valida JWT en /api/*
+  - role.middleware.js permit() existe pero hace bypass (return next() siempre)
+  - Reglas reales parciales en controladores/servicios:
+      · Filtro de datos para cliente en solicitudes/cotizaciones/chat
+      · aprobarCotizacionInterna valida rol abogado/gerente
+      · uploadOrdenCompra / rechazarOrdenCompra validan rol y estado
+      · join_room en socket valida propiedad para clientes
+
+Uploads:
+  - Límites Multer: PDF 5–10 MB, imágenes 5 MB
+  - Filtro MIME: solo PDF en docs; JPEG/PNG/WEBP/GIF en imágenes
+  - Archivos servidos públicamente bajo /uploads (sin auth)
+
+Logging / monitoreo:
+  - Solo console.log / console.error en servidor
+  - NO Sentry, Datadog, Winston estructurado ni APM
+
+
+11. WEBSOCKETS (SOCKET.IO) — DETALLE
+--------------------------------------------------------------------------------
+
+¿Mismo proceso que REST?
+  SÍ. Un solo server HTTP (server.js) monta Express + Socket.io en el mismo puerto.
+  io se registra en app.set('socketio', io) para que REST también emita eventos
+  (ej. POST /cotizaciones/:id/chat emite receive_message).
+
+URL conexión:
+  Prod:  wss://swefire.onrender.com  (mismo host que API, sin path /api)
+  Local: http://localhost:3000
+
+Autenticación conexión:
+  io.use() verifica JWT en socket.handshake.auth.token
+  Mismo JWT_SECRET que REST
+  Si falla → Error 'Authentication error: Invalid token'
+
+EVENTOS IMPLEMENTADOS (todos en src/sockets/chat.socket.js):
+
+  Cliente → Servidor:
+    join_room(cotizacionId)
+      Une socket a sala room = String(cotizacionId)
+      Cliente: valida que la cotización le pertenezca (CLIENTE_CONTACTO + SOLICITUD)
+      Staff: entra sin validación extra de propiedad
+
+    send_message({ id_cotizacion, mensaje })
+      Persiste en COTIZACION_CHAT_MENSAJE
+      Emite receive_message a io.to(id_cotizacion)
+
+  Servidor → Cliente:
+    receive_message(payload)
+      payload: { id_mensaje, id_cotizacion, id_remitente, id_cliente,
+                  tipo_remitente, nombre_remitente, mensaje, fecha_hora }
+
+    error(mensajeString)
+      Permisos denegados, cotización no encontrada, error interno
+
+  Sistema (Socket.io built-in):
+    connect / disconnect
+      disconnect se registra en log; no emite evento custom al cliente
+
+  NO existen otros eventos custom en el backend:
+    No hay typing, read receipts, presencia, notificaciones globales, etc.
+
+SALAS:
+  Solo por COTIZACIÓN (room id = id numérico de COTIZACION_COMERCIAL)
+  NO hay salas por proyecto, usuario, incidencia ni sala global
+
+Alcance del chat:
+  Exclusivo al dominio de cotizaciones comerciales.
+  Un chatbot de cotización debe usar join_room(cotizacionId) + send_message.
+
+
+12. SERVICIOS EXTERNOS E INTEGRACIONES
+--------------------------------------------------------------------------------
+
+Email (SendGrid, SMTP):           NO
+Pagos (Stripe, transferencias):   NO — flujo manual vía orden de compra PDF
+                                   y plazos de pago en BD (sin pasarela)
+Generación PDF server-side:       NO — no hay puppeteer, pdfkit ni jspdf en backend
+                                   Los PDFs se SUBEN (Multer) o se referencian por URL:
+                                     · Orden de compra (cliente/staff sube PDF)
+                                     · CV, brevetes, certificaciones, camiones, RRHH
+                                   La generación de cotización/informe PDF es responsabilidad
+                                   del FRONTEND (client-side) si se necesita imprimir
+APIs terceros (mapas, tipo cambio): NO integradas en backend
+                                   Tasa_Cambio en cotización se envía en el body (manual)
+Monitoreo (Sentry, Datadog):      NO
+Colas / workers externos:         NO — job inventario corre in-process (setInterval)
+
+Job interno (no es servicio externo):
+  processProyectoInventarioRetornos cada INVENTARIO_JOB_INTERVAL_MS (default 60s)
+  Procesa retornos automáticos de inventario en proyectos completados
+
+
+13. FLUJOS DE NEGOCIO CRÍTICOS (3–5 PASOS)
+--------------------------------------------------------------------------------
+
+--- FLUJO A: Cotización → Presupuesto → Orden de compra → Proyecto ---
+
+  1. SOLICITUD DEL CLIENTE
+     Cliente crea POST /api/solicitudes con servicios, inventario y camiones deseados.
+     Backend arma flujo desde catálogo (servicio principal + secundarios + etapas).
+
+  2. COTIZACIÓN + PRESUPUESTO (STAFF)
+     Staff crea POST /api/cotizaciones ligada a id_solicitud.
+     Se cargan servicios/inventario/camiones/personal desde la solicitud.
+     Staff arma presupuesto vía POST /api/presupuestos/cotizacion/:id (items, totales).
+     Estado inicial: aprobado=NO, estado=No aprobado (salvo gerente cree directo).
+
+  3. APROBACIÓN INTERNA
+     Gerente ejecuta PUT /api/cotizaciones/:id/aprobar-interna.
+     Resultado: aprobado=YES, estado=Pendiente.
+     Cliente ya puede ver la cotización (GET filtrado por aprobado=YES).
+
+  4. ORDEN DE COMPRA (CLIENTE)
+     Cliente sube PDF POST /api/cotizaciones/:id/orden-compra (campo: orden_compra).
+     Staff puede rechazar PUT /api/cotizaciones/:id/orden-compra/rechazar { motivo }.
+     Opcional: PUT /api/cotizaciones/:id/plazos-pago (cuotas de pago).
+
+  5. APROBACIÓN FINAL → PROYECTO
+     Staff ejecuta PUT /api/cotizaciones/:id/aprobar.
+     Requisitos: aprobado=YES, Orden_compra adjunta, estado=Pendiente.
+     Backend crea PROYECTO heredando inventario, servicios, camiones, etapas y TRABAJO.
+     Cotización pasa a estado=aprobado.
+
+
+--- FLUJO B: Solicitud cliente → Proyecto → Asignación de recursos ---
+
+  1. Cliente registra solicitud (POST /api/solicitudes) eligiendo servicios del catálogo
+     público (/api/servicios/publicos) y detallando necesidades.
+
+  2. Staff convierte solicitud en cotización (POST /api/cotizaciones) y completa
+     presupuesto, personal, camiones e inventario en cotización.
+
+  3. Tras aprobación interna + orden de compra, PUT /aprobar genera el PROYECTO
+     con PROYECTO_INVENTARIO, PROYECTO_SERVICIO, PROYECTO_CAMION y TRABAJO.
+
+  4. En ejecución, staff gestiona recursos en proyecto:
+     POST /api/proyectos/:id/inventario (asignación salida/retorno)
+     POST /api/proyectos/:id/camiones
+     POST /api/proyectos/:id/informes (+ evidencia fotográfica)
+     Job automático procesa retornos de inventario al completar fechas/proyecto.
+
+  5. Seguimiento: GET /api/proyectos/:id/proyecto_todo, informe-etapas,
+     incidencias/resumen-gastos; trabajos vía /api/trabajos/proyecto/:id.
+
+
+--- FLUJO C: Incidencia → Cotización de reparación ---
+
+  1. REGISTRO DE INCIDENCIA
+     Staff crea POST /api/incidencias sobre un proyecto existente
+     (objetos dañados, involucrados, descripción).
+
+  2. COTIZACIÓN DE INCIDENCIA
+     Staff crea POST /api/incidencias/:id/cotizaciones
+     (NO usar POST /api/cotizaciones directo con Id_incidencia).
+     Solo servicios marcados servicio_de_incidencia=YES en catálogo.
+     Aprobación dual requerida: abogado + gerente.
+
+  3. APROBACIÓN INTERNA (doble firma)
+     PUT /api/cotizaciones/:id/aprobar-interna
+     Abogado y gerente aprueban por separado (aprobado_por_abogado / aprobado_por_gerente).
+     Cuando ambos=YES → aprobado=YES, estado=Pendiente.
+
+  4. PAGO / OC
+     PUT /api/cotizaciones/:id/pagar-incidencia → estado=Incidencia Pagada.
+     Cliente o staff sube orden de compra POST /api/cotizaciones/:id/orden-compra.
+
+  5. CIERRE
+     PUT /api/cotizaciones/:id/aprobar crea proyecto de reparación (mismo mecanismo)
+     o continúa flujo presupuestal con GET /api/cotizaciones/:id/cotizacion-original
+     para comparar contra cotización del proyecto padre.
+
+
+Estados de cotización (referencia):
+  Pendiente | No aprobado | aprobado | rechazado por cliente | descartada | Incidencia Pagada
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================
